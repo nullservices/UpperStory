@@ -1,63 +1,70 @@
-# Upper Story — A Vertical World
+# Upper Story
 
-A browser-based tower simulation inspired by **SimTower** (Maxis 1994, by Yoot Saito / OPeNBooK — aka *The Tower* / *Yoot Tower*).
+A tower-building game inspired by SimTower. Build offices, homes, hotels, and shops, then keep the people inside moving, working, and coming back.
 
-- **Stack**: TypeScript + Vite + PixiJS. The simulation core (`src/sim/**`) is pure,
-  deterministic TypeScript (seeded RNG, tick-based time) with no DOM or rendering
-  imports — fully unit-tested with Vitest.
-- **Reference**: the official [YootTower](https://github.com/YootTowerManagement/YootTower)
-  code-drop documentation (cloned locally at `reference/YootTower`, git-ignored) and
-  reverse-engineering notes on the original `.TDT` save format.
-- **Art**: procedural rooms with furniture silhouettes and a city backdrop; pixel art can swap in later
-  behind the render layer's visual-model seam. Original assets are off-limits.
+**[Play in your browser](https://nullservices.github.io/UpperStory/)** · **[Try the demo tower](https://nullservices.github.io/UpperStory/?demo=1)**
 
-## Development
+## Build your tower
+
+Start with a lobby and a budget. Add floors, connect them with elevators, and move in your first tenants. Offices bring the morning commute; restaurants draw lunchtime crowds; homes and hotels keep the building occupied after hours.
+
+As the tower grows, so do its demands. Long elevator queues frustrate tenants. Hotels need housekeeping. New facilities unlock as your population and star rating increase.
+
+Use the tower report to track vacancies, construction, lift queues, and finances. Click a room or elevator to inspect it and manage its settings.
+
+## Getting started
+
+1. Select **Floor** and click above the lobby to build an upper floor.
+2. Select **Elevator** and drag from the lobby to the new floor. Leave two cells clear for the shaft.
+3. Place an **Office** or **Condo** upstairs and let construction finish. The time controls can speed things up.
+4. Watch your tenants arrive, then expand as your budget allows.
+
+The demo starts with an occupied tower if you'd rather explore before building.
+
+## Controls
+
+Designed for a desktop browser with a mouse and keyboard.
+
+| Control | Action |
+| --- | --- |
+| Left click | Place the selected facility or inspect a room |
+| Right drag | Pan the view |
+| Mouse wheel | Zoom in or out |
+| `I` | Inspect |
+| `F` | Build a floor |
+| `E` | Build an elevator |
+| `O` | Build an office |
+| `C` | Build a condo |
+| `Space` | Pause or resume |
+| `Home` | Center the tower |
+| `Escape` | Close a window or return to inspection |
+
+## Saving
+
+Open **Game → Save tower** to save your progress. Saves are stored in the browser you're playing in; they don't sync between devices. Clearing site data removes them.
+
+## Run locally
+
+Use Node.js 22 or later.
 
 ```sh
-npm install
-npm run dev      # Vite dev server at http://localhost:5173  (?demo=1 for the demo tower)
-npm test         # Vitest unit tests (sim core, node environment)
-npm run smoke    # headless multi-day simulation run with invariants
-npm run perf     # 100-floor / ~2k-people sim performance check
-npm run lint     # ESLint incl. the sim-purity boundary rules
+npm ci
+npm run dev
 ```
 
-## Hosting
+Open [localhost:5173](http://localhost:5173/). Add `?demo=1` to start with the demo tower.
 
-GitHub Actions builds, tests, and publishes `main` to GitHub Pages using
-`.github/workflows/pages.yml`. The repository's Pages source must be **GitHub Actions**.
-The deployment sets `VITE_BASE_PATH=/UpperStory/`; local development keeps `/`.
-The public URL is `https://nullservices.github.io/UpperStory/` once Pages is enabled
-and the first deployment succeeds. Add `?demo=1` for the populated demonstration tower.
+| Command | Purpose |
+| --- | --- |
+| `npm run build` | Type-check and create a production build in `dist/` |
+| `npm run preview` | Serve the production build locally |
+| `npm test` | Run the test suite |
+| `npm run lint` | Check code style and module boundaries |
+| `npm run smoke` | Run a headless simulation check |
+| `npm run perf` | Run the large-tower performance check |
 
-## Gameplay
+Built with TypeScript, PixiJS, and Vite. The simulation lives in `src/sim`, rendering in `src/render`, and interface code in `src/ui`.
 
-Build and run a tower: lobby, offices, condos, hotels, restaurants, fast food,
-shops, security, housekeeping — elevators (standard/service/express),
-escalators, stairs, sky lobbies. People commute on schedules, lunch crowds
-flood in, hotel guests check in and out, staff patrol and clean, tenants
-grade daily and vacate if conditions are bad. Population gates raise the star
-rating (2★@300, 3★@1,000, 4★@5,000, 5★@10,000), unlocking new facilities.
-Save/load via the in-game menu (localStorage).
+## Deployment
 
-## Upper Story interface
-
-Upper Story uses an original SimTower-inspired visual identity, replacing the dashboard-style UI with
-an original illustrated construction palette and a compact desktop-simulation layout.
-
-- A continuous tower cutaway: glass lobby, furnished offices and homes, shops,
-  restaurants, construction scaffolding, trees, and a soft city skyline.
-- Funds, population, rating, clock, and speed controls remain visible in a compact bar.
-- Construction tools show current floor prices and star unlocks. Inspect is the default tool.
-- Contextual guidance and placement errors appear beside the world and in the status bar.
-- Tower report shows progression, open/vacant facilities, construction, lift queues, and quarterly finances.
-- Room/elevator/game windows pause simulation, trap keyboard focus, and close with Escape.
-- Save/load retains the original localStorage key. Loading and starting over require a second click to discard unsaved progress.
-- People remain visible inside occupied rooms; walking and elevator travel interpolate between simulation ticks. Elevator doors animate and riders stay attached to their cabin.
-- `?demo=1` opens the existing demonstration tower after construction has completed.
-
-Controls: **I** inspect, **F** floor, **E** elevator, **O** office, **C** condo,
-**Space** pause/resume, **Home** recenter, **Escape** return to inspection.
-Right-drag pans; the wheel and on-screen buttons zoom. The palette scrolls in smaller windows.
-
-
+Pushes to `main` run the checks and deploy to GitHub Pages through [the publishing workflow](.github/workflows/pages.yml). The Pages build uses `VITE_BASE_PATH=/UpperStory/`; local builds default to `/`.

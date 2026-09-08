@@ -22,6 +22,14 @@ npm run perf     # 100-floor / ~2k-people sim performance check
 npm run lint     # ESLint incl. the sim-purity boundary rules
 ```
 
+## Hosting
+
+GitHub Actions builds, tests, and publishes `main` to GitHub Pages using
+`.github/workflows/pages.yml`. The repository's Pages source must be **GitHub Actions**.
+The deployment sets `VITE_BASE_PATH=/UpperStory/`; local development keeps `/`.
+The public URL is `https://nullservices.github.io/UpperStory/` once Pages is enabled
+and the first deployment succeeds. Add `?demo=1` for the populated demonstration tower.
+
 ## Gameplay
 
 Build and run a tower: lobby, offices, condos, hotels, restaurants, fast food,

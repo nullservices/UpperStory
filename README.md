@@ -28,6 +28,7 @@ Designed for a desktop browser with a mouse and keyboard.
 | Control | Action |
 | --- | --- |
 | Left click | Place the selected facility or inspect a room |
+| Left drag with a room, stair, or escalator tool | Build a row; each room snaps to its own width |
 | Right drag | Pan the view |
 | Mouse wheel | Zoom in or out |
 | `I` | Inspect |

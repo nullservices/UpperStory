@@ -1,5 +1,6 @@
 import { CONFIG, TENANT_DATA } from '../data/config';
 import { floorCostDollars, topFloorIndex, type GameState } from '../sim';
+import { isRowBuildTool } from '../game/buildStroke';
 import type { Tool } from '../game/controller';
 
 export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string }> = {
@@ -75,7 +76,7 @@ export class ToolPalette {
         const button = document.createElement('button');
         button.innerHTML = `${toolIcon(info.icon)}<span>${tool === 'housekeeping' ? 'Cleaning' : info.label}</span><small></small>`;
         button.setAttribute('aria-label', info.label);
-        button.title = info.hint;
+        button.title = info.hint + (isRowBuildTool(tool) ? ' Hold and drag to build a row.' : '');
         button.onclick = () => { this.setActive(tool); this.onSelect(tool); };
         button.onmouseenter = () => this.describe(tool);
         button.onmouseleave = () => this.describe(this.active);
@@ -107,7 +108,7 @@ export class ToolPalette {
       const locked = required > state.starLevel;
       const cost = data?.costDollars ?? (tool === 'buildFloor' ? floorCostDollars(topFloorIndex(state.tower) + 1) : tool === 'stairs' ? CONFIG.STAIR_COST_DOLLARS : tool.startsWith('escalator') ? CONFIG.ESCALATOR_COST_DOLLARS : null);
       button.disabled = locked;
-      button.title = locked ? `${TOOL_INFO[tool].label} — unlocks at ${required} stars` : TOOL_INFO[tool].hint;
+      button.title = locked ? `${TOOL_INFO[tool].label} — unlocks at ${required} stars` : TOOL_INFO[tool].hint + (isRowBuildTool(tool) ? ' Hold and drag to build a row.' : '');
       button.querySelector('small')!.textContent = locked ? `${required}★` : cost !== null && cost > 0 ? `$${(cost / 1000).toLocaleString()}k` : tool.toLowerCase().includes('elevator') ? '$500/floor' : '';
       button.classList.toggle('unaffordable', cost !== null && cost * 100 > state.money.balanceCents);
       if (locked && this.active === tool) { this.setActive('select'); this.onSelect('select'); }
@@ -115,6 +116,6 @@ export class ToolPalette {
   }
   private describe(tool: Tool | null): void {
     const info = TOOL_INFO[tool ?? 'select'];
-    this.description.innerHTML = `<b>${info.label}</b><p>${info.hint}</p>`;
+    this.description.innerHTML = `<b>${info.label}</b><p>${info.hint}${tool && isRowBuildTool(tool) ? ' Hold and drag to build a row.' : ''}</p>`;
   }
 }

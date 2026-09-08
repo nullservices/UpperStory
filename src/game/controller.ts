@@ -30,6 +30,7 @@ import { ElevatorEditor } from '../ui/dialogs/elevatorEditor';
 import { QuarterReport } from '../ui/dialogs/quarterReport';
 import { TenantInfo } from '../ui/dialogs/tenantInfo';
 import type { Hud } from '../ui/hud';
+import { BuildStroke, isRowBuildTool } from './buildStroke';
 
 /** Player-facing build/demolish tools. Tenant tools share TenantType names. */
 export type Tool =
@@ -81,6 +82,7 @@ export class Controller {
   /** Which dialog (if any) is open — Escape closes it before the tool. */
   private openDialog: 'tenant' | 'elevator' | 'quarter' | null = null;
   private dragStart: ElevatorDrag | null = null;
+  private buildStroke: BuildStroke | null = null;
 
   constructor(
     app: Application,
@@ -101,7 +103,14 @@ export class Controller {
       if (this.openDialog === 'quarter') this.openDialog = null;
     };
     app.stage.on('pointermove', (e: FederatedPointerEvent) => this.onPointerMove(e));
-    app.canvas.addEventListener('pointerleave', () => { if (!this.dragStart) { this.hover = null; this.hoverError = null; } });
+    app.canvas.addEventListener('pointerleave', () => {
+      this.finishBuildStroke();
+      if (!this.dragStart) { this.hover = null; this.hoverError = null; }
+    });
+    const cancel = (): void => { this.finishBuildStroke(); this.dragStart = null; };
+    app.canvas.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', cancel);
+    window.addEventListener('pointerup', (e) => { if (e.button === 0) cancel(); });
     app.stage.on('pointerdown', (e: FederatedPointerEvent) => this.onPointerDown(e));
     const commit = (e: FederatedPointerEvent): void => this.onPointerUp(e);
     app.stage.on('pointerup', commit);
@@ -116,6 +125,7 @@ export class Controller {
 
   /** Palette click / Escape: set the tool and drop any stale hover error. */
   selectTool(tool: Tool | null): void {
+    this.finishBuildStroke();
     this.tool = tool;
     this.hoverError = null;
     this.dragStart = null;
@@ -158,6 +168,7 @@ export class Controller {
           this.hud.toast(event.message);
           break;
         case 'QUARTER_REPORT': {
+          this.finishBuildStroke();
           this.openDialog = 'quarter';
           this.quarterReport.open({
             quarter: event.quarter,
@@ -202,13 +213,21 @@ export class Controller {
     else if (this.openDialog === 'quarter') this.quarterReport.close();
   }
 
-  private onPointerMove(e: FederatedPointerEvent): void {
+  private onPointerMove(e: FederatedPointerEvent, finishing = false): void {
     const world = this.camera.screenToWorld(e.global.x, e.global.y);
     this.hover = {
       floor: floorIndexAtWorldY(world.y),
       cell: cellIndexAtWorldX(world.x),
     };
-    this.hoverError = this.errorFor(this.tool, this.hover);
+    if (this.buildStroke && (finishing || (e.buttons & 1) !== 0)) {
+      this.buildStroke.extend(this.state, this.hover.cell);
+      this.hover.floor = this.buildStroke.floor;
+      this.hover.cell = this.buildStroke.anchor + Math.trunc((this.hover.cell - this.buildStroke.anchor) / this.buildStroke.width) * this.buildStroke.width;
+      this.hoverError = this.buildStroke.error;
+    } else {
+      this.finishBuildStroke();
+      this.hoverError = this.errorFor(this.tool, this.hover);
+    }
   }
 
   private onPointerDown(e: FederatedPointerEvent): void {
@@ -217,6 +236,12 @@ export class Controller {
     const tool = this.tool;
     const hover = this.hover;
     const state = this.state;
+    if (hover && isRowBuildTool(tool)) {
+      this.buildStroke = new BuildStroke(tool, hover.floor, hover.cell);
+      this.buildStroke.extend(state, hover.cell);
+      this.hoverError = this.buildStroke.error;
+      return;
+    }
     try {
       switch (tool) {
         case 'buildFloor': {
@@ -270,6 +295,11 @@ export class Controller {
   /** Commit the elevator drag: place the shaft over the dragged span. */
   private onPointerUp(e: FederatedPointerEvent): void {
     const tool = this.tool;
+    if (e.button === 0 && this.buildStroke) {
+      this.onPointerMove(e, true);
+      this.finishBuildStroke();
+      return;
+    }
     if (e.button !== 0 || !this.dragStart) return;
     this.onPointerMove(e);
     if (tool !== 'elevator' && tool !== 'serviceElevator' && tool !== 'expressElevator') {
@@ -286,6 +316,14 @@ export class Controller {
       this.hud.toast(err instanceof Error ? err.message : String(err));
     }
     this.hoverError = this.errorFor(tool, this.hover);
+  }
+
+  private finishBuildStroke(): void {
+    const stroke = this.buildStroke;
+    this.buildStroke = null;
+    if (!stroke) return;
+    if (stroke.placed > 1) this.hud.toast(`Built ${stroke.placed} facilities${stroke.error ? ` — ${stroke.error}` : ''}`);
+    else if (stroke.error) this.hud.toast(stroke.error);
   }
 
   /** 'select' click: open the info dialog for the thing under the pointer. */

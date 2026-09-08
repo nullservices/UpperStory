@@ -1,0 +1,86 @@
+import type { GameState } from './state';
+
+/**
+ * Versioned JSON save/load. The whole GameState is plain data (Maps included)
+ * so a save is a JSON round-trip; Maps/Set serialize with marker wrappers.
+ * Version bumps go through the migration chain in `deserialize`.
+ */
+
+export const SAVE_VERSION = 1;
+
+export interface SaveEnvelope {
+  version: number;
+  state: GameState;
+}
+
+const MAP_MARKER = '__simMap';
+const SET_MARKER = '__simSet';
+
+interface WrappedMap {
+  [MAP_MARKER]: [unknown, unknown][];
+}
+interface WrappedSet {
+  [SET_MARKER]: unknown[];
+}
+
+function replacer(_key: string, value: unknown): unknown {
+  if (value instanceof Map) {
+    const wrapped: WrappedMap = { [MAP_MARKER]: [...value.entries()] };
+    return wrapped;
+  }
+  if (value instanceof Set) {
+    const wrapped: WrappedSet = { [SET_MARKER]: [...value] };
+    return wrapped;
+  }
+  return value;
+}
+
+function isNumericString(key: string): boolean {
+  return key !== '' && /^-?\d+$/.test(key);
+}
+
+function reviver(_key: string, value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  const obj = value as Record<string, unknown>;
+  if (MAP_MARKER in obj) {
+    const entries = (obj[MAP_MARKER] as [unknown, unknown][]).map(([k, v]) => [
+      typeof k === 'string' && isNumericString(k) ? Number(k) : k,
+      v,
+    ]);
+    return new Map(entries as [unknown, unknown][]);
+  }
+  if (SET_MARKER in obj) {
+    return new Set(obj[SET_MARKER] as unknown[]);
+  }
+  return value;
+}
+
+/** Serialize a state to a save string (transient events are dropped). */
+export function serializeGame(state: GameState): string {
+  const envelope: SaveEnvelope = {
+    version: SAVE_VERSION,
+    state: { ...state, events: [] },
+  };
+  return JSON.stringify(envelope, replacer);
+}
+
+/**
+ * Parse a save string back into a live GameState. Throws on version
+ * mismatch — new versions should add migrations here instead.
+ */
+export function deserializeGame(json: string): GameState {
+  const envelope = JSON.parse(json, reviver) as SaveEnvelope;
+  if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
+    throw new Error('Not a TowerProject save file');
+  }
+  if (envelope.version !== SAVE_VERSION) {
+    // Migration chain slot: handle older versions here as they appear.
+    throw new Error(
+      `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
+    );
+  }
+  if (!envelope.state || typeof envelope.state !== 'object') {
+    throw new Error('Save file is missing its state');
+  }
+  return envelope.state as GameState;
+}

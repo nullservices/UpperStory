@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.vite/
+*.local
+
+# The YootTower reference clone is large (166 MB) and stays local.
+reference/

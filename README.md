@@ -60,7 +60,4 @@ Controls: **I** inspect, **F** floor, **E** elevator, **O** office, **C** condo,
 **Space** pause/resume, **Home** recenter, **Escape** return to inspection.
 Right-drag pans; the wheel and on-screen buttons zoom. The palette scrolls in smaller windows.
 
-The simulation remains an adaptation rather than complete feature parity with the
-original game. This pass focuses on presentation and interaction, not adding the
-original's missing facilities, disasters, or later-game progression requirements.
 

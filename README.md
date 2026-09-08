@@ -60,19 +60,7 @@ Controls: **I** inspect, **F** floor, **E** elevator, **O** office, **C** condo,
 **Space** pause/resume, **Home** recenter, **Escape** return to inspection.
 Right-drag pans; the wheel and on-screen buttons zoom. The palette scrolls in smaller windows.
 
-Validation: 110 simulation/render-motion tests, TypeScript, ESLint, and production build.
-Browser checks cover construction, elevator dragging, room inspection, keyboard
-cancellation/pause, save/load restoration, and 1280×720 / 800×600 layouts.
-
 The simulation remains an adaptation rather than complete feature parity with the
 original game. This pass focuses on presentation and interaction, not adding the
 original's missing facilities, disasters, or later-game progression requirements.
 
-## Status
-
-- [x] M0 — Scaffold, deterministic sim tick, grid render, camera
-- [x] M1 — Building: floors, lobby, tenants, construction
-- [x] M2 — Elevators, routing, people + stress
-- [x] M3 — Economy, full tenants, time, visitors, staff, evaluation
-- [x] M4 — Star progression, express elevators + sky lobbies
-- [x] M5 — Save/load, speed controls, perf pass, smoke runs

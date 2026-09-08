@@ -47,6 +47,8 @@ export const CONFIG = {
 
   // --- Vertical transport (approx — tune) ---
   ELEVATOR_CAPACITY: 21,
+  /** Capacities documented in tower-docs, Elevator Header byte 2. */
+  ELEVATOR_CAPACITIES: { standard: 21, express: 42, service: 10 },
   /** Floors per tick at speed level 1 (level 2/3 in ELEVATOR_SPEED_LEVELS). */
   ELEVATOR_SPEED_LEVELS: [0.2, 0.3, 0.45],
   ELEVATOR_DOOR_TICKS: 2,

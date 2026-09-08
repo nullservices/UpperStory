@@ -15,11 +15,13 @@ Use the tower report to track vacancies, construction, lift queues, and finances
 ## Getting started
 
 1. Select **Floor** and click above the lobby to build an upper floor.
-2. Select **Elevator** and drag from the lobby to the new floor. Leave two cells clear for the shaft.
+2. Select **Elevator** and click the lobby to connect the floor above, or drag across several floors. Leave two cells clear for the shaft. **Stairs** can also be placed by clicking the lobby.
 3. Place an **Office** or **Condo** upstairs and let construction finish. The time controls can speed things up.
 4. Watch your tenants arrive, then expand as your budget allows.
 
 The demo starts with an occupied tower if you'd rather explore before building.
+
+To extend an elevator, build the new floors, select the matching elevator tool, and drag from the existing shaft into the new floors. Your cars keep running; you pay only for the added shaft floors.
 
 ## Controls
 
@@ -29,6 +31,7 @@ Designed for a desktop browser with a mouse and keyboard.
 | --- | --- |
 | Left click | Place the selected facility or inspect a room |
 | Left drag with a room, stair, or escalator tool | Build a row; each room snaps to its own width |
+| Left drag with an elevator tool | Build a shaft or extend an existing one |
 | Right drag | Pan the view |
 | Mouse wheel | Zoom in or out |
 | `I` | Inspect |

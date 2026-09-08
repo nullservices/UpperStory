@@ -12,6 +12,7 @@ import {
 } from './sim';
 import { Controller } from './game/controller';
 import { Motion } from './render/motion';
+import { setupReferenceTower } from './sim/referenceTower';
 import { SkyView } from './render/sky';
 import { Camera } from './render/camera';
 import { DayNightView } from './render/dayNight';
@@ -43,7 +44,9 @@ async function main(): Promise<void> {
   // `state` is reassigned by New game / Load, so the ticker closure below
   // must re-read the variable each frame (it does). ---
   let state = createInitialState(20260907);
-  if (new URLSearchParams(window.location.search).has('demo')) {
+  if (new URLSearchParams(window.location.search).has('reference')) {
+    setupReferenceTower(state);
+  } else if (new URLSearchParams(window.location.search).has('demo')) {
     setupDemoTower(state);
     state.starLevel = 5;
     // Upper-floor residents and offices create real demand for the lift.

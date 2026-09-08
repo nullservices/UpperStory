@@ -48,7 +48,7 @@ describe('express elevators', () => {
     expect(elevatorPlacementError(state, 1, 40, 45, 'express')).toBe(
       'An elevator is already here',
     );
-    expect(elevatorPlacementError(state, 1, 40, 44, 'express')).toBe('Space is occupied');
+    expect(elevatorPlacementError(state, 1, 40, 44, 'express')).toBe('An elevator is already here');
   });
 
   it('a valid express shaft runs through the sky lobby without touching its cells', () => {

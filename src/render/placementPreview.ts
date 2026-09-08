@@ -1,6 +1,7 @@
 import { Graphics, Text } from 'pixi.js';
 import { CONFIG, TENANT_DATA } from '../data/config';
 import type { Tool } from '../game/controller';
+import { elevatorBuildPlan } from '../game/elevatorBuild';
 import {
   buildFloorError,
   escalatorPlacementError,
@@ -82,13 +83,11 @@ export class PlacementPreview {
       case 'serviceElevator':
       case 'expressElevator': {
         if (!hover) break;
-        const x = (drag?.cell ?? hover.cell) * cell;
-        const y = floorTopY(drag ? Math.max(drag.fromFloor, hover.floor) : hover.floor);
-        const h = drag
-          ? bandBottomPx(Math.min(drag.fromFloor, hover.floor)) - y
-          : bandHeightPx(hover.floor);
-        // Pre-drag the hint is always "too short" (a shaft needs 2+ floors),
-        // which is the caption the controller computes for a single band.
+        const kind = tool === 'expressElevator' ? 'express' : tool === 'serviceElevator' ? 'service' : 'standard';
+        const plan = elevatorBuildPlan(state, drag?.fromFloor ?? hover.floor, hover.floor, drag?.cell ?? hover.cell, kind);
+        const x = plan.x * cell;
+        const y = floorTopY(plan.hi);
+        const h = bandBottomPx(plan.lo) - y;
         g.rect(x, y, cell * 2, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
@@ -127,8 +126,9 @@ export class PlacementPreview {
             ? cell
             : TENANT_DATA[tool].sizeCells * cell;
         const x = hover.cell * cell;
-        const y = floorTopY(hover.floor);
-        const h = bandHeightPx(hover.floor);
+        const stairFromLobby = tool === 'stairs' && hover.floor === CONFIG.LOBBY_FLOOR_INDEX;
+        const y = floorTopY(stairFromLobby ? hover.floor + 1 : hover.floor);
+        const h = stairFromLobby ? bandBottomPx(hover.floor) - y : bandHeightPx(hover.floor);
         g.rect(x, y, width, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );

@@ -57,7 +57,9 @@ export class TowerView {
       const y = floorTopY(floor.index); const h = floorHeightPx(floor);
       floor.cells.forEach((cell, index) => {
         const x = index * CONFIG.CELL_WIDTH_PX;
-        if (cell.content === 'stair' || cell.content === 'escalator') {
+        const lobbyStair = floor.index === CONFIG.LOBBY_FLOOR_INDEX &&
+          floors.find(f => f.index === CONFIG.LOBBY_FLOOR_INDEX + 1)?.cells[index]?.content === 'stair';
+        if (cell.content === 'stair' || cell.content === 'escalator' || lobbyStair) {
           g.rect(x, y + 1, 12, h - 2).fill(0xc1c9bc);
           for (let i = 0; i < 5; i++) g.rect(x + i * 2, y + h - 4 - i * 3, 4, 2).fill(0x6c8276);
         }

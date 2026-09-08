@@ -7,13 +7,11 @@ import {
   cellIndexAtWorldX,
   cyclePricing,
   demolishAt,
-  elevatorPlacementError,
   escalatorPlacementError,
   floorIndexAtWorldY,
   getFloor,
   getTenantAt,
   groupAt,
-  placeElevatorGroup,
   placeEscalator,
   placeStair,
   placeTenant,
@@ -31,6 +29,7 @@ import { QuarterReport } from '../ui/dialogs/quarterReport';
 import { TenantInfo } from '../ui/dialogs/tenantInfo';
 import type { Hud } from '../ui/hud';
 import { BuildStroke, isRowBuildTool } from './buildStroke';
+import { buildElevator, elevatorBuildPlan } from './elevatorBuild';
 
 /** Player-facing build/demolish tools. Tenant tools share TenantType names. */
 export type Tool =
@@ -308,10 +307,8 @@ export class Controller {
     const drag = this.dragStart;
     this.dragStart = null;
     const hoverFloor = this.hover?.floor ?? drag.fromFloor;
-    const lo = Math.min(drag.fromFloor, hoverFloor);
-    const hi = Math.max(drag.fromFloor, hoverFloor);
     try {
-      placeElevatorGroup(this.state, lo, hi, drag.cell, kindFor(tool));
+      buildElevator(this.state, drag.fromFloor, hoverFloor, drag.cell, kindFor(tool));
     } catch (err) {
       this.hud.toast(err instanceof Error ? err.message : String(err));
     }
@@ -420,20 +417,8 @@ export class Controller {
       case 'elevator':
       case 'serviceElevator':
       case 'expressElevator': {
-        if (!this.dragStart) return null;
-        const lo = this.dragStart
-          ? Math.min(this.dragStart.fromFloor, hover.floor)
-          : hover.floor;
-        const hi = this.dragStart
-          ? Math.max(this.dragStart.fromFloor, hover.floor)
-          : hover.floor;
-        return elevatorPlacementError(
-          state,
-          lo,
-          hi,
-          this.dragStart?.cell ?? hover.cell,
-          kindFor(tool),
-        );
+        return elevatorBuildPlan(state, this.dragStart?.fromFloor ?? hover.floor,
+          hover.floor, this.dragStart?.cell ?? hover.cell, kindFor(tool)).error;
       }
       case 'escalatorUp':
       case 'escalatorDown':

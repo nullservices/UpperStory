@@ -1,6 +1,7 @@
 import { configureDialog } from './accessibility';
 import { CONFIG } from '../../data/config';
 import type { ElevatorGroup } from '../../sim';
+import { elevatorCapacity } from '../../sim/elevators';
 
 /**
  * Actions the controller hands the dialog: each wraps a sim command and
@@ -156,7 +157,7 @@ export class ElevatorEditor {
         row = this.makeRow(car.id);
         this.rowEls.set(car.id, row);
       }
-      row.label.textContent = carText(car.id, car.speedLevel, car.passengers.length);
+      row.label.textContent = carText(car.id, car.speedLevel, car.passengers.length) + ` / ${elevatorCapacity(group.kind)} capacity`;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
       row.removeBtn.hidden = group.cars.length <= 1;
     }

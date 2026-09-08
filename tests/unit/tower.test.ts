@@ -84,11 +84,11 @@ describe('tower floors', () => {
 });
 
 describe('stairs', () => {
-  it('stairs start above the lobby and need a stair below', () => {
+  it('stairs accept lobby clicks and need a stair below higher floors', () => {
     const state = newTestGame();
     buildFloor(state, 2);
     buildFloor(state, 3);
-    expect(stairPlacementError(state, 1, 5)).toBe('Stairs start above the lobby');
+    expect(stairPlacementError(state, 1, 5)).toBeNull();
     // floor 2: below is the lobby floor — allowed
     expect(stairPlacementError(state, 2, 5)).toBeNull();
     // floor 3: below floor 2 has no stair at col 5 — blocked

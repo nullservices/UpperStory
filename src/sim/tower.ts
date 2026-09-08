@@ -122,6 +122,7 @@ export function demolishFloor(state: GameState, index: number): void {
 
 /** Human-readable reason a stair placement would fail, or null. */
 export function stairPlacementError(state: GameState, floorIndex: number, x: number): string | null {
+  if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX) floorIndex++;
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) return 'Build this floor first';
   if (floorIndex <= CONFIG.LOBBY_FLOOR_INDEX) return 'Stairs start above the lobby';
@@ -142,7 +143,7 @@ export function placeStair(state: GameState, floorIndex: number, x: number): voi
   const error = stairPlacementError(state, floorIndex, x);
   if (error) throw new Error(error);
   if (!spend(state, CONFIG.STAIR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
-  const floor = getFloor(state.tower, floorIndex)!;
+  const floor = getFloor(state.tower, floorIndex === CONFIG.LOBBY_FLOOR_INDEX ? floorIndex + 1 : floorIndex)!;
   floor.cells[x] = { content: 'stair', tenantId: -1 };
   state.tower.structureRevision++;
 }

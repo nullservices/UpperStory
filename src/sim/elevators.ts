@@ -21,6 +21,10 @@ import { getFloor } from './tower';
 
 export type ElevatorKind = 'standard' | 'service' | 'express';
 
+export function elevatorCapacity(kind: ElevatorKind): number {
+  return CONFIG.ELEVATOR_CAPACITIES[kind];
+}
+
 export interface ElevatorGroup {
   id: number;
   kind: ElevatorKind;
@@ -77,17 +81,27 @@ export function elevatorPlacementError(
   floorHi: number,
   x: number,
   kind: ElevatorKind = 'standard',
+  existingGroupId?: number,
 ): string | null {
+  if (![floorLo, floorHi, x].every(Number.isInteger)) return 'Invalid shaft position';
+  if (floorLo < CONFIG.BASEMENT_FLOOR_INDEX || floorHi > CONFIG.MAX_FLOORS) return 'Floor out of range';
   if (floorLo > floorHi) return 'Drag from a lower floor upward';
   const span = floorHi - floorLo + 1;
   if (span < 2) return 'Shaft must span at least 2 floors';
   const maxSpan = kind === 'express' ? CONFIG.MAX_FLOORS : CONFIG.MAX_SHAFT_FLOORS;
   if (span > maxSpan) return `Shaft max ${maxSpan} floors`;
   if (x < 0 || x + 1 >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
-  if (groupAt(state, floorLo, x)) return 'An elevator is already here';
+  const existing = existingGroupId === undefined ? undefined : state.elevatorGroups.get(existingGroupId);
+  for (const other of state.elevatorGroups.values()) {
+    if (other.id === existingGroupId) continue;
+    if (floorLo <= other.serviceHi && floorHi >= other.serviceLo && x < other.x + 2 && x + 2 > other.x) {
+      return 'An elevator is already here';
+    }
+  }
   for (let f = floorLo; f <= floorHi; f++) {
     const floor = getFloor(state.tower, f);
     if (!floor) return 'Build the floors first';
+    if (existing && f >= existing.serviceLo && f <= existing.serviceHi) continue;
     if (f === CONFIG.LOBBY_FLOOR_INDEX) continue; // shafts pass through the lobby
     const sky = kind === 'express' ? skyLobbyOn(state, f) : null;
     if (sky) {
@@ -110,7 +124,8 @@ export function elevatorPlacementError(
       if (!cell || cell.content !== 'empty') return 'Space is occupied';
     }
   }
-  const cost = span * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100;
+  const overlap = existing ? Math.max(0, Math.min(floorHi, existing.serviceHi) - Math.max(floorLo, existing.serviceLo) + 1) : 0;
+  const cost = (span - overlap) * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100;
   if (cost > state.money.balanceCents) return 'Not enough funds';
   return null;
 }
@@ -271,31 +286,46 @@ export function upgradeCarSpeed(state: GameState, groupId: number, carId: number
   state.tower.structureRevision++;
 }
 
-/** Resize a shaft's service range (extend/shrink). Throws if invalid. */
-export function setElevatorServiceRange(
-  state: GameState,
-  groupId: number,
-  lo: number,
-  hi: number,
-): void {
+/** Validate resizing without changing the shaft, for both previews and commands. */
+export function elevatorServiceRangeError(state: GameState, groupId: number, lo: number, hi: number): string | null {
   const group = state.elevatorGroups.get(groupId);
-  if (!group) throw new Error('Elevator not found');
-  if (lo > hi) throw new Error('Invalid range');
-  if (hi - lo + 1 > CONFIG.MAX_SHAFT_FLOORS) throw new Error('Shaft too tall');
-  // New floors must exist and be empty at this column.
-  for (let f = lo; f <= hi; f++) {
-    if (f < group.serviceLo || f > group.serviceHi) {
-      const floor = getFloor(state.tower, f);
-      if (!floor) throw new Error('Build the floors first');
-      for (const cx of [group.x, group.x + 1]) {
-        const cell = floor.cells[cx];
-        if (!cell || cell.content !== 'empty') throw new Error('Space is occupied');
-      }
+  if (!group) return 'Elevator not found';
+  const error = elevatorPlacementError(state, lo, hi, group.x, group.kind, groupId);
+  if (error) return error;
+  // Extensions preserve every active route and car. Shrinks must not strand riders.
+  if (lo > group.serviceLo || hi < group.serviceHi) {
+    if (group.cars.some(car => car.state !== 'idle' || car.passengers.length > 0)) {
+      return 'Wait for the elevators to empty and stop';
+    }
+    if ([...state.people.values()].some(p => p.route?.slice(p.legIndex).some(leg =>
+      leg.mode === 'elevator' && leg.groupId === groupId &&
+      (leg.from < lo || leg.from > hi || leg.to < lo || leg.to > hi)))) {
+      return 'People still need the floors being removed';
     }
   }
+  return null;
+}
+
+/** Extend an operating shaft; only added floors are charged. Shrinks have no refund. */
+export function setElevatorServiceRange(state: GameState, groupId: number, lo: number, hi: number): void {
+  const error = elevatorServiceRangeError(state, groupId, lo, hi);
+  if (error) throw new Error(error);
+  const group = state.elevatorGroups.get(groupId)!;
+  if (lo === group.serviceLo && hi === group.serviceHi) return;
+  const overlap = Math.max(0, Math.min(hi, group.serviceHi) - Math.max(lo, group.serviceLo) + 1);
+  spendHelper(state, (hi - lo + 1 - overlap) * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100);
   clearCells(state, group);
   group.serviceLo = lo;
   group.serviceHi = hi;
+  group.stops = stopsFor(state, group.kind, lo, hi);
+  for (const car of group.cars) {
+    if (car.y < lo || car.y > hi) {
+      car.y = Math.max(lo, Math.min(hi, car.y));
+      car.lastFloor = Math.round(car.y);
+      car.targetFloor = null;
+      car.dir = 0;
+    }
+  }
   paintCells(state, group);
   state.tower.structureRevision++;
 }
@@ -431,7 +461,7 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
   }
   // Opportunistic collect: a car with spare capacity stops for a pending
   // same-direction call on a floor it crosses.
-  if (car.passengers.length < CONFIG.ELEVATOR_CAPACITY) {
+  if (car.passengers.length < elevatorCapacity(group.kind)) {
     const crossed = car.dir > 0 ? Math.floor(car.y) : Math.ceil(car.y);
     if (crossed !== car.lastFloor) {
       car.lastFloor = crossed;
@@ -440,7 +470,8 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
         group.stops.includes(crossed) &&
         callPending(state, crossed, dir)
       ) {
-        car.targetFloor = crossed;
+        car.y = crossed;
+        arrive(state, group, car);
       }
     }
   }
@@ -479,6 +510,16 @@ function arrive(state: GameState, group: ElevatorGroup, car: ElevatorCar): void 
   car.targetFloor = null;
   const floor = Math.round(car.y);
   car.lastFloor = floor;
+  for (const pid of car.passengers) {
+    const p = state.people.get(pid);
+    if (p) p.pos = { floor, x: group.x + 0.5 };
+  }
+  // An empty car travels toward a call, then serves the requested direction.
+  if (car.passengers.length === 0) {
+    if (car.dir >= 0 && callPending(state, floor, 'up')) car.dir = 1;
+    else if (callPending(state, floor, 'down')) car.dir = -1;
+    else if (callPending(state, floor, 'up')) car.dir = 1;
+  }
   const dir: QueueDir | null = car.dir > 0 ? 'up' : car.dir < 0 ? 'down' : null;
   if (dir) clearCall(state, floor, dir);
   else {
@@ -511,7 +552,7 @@ function completeDoors(state: GameState, group: ElevatorGroup, car: ElevatorCar)
   if (dir) {
     const queue = queueHead(state, floor, dir);
     for (const pid of [...queue]) {
-      if (car.passengers.length >= CONFIG.ELEVATOR_CAPACITY) break;
+      if (car.passengers.length >= elevatorCapacity(group.kind)) break;
       const p = state.people.get(pid);
       const leg = p?.route?.[p.legIndex];
       if (
@@ -523,6 +564,7 @@ function completeDoors(state: GameState, group: ElevatorGroup, car: ElevatorCar)
         queue.splice(queue.indexOf(pid), 1);
         car.passengers.push(pid);
         p.state = 'riding';
+        p.pos = { floor, x: group.x + 0.5 };
         p.waitTicks = 0;
         boarded++;
       }

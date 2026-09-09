@@ -11,12 +11,6 @@ function isStaff(kind: PersonKind): boolean {
   return kind === 'guard' || kind === 'housekeeper';
 }
 
-function range(lo: number, hi: number): number[] {
-  const out: number[] = [];
-  for (let f = lo; f <= hi; f++) out.push(f);
-  return out;
-}
-
 /**
  * Per-trip route selection (RouteT equivalent: PickupRoute/PickupDRoute).
  * Preference order: stairs (short hops) → escalators → direct elevator →
@@ -59,10 +53,7 @@ export function rebuildRouting(state: GameState): void {
   rt.revision = state.tower.structureRevision;
 
   for (const group of state.elevatorGroups.values()) {
-    // Express groups register only their actual stops (sky lobbies etc.).
-    const floors =
-      group.kind === 'express' ? group.stops : range(group.serviceLo, group.serviceHi);
-    for (const f of floors) {
+    for (const f of group.stops) {
       const list = rt.groupsServing.get(f) ?? [];
       list.push(group.id);
       rt.groupsServing.set(f, list);

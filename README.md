@@ -43,6 +43,8 @@ To extend an elevator, build the new floors, select the matching elevator tool, 
 
 Inspect an elevator to add cars, upgrade speed or choose each car's home floor. Expand **Weekday & weekend service** to prioritize upward or downward calls in six time periods. Cars deliver passengers before returning home, and still answer other calls when no preferred calls remain.
 
+Use **Floors served** to turn individual stops on or off. Existing trips finish normally; new passengers use the revised stop list. Disabled stops stay disabled when you extend the shaft, while newly added floors start in service.
+
 ## Controls
 
 Designed for a desktop browser with a mouse and keyboard.

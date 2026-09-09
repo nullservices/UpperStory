@@ -17,6 +17,7 @@ economic comparisons have not been completed.
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
 | Persistence | Versioned browser saves, campaign history and active incidents; deterministic replay |
 | Audio | Original synthesized construction, elevator, interface and event cues; motor and rain ambience; persistent volume/mute controls |
+| Elevator management | Per-car home floors, six weekday/weekend priority periods and individual stop controls; existing trips finish when a stop is disabled |
 
 Catalogue dimensions, purchase costs and rating requirements draw on the
 reference below. Simulation formulas and event timing remain approximations.

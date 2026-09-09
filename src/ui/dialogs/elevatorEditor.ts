@@ -13,6 +13,7 @@ export interface ElevatorEditorActions {
   upgrade(carId: number): void;
   home(carId: number, floor: number | null): void;
   priority(day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void;
+  stop(floor: number, enabled: boolean): void;
   close(): void;
 }
 
@@ -45,6 +46,7 @@ export class ElevatorEditor {
   private readonly errorEl: HTMLDivElement;
   private readonly addCarBtn: HTMLButtonElement;
   private readonly schedules = document.createElement('details');
+  private readonly stops = document.createElement('details');
   private readonly rowEls = new Map<
     number,
     {
@@ -108,7 +110,8 @@ export class ElevatorEditor {
     footer.appendChild(this.addCarBtn);
 
     this.schedules.style.cssText = 'margin:16px 0;line-height:1.7';
-    panel.append(closeBtn, this.title, body, this.schedules, this.errorEl, footer);
+    this.stops.style.cssText = 'margin:16px 0;line-height:1.7';
+    panel.append(closeBtn, this.title, body, this.schedules, this.stops, this.errorEl, footer);
     this.overlay.appendChild(panel);
     document.body.appendChild(this.overlay);
   }
@@ -117,6 +120,7 @@ export class ElevatorEditor {
     this.group = group;
     this.actions = actions;
     this.renderSchedules();
+    this.renderStops();
     this.clearError();
     this.overlay.style.display = 'flex';
     this.visible = true;
@@ -229,6 +233,22 @@ export class ElevatorEditor {
       }
     }
     this.schedules.append(grid);
+  }
+
+  private renderStops(): void {
+    this.stops.replaceChildren();
+    const summary = document.createElement('summary'); summary.textContent = 'Floors served';
+    const help = document.createElement('p'); help.textContent = 'Uncheck a floor to exclude it from new trips. People already on their way finish their trips. Disabling a car’s home floor clears its home assignment.';
+    const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:180px;overflow:auto';
+    const group = this.group!;
+    for (const floor of [...group.stops, ...(group.disabledStops ?? [])].sort((a, b) => a - b)) {
+      const label = document.createElement('label');
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = group.stops.includes(floor);
+      checkbox.setAttribute('aria-label', `Serve floor ${floorLabel(floor)}`);
+      checkbox.onchange = () => { this.actions?.stop(floor, checkbox.checked); checkbox.checked = group.stops.includes(floor); };
+      label.append(checkbox, ` ${floorLabel(floor)}`); grid.append(label);
+    }
+    this.stops.append(summary, help, grid);
   }
 
   private button(text: string): HTMLButtonElement {

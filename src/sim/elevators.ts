@@ -68,6 +68,7 @@ export interface ElevatorGroup {
   stops: number[];
   cars: ElevatorCar[];
   schedule?: { weekday: ElevatorPriority[]; weekend: ElevatorPriority[] };
+  disabledStops?: number[];
 }
 
 export interface ElevatorCar {
@@ -192,6 +193,19 @@ function stopsFor(
     }
   }
   return stops;
+}
+
+/** Stop changes affect new routes; trips already planned finish normally. */
+export function setElevatorStop(state: GameState, groupId: number, floor: number, enabled: boolean): void {
+  const group = state.elevatorGroups.get(groupId);
+  if (!group) throw new Error('Elevator not found');
+  if (!stopsFor(state, group.kind, group.serviceLo, group.serviceHi).includes(floor)) throw new Error('This shaft cannot stop on that floor');
+  if (group.stops.includes(floor) === enabled) return;
+  if (!enabled && group.stops.length <= 2) throw new Error('Keep at least two stops in service');
+  group.disabledStops = enabled ? (group.disabledStops ?? []).filter(f => f !== floor) : [...(group.disabledStops ?? []), floor];
+  group.stops = stopsFor(state, group.kind, group.serviceLo, group.serviceHi).filter(f => !group.disabledStops!.includes(f));
+  for (const car of group.cars) if (car.homeFloor === floor && !enabled) car.homeFloor = null;
+  state.tower.structureRevision++;
 }
 
 /** Place a shaft spanning floors [lo, hi], deducting cost. Throws if invalid. */
@@ -326,6 +340,7 @@ export function elevatorServiceRangeError(state: GameState, groupId: number, lo:
   if (!group) return 'Elevator not found';
   const error = elevatorPlacementError(state, lo, hi, group.x, group.kind, groupId);
   if (error) return error;
+  if (group.disabledStops?.length && stopsFor(state, group.kind, lo, hi).filter(f => !group.disabledStops!.includes(f)).length < 2) return 'Keep at least two stops in service';
   // Extensions preserve every active route and car. Shrinks must not strand riders.
   if (lo > group.serviceLo || hi < group.serviceHi) {
     if (group.cars.some(car => car.state !== 'idle' || car.passengers.length > 0)) {
@@ -351,7 +366,9 @@ export function setElevatorServiceRange(state: GameState, groupId: number, lo: n
   clearCells(state, group);
   group.serviceLo = lo;
   group.serviceHi = hi;
-  group.stops = stopsFor(state, group.kind, lo, hi);
+  const available = stopsFor(state, group.kind, lo, hi);
+  if (group.disabledStops) group.disabledStops = group.disabledStops.filter(f => available.includes(f));
+  group.stops = available.filter(f => !group.disabledStops?.includes(f));
   for (const car of group.cars) if (car.homeFloor != null && !group.stops.includes(car.homeFloor)) car.homeFloor = null;
   for (const car of group.cars) {
     if (car.y < lo || car.y > hi) {
@@ -502,7 +519,7 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
       car.lastFloor = crossed;
       const dir: QueueDir = car.dir > 0 ? 'up' : 'down';
       if (
-        group.stops.includes(crossed) &&
+        (group.stops.includes(crossed) || hasCommittedPickup(state, group, crossed)) &&
         callPending(state, crossed, dir)
       ) {
         car.y = crossed;
@@ -517,7 +534,7 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
   let best: number | null = null;
   let bestDist = Infinity;
   const consider = (floor: number): void => {
-    if (!group.stops.includes(floor)) return;
+    if (floor < group.serviceLo || floor > group.serviceHi) return;
     const d = Math.abs(car.y - floor);
     if (d < bestDist || (d === bestDist && best !== null && floor < best)) {
       best = floor;
@@ -533,7 +550,7 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
     return best;
   }
   for (let f = group.serviceLo; f <= group.serviceHi; f++) {
-    if (!anyCallPending(state, f) || !group.stops.includes(f)) continue;
+    if (!anyCallPending(state, f) || (!group.stops.includes(f) && !hasCommittedPickup(state, group, f))) continue;
     const priority = activePriority(state, group);
     const penalty = priority !== 'normal' && !callPending(state, f, priority) ? group.serviceHi - group.serviceLo + 1 : 0;
     const distance = Math.abs(car.y - f) + penalty;
@@ -541,6 +558,14 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
   }
   if (best !== null) return best;
   return car.homeFloor != null && group.stops.includes(car.homeFloor) && Math.abs(car.y - car.homeFloor) > 1e-9 ? car.homeFloor : null;
+}
+
+function hasCommittedPickup(state: GameState, group: ElevatorGroup, floor: number): boolean {
+  return (['up', 'down'] as const).some(dir => queueHead(state, floor, dir).some(id => {
+    const person = state.people.get(id);
+    const leg = person?.route?.[person.legIndex];
+    return leg?.mode === 'elevator' && leg.groupId === group.id && leg.from === floor;
+  }));
 }
 
 /** Car reached its target floor: open doors, clear the served call. */

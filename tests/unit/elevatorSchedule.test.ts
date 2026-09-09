@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
-import { activePriority, setCarHome, setElevatorPriority, setElevatorServiceRange, stepElevators } from '../../src/sim/elevators';
-import { pressCall } from '../../src/sim/queues';
+import { activePriority, setCarHome, setElevatorPriority, setElevatorServiceRange, setElevatorStop, stepElevators } from '../../src/sim/elevators';
+import { joinQueue, pressCall } from '../../src/sim/queues';
 import { spawnTenantPeople } from '../../src/sim/people';
-import { deserializeGame, serializeGame } from '../../src/sim';
+import { buildFloor, deserializeGame, serializeGame, checkRouting, pickupRoute } from '../../src/sim';
 import { newTestGame, scenarioTower, tickN } from '../helpers/simHarness';
 
 function fixture() {
@@ -69,4 +69,39 @@ it('preserves scheduled service and home floors through deterministic save repla
   const restored = deserializeGame(serializeGame(state));
   tickN(state, 200); tickN(restored, 200);
   expect(serializeGame(restored)).toBe(serializeGame(state));
+});
+
+it.each([1, 5])('finishes a trip from floor %i after its stop is disabled', from => {
+  const { state, group } = fixture();
+  const to = from === 1 ? 5 : 1;
+  const office = [...state.tenants.values()].find(t => t.type === 'office')!;
+  spawnTenantPeople(state, office);
+  const person = [...state.people.values()][0]!;
+  person.route = [{ mode: 'elevator', from, to, dir: to > from ? 1 : -1, groupId: group.id }];
+  person.legIndex = 0; person.state = 'waiting'; person.pos = { floor: from, x: 11 };
+  joinQueue(state, person.id, from, to > from ? 'up' : 'down');
+  pressCall(state, from, to > from ? 'up' : 'down');
+  setElevatorStop(state, group.id, 5, false); checkRouting(state);
+  expect(pickupRoute(state, 1, 5, 'officeWorker')).toBeNull();
+  for (let i = 0; i < 200; i++) stepElevators(state);
+  expect(person.state).toBe('walking'); expect(person.pos.floor).toBe(to);
+  expect(person.legIndex).toBe(1);
+  setElevatorStop(state, group.id, 5, true); checkRouting(state);
+  expect(pickupRoute(state, 1, 5, 'officeWorker')).not.toBeNull();
+});
+
+it('retains disabled stops on extension and save, without disabling new floors', () => {
+  const { state, group, car } = fixture();
+  setCarHome(state, group.id, car.id, 5);
+  setElevatorStop(state, group.id, 5, false);
+  expect(car.homeFloor).toBeNull();
+  buildFloor(state, 6); setElevatorServiceRange(state, group.id, 1, 6);
+  expect(group.stops).toEqual([1, 2, 3, 4, 6]);
+  const restored = deserializeGame(serializeGame(state));
+  expect(restored.elevatorGroups.get(group.id)!.disabledStops).toEqual([5]);
+  for (const floor of [1, 2, 3]) setElevatorStop(state, group.id, floor, false);
+  const before = serializeGame(state);
+  expect(() => setElevatorStop(state, group.id, 4, false)).toThrow('two stops');
+  expect(() => setElevatorServiceRange(state, group.id, 1, 3)).toThrow('two stops');
+  expect(serializeGame(state)).toBe(before);
 });

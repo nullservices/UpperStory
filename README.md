@@ -41,6 +41,8 @@ The demo starts with a furnished 15-floor tower, all nine basements, five-star t
 
 To extend an elevator, build the new floors, select the matching elevator tool, and drag from the existing shaft into the new floors. Your cars keep running; you pay only for the added shaft floors.
 
+Inspect an elevator to add cars, upgrade speed or choose each car's home floor. Expand **Weekday & weekend service** to prioritize upward or downward calls in six time periods. Cars deliver passengers before returning home, and still answer other calls when no preferred calls remain.
+
 ## Controls
 
 Designed for a desktop browser with a mouse and keyboard.

@@ -20,6 +20,35 @@ import { getFloor } from './tower';
  */
 
 export type ElevatorKind = 'standard' | 'service' | 'express';
+export type ElevatorPriority = 'normal' | 'up' | 'down';
+export const SERVICE_PERIODS = [
+  { start: 420, label: '07:00–10:00' }, { start: 600, label: '10:00–12:00' },
+  { start: 720, label: '12:00–13:00' }, { start: 780, label: '13:00–17:00' },
+  { start: 1020, label: '17:00–21:00' }, { start: 1260, label: '21:00–07:00' },
+] as const;
+
+export function activePriority(state: GameState, group: ElevatorGroup): ElevatorPriority {
+  const minute = ((state.calendar.minuteOfDay - 420) % 1440 + 1440) % 1440 + 420;
+  let period = 0;
+  for (let i = 1; i < SERVICE_PERIODS.length; i++) if (minute >= SERVICE_PERIODS[i]!.start) period = i;
+  return group.schedule?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][period] ?? 'normal';
+}
+
+export function setElevatorPriority(state: GameState, groupId: number, day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void {
+  const group = state.elevatorGroups.get(groupId);
+  if (!group) throw new Error('Elevator not found');
+  if (!['weekday', 'weekend'].includes(day) || !Number.isInteger(period) || period < 0 || period >= SERVICE_PERIODS.length || !['normal', 'up', 'down'].includes(priority)) throw new Error('Invalid service schedule');
+  group.schedule ??= { weekday: Array<ElevatorPriority>(6).fill('normal'), weekend: Array<ElevatorPriority>(6).fill('normal') };
+  group.schedule[day][period] = priority;
+}
+
+export function setCarHome(state: GameState, groupId: number, carId: number, floor: number | null): void {
+  const group = state.elevatorGroups.get(groupId);
+  const car = group?.cars.find(c => c.id === carId);
+  if (!group || !car) throw new Error('Elevator car not found');
+  if (floor !== null && !group.stops.includes(floor)) throw new Error('Home floor must be a serviced stop');
+  car.homeFloor = floor;
+}
 
 export function elevatorCapacity(kind: ElevatorKind): number {
   return CONFIG.ELEVATOR_CAPACITIES[kind];
@@ -38,6 +67,7 @@ export interface ElevatorGroup {
    */
   stops: number[];
   cars: ElevatorCar[];
+  schedule?: { weekday: ElevatorPriority[]; weekend: ElevatorPriority[] };
 }
 
 export interface ElevatorCar {
@@ -52,6 +82,8 @@ export interface ElevatorCar {
   speedLevel: 1 | 2 | 3;
   /** Last floor the car was at/left — used for crossing detection. */
   lastFloor: number;
+  /** Null/absent retains the current idle position. */
+  homeFloor?: number | null;
 }
 
 export function carSpeed(car: ElevatorCar): number {
@@ -320,6 +352,7 @@ export function setElevatorServiceRange(state: GameState, groupId: number, lo: n
   group.serviceLo = lo;
   group.serviceHi = hi;
   group.stops = stopsFor(state, group.kind, lo, hi);
+  for (const car of group.cars) if (car.homeFloor != null && !group.stops.includes(car.homeFloor)) car.homeFloor = null;
   for (const car of group.cars) {
     if (car.y < lo || car.y > hi) {
       car.y = Math.max(lo, Math.min(hi, car.y));
@@ -500,9 +533,14 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
     return best;
   }
   for (let f = group.serviceLo; f <= group.serviceHi; f++) {
-    if (anyCallPending(state, f)) consider(f);
+    if (!anyCallPending(state, f) || !group.stops.includes(f)) continue;
+    const priority = activePriority(state, group);
+    const penalty = priority !== 'normal' && !callPending(state, f, priority) ? group.serviceHi - group.serviceLo + 1 : 0;
+    const distance = Math.abs(car.y - f) + penalty;
+    if (distance < bestDist) { best = f; bestDist = distance; }
   }
-  return best;
+  if (best !== null) return best;
+  return car.homeFloor != null && group.stops.includes(car.homeFloor) && Math.abs(car.y - car.homeFloor) > 1e-9 ? car.homeFloor : null;
 }
 
 /** Car reached its target floor: open doors, clear the served call. */
@@ -518,7 +556,9 @@ function arrive(state: GameState, group: ElevatorGroup, car: ElevatorCar): void 
   }
   // An empty car travels toward a call, then serves the requested direction.
   if (car.passengers.length === 0) {
-    if (car.dir >= 0 && callPending(state, floor, 'up')) car.dir = 1;
+    const priority = activePriority(state, group);
+    if (priority !== 'normal' && callPending(state, floor, priority)) car.dir = priority === 'up' ? 1 : -1;
+    else if (car.dir >= 0 && callPending(state, floor, 'up')) car.dir = 1;
     else if (callPending(state, floor, 'down')) car.dir = -1;
     else if (callPending(state, floor, 'up')) car.dir = 1;
   }

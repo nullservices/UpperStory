@@ -27,8 +27,10 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
 
 - Compare original PC gameplay against repeatable morning, lunch and evening
   traffic scenarios. Calibrate dispatch, journey times, patience and stress.
-- Implement original elevator weekday/weekend schedules, priorities and home
-  floors. Current dispatch uses nearest calls with same-direction collection.
+- Compare weekday/weekend schedules, priorities and home-floor dispatch against
+  the original. Six configurable periods, direction priority and per-car homes
+  are implemented; period boundaries and priority weighting are our own model.
+  Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
 - Reproduce the original lobby height options and detailed transport restrictions.

@@ -1,7 +1,7 @@
 import { configureDialog } from './accessibility';
 import { CONFIG } from '../../data/config';
 import type { ElevatorGroup } from '../../sim';
-import { elevatorCapacity } from '../../sim/elevators';
+import { elevatorCapacity, SERVICE_PERIODS, type ElevatorPriority } from '../../sim/elevators';
 
 /**
  * Actions the controller hands the dialog: each wraps a sim command and
@@ -11,6 +11,8 @@ export interface ElevatorEditorActions {
   addCar(): void;
   removeCar(carId: number): void;
   upgrade(carId: number): void;
+  home(carId: number, floor: number | null): void;
+  priority(day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void;
   close(): void;
 }
 
@@ -42,6 +44,7 @@ export class ElevatorEditor {
   private readonly rows: HTMLDivElement;
   private readonly errorEl: HTMLDivElement;
   private readonly addCarBtn: HTMLButtonElement;
+  private readonly schedules = document.createElement('details');
   private readonly rowEls = new Map<
     number,
     {
@@ -49,6 +52,7 @@ export class ElevatorEditor {
       label: HTMLSpanElement;
       speedBtn: HTMLButtonElement;
       removeBtn: HTMLButtonElement;
+      home: HTMLSelectElement;
     }
   >();
 
@@ -69,7 +73,7 @@ export class ElevatorEditor {
     const panel = document.createElement('div');
     panel.style.cssText =
       `background:${C.bg};border:1px solid ${C.panel};border-radius:8px;` +
-      'padding:16px;min-width:340px;max-width:420px;box-sizing:border-box;' +
+      'padding:16px;width:560px;max-width:95vw;max-height:90vh;overflow:auto;box-sizing:border-box;position:relative;' +
       'box-shadow:0 8px 32px rgba(0,0,0,0.5);font:12px sans-serif;color:' + C.text;
     configureDialog(this.overlay, panel, 'Elevator management', () => this.close());
     panel.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -103,7 +107,8 @@ export class ElevatorEditor {
     footer.style.cssText = 'margin-top:10px;display:flex;justify-content:flex-end;';
     footer.appendChild(this.addCarBtn);
 
-    panel.append(closeBtn, this.title, body, this.errorEl, footer);
+    this.schedules.style.cssText = 'margin:16px 0;line-height:1.7';
+    panel.append(closeBtn, this.title, body, this.schedules, this.errorEl, footer);
     this.overlay.appendChild(panel);
     document.body.appendChild(this.overlay);
   }
@@ -111,6 +116,7 @@ export class ElevatorEditor {
   open(group: ElevatorGroup, actions: ElevatorEditorActions): void {
     this.group = group;
     this.actions = actions;
+    this.renderSchedules();
     this.clearError();
     this.overlay.style.display = 'flex';
     this.visible = true;
@@ -157,9 +163,16 @@ export class ElevatorEditor {
         row = this.makeRow(car.id);
         this.rowEls.set(car.id, row);
       }
-      row.label.textContent = carText(car.id, car.speedLevel, car.passengers.length) + ` / ${elevatorCapacity(group.kind)} capacity`;
+      row.label.textContent = `Car ${car.id} · Lv${car.speedLevel} · ${car.passengers.length}/${elevatorCapacity(group.kind)}`;
+      row.label.title = `${car.passengers.length} passengers aboard; capacity ${elevatorCapacity(group.kind)}`;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
       row.removeBtn.hidden = group.cars.length <= 1;
+      if (row.home.dataset.stops !== group.stops.join(',')) {
+        row.home.replaceChildren(new Option('Stay where idle', ''));
+        for (const floor of group.stops) row.home.add(new Option(`Home: ${floorLabel(floor)}`, String(floor)));
+        row.home.dataset.stops = group.stops.join(',');
+      }
+      row.home.value = car.homeFloor == null ? '' : String(car.homeFloor);
     }
     for (const [carId, row] of this.rowEls) {
       if (seen.has(carId)) continue;
@@ -175,10 +188,11 @@ export class ElevatorEditor {
     label: HTMLSpanElement;
     speedBtn: HTMLButtonElement;
     removeBtn: HTMLButtonElement;
+    home: HTMLSelectElement;
   } {
     const row = document.createElement('div');
     row.style.cssText =
-      'display:flex;align-items:center;gap:8px;background:' + C.bg +
+      'display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:' + C.bg +
       ';border-radius:4px;padding:5px 7px;';
 
     const label = document.createElement('span');
@@ -190,9 +204,31 @@ export class ElevatorEditor {
     removeBtn.style.color = C.danger;
     removeBtn.addEventListener('click', () => this.actions?.removeCar(carId));
 
-    row.append(label, speedBtn, removeBtn);
+    const home = document.createElement('select'); home.setAttribute('aria-label', `Car ${carId} home floor`);
+    home.onchange = () => this.actions?.home(carId, home.value === '' ? null : Number(home.value));
+    row.append(label, speedBtn, removeBtn, home);
     this.rows.appendChild(row);
-    return { row, label, speedBtn, removeBtn };
+    return { row, label, speedBtn, removeBtn, home };
+  }
+
+  private renderSchedules(): void {
+    this.schedules.replaceChildren();
+    const summary = document.createElement('summary'); summary.textContent = 'Weekday & weekend service'; this.schedules.append(summary);
+    const help = document.createElement('p'); help.textContent = 'Priority chooses which waiting calls empty cars serve first. Passengers already aboard keep their destinations. Idle cars return to their home floors when no calls remain.';
+    this.schedules.append(help);
+    const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center';
+    for (const title of ['Period', 'Weekday', 'Weekend']) { const strong = document.createElement('strong'); strong.textContent = title; grid.append(strong); }
+    for (const [period, data] of SERVICE_PERIODS.entries()) {
+      const time = document.createElement('span'); time.textContent = data.label; grid.append(time);
+      for (const day of ['weekday', 'weekend'] as const) {
+        const select = document.createElement('select'); select.setAttribute('aria-label', `${day} ${data.label} priority`);
+        for (const [value, label] of [['normal', 'Normal'], ['up', 'Up first'], ['down', 'Down first']]) select.add(new Option(label, value));
+        select.value = this.group?.schedule?.[day][period] ?? 'normal';
+        select.onchange = () => this.actions?.priority(day, period, select.value as ElevatorPriority);
+        grid.append(select);
+      }
+    }
+    this.schedules.append(grid);
   }
 
   private button(text: string): HTMLButtonElement {
@@ -213,10 +249,6 @@ export class ElevatorEditor {
 
 function fmt(dollars: number): string {
   return dollars.toLocaleString('en-US');
-}
-
-function carText(id: number, speedLevel: number, passengers: number): string {
-  return `Car ${id} · speed Lv ${speedLevel} · ${passengers} aboard`;
 }
 
 function floorLabel(floor: number): string {

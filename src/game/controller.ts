@@ -31,6 +31,7 @@ import type { Hud } from '../ui/hud';
 import { BuildStroke, isRowBuildTool } from './buildStroke';
 import { repairTenant, changeMovie } from '../sim/tenants';
 import { buildElevator, elevatorBuildPlan } from './elevatorBuild';
+import { setCarHome, setElevatorPriority } from '../sim/elevators';
 
 /** Player-facing build/demolish tools. Tenant tools share TenantType names. */
 export type Tool =
@@ -395,6 +396,8 @@ export class Controller {
         this.elevatorAction(() => removeElevatorCar(state, group.id, carId)),
       upgrade: (carId: number) =>
         this.elevatorAction(() => upgradeCarSpeed(state, group.id, carId)),
+      home: (carId, floor) => this.elevatorAction(() => setCarHome(state, group.id, carId, floor)),
+      priority: (day, period, priority) => this.elevatorAction(() => setElevatorPriority(state, group.id, day, period, priority)),
       close: () => this.elevatorEditor.close(),
     });
   }

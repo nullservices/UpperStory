@@ -1,5 +1,5 @@
 import { Graphics, Text } from 'pixi.js';
-import { CONFIG, TENANT_DATA } from '../data/config';
+import { CONFIG, TENANT_DATA, facilityHeight } from '../data/config';
 import type { Tool } from '../game/controller';
 import { elevatorBuildPlan } from '../game/elevatorBuild';
 import {
@@ -62,6 +62,13 @@ export class PlacementPreview {
     const valid = hoverError === null;
 
     switch (tool) {
+      case 'buildBasement': {
+        const floor = state.tower.floors[0]!.index - 1;
+        const error = buildFloorError(state, floor);
+        g.rect(0, floorTopY(floor), towerWidth, CONFIG.FLOOR_HEIGHT_PX).fill({ color: error ? RED : GREEN, alpha: GREEN_ALPHA });
+        if (error) this.showError(error, hover ? hover.cell * cell : 0, floorTopY(floor), cell);
+        break;
+      }
       case 'buildFloor': {
         if (state.tower.floors.length === 0) break;
         const canBuild = buildFloorError(state, nextIndex) === null;
@@ -127,8 +134,9 @@ export class PlacementPreview {
             : TENANT_DATA[tool].sizeCells * cell;
         const x = hover.cell * cell;
         const stairFromLobby = tool === 'stairs' && hover.floor === CONFIG.LOBBY_FLOOR_INDEX;
-        const y = floorTopY(stairFromLobby ? hover.floor + 1 : hover.floor);
-        const h = stairFromLobby ? bandBottomPx(hover.floor) - y : bandHeightPx(hover.floor);
+        const height = tool === 'stairs' ? 1 : facilityHeight(tool);
+        const y = floorTopY(stairFromLobby ? hover.floor + 1 : hover.floor + height - 1);
+        const h = stairFromLobby ? bandBottomPx(hover.floor) - y : height * bandHeightPx(hover.floor);
         g.rect(x, y, width, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );

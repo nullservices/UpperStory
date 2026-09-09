@@ -33,6 +33,8 @@ export const TENANT_COLORS: Record<TenantType, number> = {
   restaurant: 0x4f9e6a,
   shop: 0xc78a3d,
   skyLobby: 0x6a9fb5,
+  hotelTwin: 0xa06ab0, hotelSuite: 0xb09a6a, partyHall: 0xb08a78, cinema: 0x556477,
+  medical: 0x90b5a5, parkingRamp: 0x89948a, parkingSpace: 0x768b92, recycling: 0x78966b, metro: 0x739693, cathedral: 0xc3ab7d,
 };
 
 /** Body color per person kind (M2). */

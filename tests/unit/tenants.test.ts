@@ -1,3 +1,4 @@
+import { CONFIG } from '../../src/data/config';
 import { describe, expect, it } from 'vitest';
 import {
   buildFloor,
@@ -21,7 +22,7 @@ describe('tenant lifecycle', () => {
     const lobby = state.tenants.get(0)!;
     expect(lobby.type).toBe('lobby');
     expect(lobby.state).toBe('open');
-    expect(lobby.sizeCells).toBe(60);
+    expect(lobby.sizeCells).toBe(CONFIG.FLOOR_WIDTH_CELLS);
   });
 
   it('placing an office: cost, scaffold cells, construction queue', () => {
@@ -29,11 +30,11 @@ describe('tenant lifecycle', () => {
     buildFloor(state, 2);
     const before = state.money.balanceCents;
     const office = placeTenant(state, 'office', 2, 10);
-    expect(state.money.balanceCents).toBe(before - 9_000 * 100);
+    expect(state.money.balanceCents).toBe(before - 40_000 * 100);
     expect(office.state).toBe('constructing');
     expect(state.constructionQueue).toEqual([office.id]);
     const floor = state.tower.floors[2]!;
-    for (let x = 10; x < 22; x++) {
+    for (let x = 10; x < 19; x++) {
       expect(floor.cells[x]!.content).toBe('scaffold');
       expect(floor.cells[x]!.tenantId).toBe(office.id);
     }
@@ -61,7 +62,7 @@ describe('tenant lifecycle', () => {
     buildFloor(state, 2);
     expect(placementError(state, 'office', 2, 0)).toBeNull();
     expect(placementError(state, 'office', 0, 0)).toBe('No tenants in the basement');
-    expect(placementError(state, 'office', 2, 55)).toBe('Does not fit on the floor');
+    expect(placementError(state, 'office', 2, CONFIG.FLOOR_WIDTH_CELLS - 5)).toBe('Does not fit on the floor');
     placeTenant(state, 'office', 2, 0);
     expect(placementError(state, 'office', 2, 6)).toBe('Space is occupied');
     state.money.balanceCents = 0;
@@ -90,7 +91,7 @@ describe('tenant lifecycle', () => {
   it('getTenantAt resolves cells to tenants', () => {
     const state = newTestGame();
     expect(getTenantAt(state, 1, 30)?.type).toBe('lobby');
-    expect(getTenantAt(state, 1, 61)).toBeUndefined();
+    expect(getTenantAt(state, 1, CONFIG.FLOOR_WIDTH_CELLS + 1)).toBeUndefined();
     expect(getTenantAt(state, 0, 0)).toBeUndefined(); // empty B1
   });
 
@@ -104,7 +105,7 @@ describe('tenant lifecycle', () => {
     expect(state.tenants.has(office.id)).toBe(false);
     expect(state.constructionQueue).toEqual([]);
     const floor = state.tower.floors[2]!;
-    for (let x = 10; x < 22; x++) expect(floor.cells[x]!.content).toBe('empty');
+    for (let x = 10; x < 19; x++) expect(floor.cells[x]!.content).toBe('empty');
   });
 
   it('demolishAt: tenant, stair, then empty top floor', () => {

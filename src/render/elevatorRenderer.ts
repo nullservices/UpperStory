@@ -51,11 +51,7 @@ export class ElevatorView {
     const cell = CONFIG.CELL_WIDTH_PX;
     const top = floorTopY(group.serviceHi);
     const loFloor = getFloor(state.tower, group.serviceLo);
-    const bottom =
-      group.serviceLo === CONFIG.BASEMENT_FLOOR_INDEX
-        ? floorTopY(CONFIG.BASEMENT_FLOOR_INDEX)
-        : floorTopY(group.serviceLo) +
-          (loFloor ? floorHeightPx(loFloor) : bandFallbackPx(group.serviceLo));
+    const bottom = floorTopY(group.serviceLo) + (loFloor ? floorHeightPx(loFloor) : bandFallbackPx(group.serviceLo));
     const housingX = group.x * cell - 1;
     const housingW = cell * 2 + 2;
     g.rect(housingX, top, housingW, bottom - top).fill({

@@ -1,3 +1,4 @@
+import { newCampaign, type CampaignState } from './campaign';
 import { CONFIG } from '../data/config';
 import { seedRng } from './core/rng';
 import type { SimEvent } from './core/events';
@@ -14,6 +15,7 @@ import type { Calendar } from './time';
  * save/load is a JSON round-trip (see sim/save.ts, M5).
  */
 export interface GameState {
+  campaign: CampaignState;
   seed: number;
   /** Live mulberry32 state — part of the save so replays resume the stream. */
   rngState: number;
@@ -44,6 +46,7 @@ export interface GameState {
 
 export function createInitialState(seed = 1): GameState {
   return {
+    campaign: newCampaign(),
     seed,
     rngState: seedRng(seed),
     nextEntityId: 0,
@@ -95,6 +98,6 @@ export function setupDemoTower(state: GameState): void {
   placeTenant(state, 'office', 2, 20);
   placeTenant(state, 'office', 2, 34);
   placeTenant(state, 'condo', 3, 20);
-  placeTenant(state, 'condo', 3, 26);
-  placeTenant(state, 'fastfood', 3, 40);
+  placeTenant(state, 'condo', 3, 36);
+  placeTenant(state, 'fastfood', 3, 60);
 }

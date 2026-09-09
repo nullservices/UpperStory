@@ -1,3 +1,6 @@
+import { CONFIG } from '../data/config';
+import { newCampaign } from './campaign';
+import { emptyCell } from './tower';
 import type { GameState } from './state';
 
 /**
@@ -6,7 +9,7 @@ import type { GameState } from './state';
  * Version bumps go through the migration chain in `deserialize`.
  */
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface SaveEnvelope {
   version: number;
@@ -73,7 +76,7 @@ export function deserializeGame(json: string): GameState {
   if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
     throw new Error('Not a TowerProject save file');
   }
-  if (envelope.version !== SAVE_VERSION) {
+  if (envelope.version !== 1 && envelope.version !== SAVE_VERSION) {
     // Migration chain slot: handle older versions here as they appear.
     throw new Error(
       `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
@@ -82,5 +85,13 @@ export function deserializeGame(json: string): GameState {
   if (!envelope.state || typeof envelope.state !== 'object') {
     throw new Error('Save file is missing its state');
   }
-  return envelope.state as GameState;
+  const state = envelope.state as GameState;
+  if (envelope.version === 1) {
+    state.campaign = newCampaign();
+    state.campaign.lastDay = state.calendar.day;
+    state.campaign.nextIncidentTick = state.tickCount + CONFIG.DAY_TICKS * 3;
+    for (const floor of state.tower.floors) while (floor.cells.length < CONFIG.FLOOR_WIDTH_CELLS) floor.cells.push(emptyCell());
+    state.tower.structureRevision++;
+  }
+  return state;
 }

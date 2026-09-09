@@ -10,6 +10,7 @@ describe('elevator fidelity regressions', () => {
     '%s boards up to its documented capacity', (kind, capacity) => {
       const state = newTestGame();
       scenarioTower(state);
+      state.starLevel = 5;
       const group = placeElevatorGroup(state, 1, 5, 40, kind);
       const tenant = [...state.tenants.values()].find(t => t.type === 'office')!;
       spawnTenantPeople(state, tenant);

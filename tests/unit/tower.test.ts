@@ -143,14 +143,14 @@ describe('grid math', () => {
     expect(floorIndexAtWorldY(-50)).toBe(2);
     expect(floorIndexAtWorldY(-60)).toBe(2); // boundary belongs to floor 2
     expect(floorIndexAtWorldY(-200)).toBe(9);
-    expect(floorIndexAtWorldY(500)).toBe(0); // deep underground clamps to B1
+    expect(floorIndexAtWorldY(500)).toBe(CONFIG.MIN_FLOOR_INDEX); // deep underground clamps to B1
   });
 
   it('cellIndexAtWorldX clamps to floor width', () => {
     expect(cellIndexAtWorldX(-5)).toBe(0);
     expect(cellIndexAtWorldX(6)).toBe(0);
     expect(cellIndexAtWorldX(18)).toBe(1);
-    expect(cellIndexAtWorldX(1000)).toBe(CONFIG.FLOOR_WIDTH_CELLS - 1);
+    expect(cellIndexAtWorldX(100000)).toBe(CONFIG.FLOOR_WIDTH_CELLS - 1);
   });
 });
 

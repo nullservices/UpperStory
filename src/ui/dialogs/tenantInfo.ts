@@ -1,5 +1,5 @@
 import { configureDialog } from './accessibility';
-import { CONFIG } from '../../data/config';
+import { CONFIG, TENANT_DATA, isHotel } from '../../data/config';
 import type { Tenant, TenantType } from '../../sim';
 
 /** Snapshot data the controller computed from live sim state at open time. */
@@ -17,6 +17,8 @@ export interface TenantInfoData {
  */
 export interface TenantInfoActions {
   demolish(): void;
+  repair(): void;
+  changeMovie(): void;
   cyclePricing(): void;
   close(): void;
 }
@@ -149,7 +151,7 @@ export class TenantInfo {
     if (!tenant) return;
     this.title.textContent = `${tenantTypeName(tenant.type)} — Floor ${floorLabel(tenant.floor)}`;
     const stateText =
-      tenant.state === 'constructing' ? 'Under construction' : tenant.state === 'vacant' ? 'Vacant' : 'Open';
+      tenant.state === 'constructing' ? 'Under construction' : tenant.state === 'vacant' ? 'Vacant' : tenant.state === 'damaged' ? 'Damaged — repairs required' : 'Open';
     const capacityText =
       tenant.capacity > 0 ? `${data.occupancy}/${tenant.capacity}` : '—';
     const rows = [
@@ -168,10 +170,19 @@ export class TenantInfo {
     if (isPricable(tenant.type)) {
       rows.push(this.line('Pricing', CONFIG.PRICING_LEVELS[tenant.pricing]!.label));
     }
-    if (tenant.type === 'hotel') {
+    if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
     }
+    if (tenant.type === 'cinema') rows.push(this.line('Film age', `${tenant.movieAge ?? 0} days`));
     this.body.replaceChildren(...rows);
+    if (tenant.state === 'damaged') {
+      const repair = this.button(`Repair · $${Math.round(TENANT_DATA[tenant.type].costDollars / 4).toLocaleString()}`);
+      repair.onclick = () => this.actions?.repair(); this.body.append(repair);
+    }
+    if (tenant.type === 'cinema' && tenant.state === 'open') {
+      const movie = this.button('Change film · $5,000');
+      movie.onclick = () => this.actions?.changeMovie(); this.body.append(movie);
+    }
     if (isPricable(tenant.type)) {
       this.body.appendChild(this.makePricingButton());
     }
@@ -242,7 +253,7 @@ function stars(grade: number): string {
 
 /** cyclePricing() applies to every tenant type but the three static ones. */
 function isPricable(type: TenantType): boolean {
-  return type !== 'lobby' && type !== 'office' && type !== 'condo';
+  return isHotel(type) || ['fastfood', 'restaurant', 'shop', 'cinema', 'partyHall'].includes(type);
 }
 
 function tenantTypeName(type: TenantType): string {
@@ -250,5 +261,5 @@ function tenantTypeName(type: TenantType): string {
 }
 
 function floorLabel(floor: number): string {
-  return floor === CONFIG.BASEMENT_FLOOR_INDEX ? 'B1' : String(floor);
+  return floor <= 0 ? `B${1 - floor}` : String(floor);
 }

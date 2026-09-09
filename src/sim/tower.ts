@@ -1,4 +1,6 @@
 import { CONFIG } from '../data/config';
+import { recordEvent } from './campaign';
+import { rngInt } from './core/rng';
 import { spend } from './money';
 import type { GameState } from './state';
 
@@ -51,7 +53,7 @@ export function topFloorIndex(tower: Tower): number {
 
 /** Pure structural add (no money). Throws on out-of-range or duplicate. */
 function addFloor(tower: Tower, index: number): Floor {
-  if (index < CONFIG.BASEMENT_FLOOR_INDEX || index > CONFIG.MAX_FLOORS) {
+  if (index < CONFIG.MIN_FLOOR_INDEX || index > CONFIG.MAX_FLOORS) {
     throw new Error(`Floor ${index} out of range`);
   }
   if (getFloor(tower, index)) {
@@ -69,6 +71,7 @@ function addFloor(tower: Tower, index: number): Floor {
 
 /** Cost in dollars for building floor `index` (B1/lobby floor are free). */
 export function floorCostDollars(index: number): number {
+  if (index < 0) return 15_000 + Math.abs(index) * 5_000;
   if (index <= CONFIG.LOBBY_FLOOR_INDEX) return 0;
   return (
     CONFIG.FLOOR_COST_BASE_DOLLARS +
@@ -78,10 +81,11 @@ export function floorCostDollars(index: number): number {
 
 /** Human-readable reason the build would fail, or null if it is allowed. */
 export function buildFloorError(state: GameState, index: number): string | null {
-  if (index < CONFIG.BASEMENT_FLOOR_INDEX || index > CONFIG.MAX_FLOORS) {
+  if (index < CONFIG.MIN_FLOOR_INDEX || index > CONFIG.MAX_FLOORS) {
     return 'Floor out of range';
   }
   if (getFloor(state.tower, index)) return 'Floor already exists';
+  if (index < 0 && !getFloor(state.tower, index + 1)) return 'Build the basement above first';
   if (index > CONFIG.LOBBY_FLOOR_INDEX && !getFloor(state.tower, index - 1)) {
     return 'Build lower floors first';
   }
@@ -97,16 +101,22 @@ export function buildFloor(state: GameState, index: number): Floor {
   if (error) throw new Error(error);
   const cost = floorCostDollars(index) * 100;
   if (cost > 0 && !spend(state, cost)) throw new Error('Not enough funds');
-  return addFloor(state.tower, index);
+  const floor = addFloor(state.tower, index);
+  if (index < 0 && !state.campaign.treasureFound && rngInt(state, 0, 7) === 0) {
+    state.campaign.treasureFound = true;
+    state.money.balanceCents += 1_000_000 * 100;
+    recordEvent(state, 'Excavation uncovered hidden treasure worth $1,000,000.');
+  }
+  return floor;
 }
 
 /** Only the top floor may be demolished, and only when completely empty. */
 export function demolishFloor(state: GameState, index: number): void {
   const tower = state.tower;
-  if (index <= CONFIG.LOBBY_FLOOR_INDEX) {
+  if (index === 0 || index === CONFIG.LOBBY_FLOOR_INDEX) {
     throw new Error('The lobby floor cannot be demolished');
   }
-  if (topFloorIndex(tower) !== index) {
+  if (index > 0 ? topFloorIndex(tower) !== index : tower.floors[0]?.index !== index) {
     throw new Error('Only the top floor can be demolished');
   }
   const floor = getFloor(tower, index);
@@ -157,7 +167,7 @@ export function placeStair(state: GameState, floorIndex: number, x: number): voi
  * -40 - 20·(N-1).
  */
 export function floorTopY(index: number): number {
-  if (index === CONFIG.BASEMENT_FLOOR_INDEX) return 0;
+  if (index <= CONFIG.BASEMENT_FLOOR_INDEX) return index === 0 ? 0 : -index * CONFIG.FLOOR_HEIGHT_PX;
   return (
     -CONFIG.FLOOR_HEIGHT_PX * CONFIG.LOBBY_HEIGHT_FLOORS -
     CONFIG.FLOOR_HEIGHT_PX * (index - 1)
@@ -175,8 +185,7 @@ export function floorHeightPx(floor: Floor): number {
 export function floorIndexAtWorldY(y: number): number {
   const h = CONFIG.FLOOR_HEIGHT_PX;
   // Deep underground clamps to B1: the tower has no floors below the basement.
-  if (y >= h) return CONFIG.BASEMENT_FLOOR_INDEX;
-  if (y >= 0) return CONFIG.BASEMENT_FLOOR_INDEX;
+  if (y >= 0) return (Math.max(CONFIG.MIN_FLOOR_INDEX, -Math.floor(y / h)) || 0);
   if (y >= -h * CONFIG.LOBBY_HEIGHT_FLOORS) return CONFIG.LOBBY_FLOOR_INDEX;
   return (
     CONFIG.LOBBY_FLOOR_INDEX +

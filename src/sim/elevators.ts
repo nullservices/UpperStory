@@ -60,7 +60,7 @@ export function carSpeed(car: ElevatorCar): number {
 
 /** World-pixel y of a car at continuous floor-unit position y. */
 export function carWorldY(y: number): number {
-  return y <= 0 ? y * CONFIG.FLOOR_HEIGHT_PX : -(y + 1) * CONFIG.FLOOR_HEIGHT_PX;
+  return y <= 0 ? -y * CONFIG.FLOOR_HEIGHT_PX : -(y + 1) * CONFIG.FLOOR_HEIGHT_PX;
 }
 
 export function groupAt(state: GameState, floorIndex: number, x: number): ElevatorGroup | undefined {
@@ -83,12 +83,14 @@ export function elevatorPlacementError(
   kind: ElevatorKind = 'standard',
   existingGroupId?: number,
 ): string | null {
+  if (existingGroupId === undefined && state.starLevel < (kind === 'express' ? 3 : kind === 'service' ? 2 : 1)) return `Requires ${kind === 'express' ? 3 : 2} stars`;
+  if (existingGroupId === undefined && state.elevatorGroups.size >= 24) return 'Maximum 24 elevator shafts';
   if (![floorLo, floorHi, x].every(Number.isInteger)) return 'Invalid shaft position';
-  if (floorLo < CONFIG.BASEMENT_FLOOR_INDEX || floorHi > CONFIG.MAX_FLOORS) return 'Floor out of range';
+  if (floorLo < CONFIG.MIN_FLOOR_INDEX || floorHi > CONFIG.MAX_FLOORS) return 'Floor out of range';
   if (floorLo > floorHi) return 'Drag from a lower floor upward';
   const span = floorHi - floorLo + 1;
   if (span < 2) return 'Shaft must span at least 2 floors';
-  const maxSpan = kind === 'express' ? CONFIG.MAX_FLOORS : CONFIG.MAX_SHAFT_FLOORS;
+  const maxSpan = kind === 'express' ? CONFIG.MAX_FLOORS - CONFIG.MIN_FLOOR_INDEX + 1 : CONFIG.MAX_SHAFT_FLOORS;
   if (span > maxSpan) return `Shaft max ${maxSpan} floors`;
   if (x < 0 || x + 1 >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const existing = existingGroupId === undefined ? undefined : state.elevatorGroups.get(existingGroupId);
@@ -153,7 +155,7 @@ function stopsFor(
       stops.push(f);
       continue;
     }
-    if (f === CONFIG.LOBBY_FLOOR_INDEX || f === CONFIG.BASEMENT_FLOOR_INDEX || skyLobbyOn(state, f)) {
+    if (f === CONFIG.LOBBY_FLOOR_INDEX || f <= CONFIG.BASEMENT_FLOOR_INDEX || skyLobbyOn(state, f)) {
       stops.push(f);
     }
   }

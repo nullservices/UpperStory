@@ -116,7 +116,8 @@ function stairRoute(state: GameState, from: number, to: number): RouteLeg[] | nu
   const fromFloor = getFloor(state.tower, from);
   if (!fromFloor) return null;
   const candidateColumns: number[] = [];
-  fromFloor.cells.forEach((cell, x) => {
+  const candidateFloor = from === CONFIG.LOBBY_FLOOR_INDEX ? getFloor(state.tower, from + 1) ?? fromFloor : fromFloor;
+  candidateFloor.cells.forEach((cell, x) => {
     if (cell.content === 'stair') candidateColumns.push(x);
   });
   for (const c of candidateColumns) {

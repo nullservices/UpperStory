@@ -14,11 +14,11 @@ export function setupReferenceTower(state: GameState): void {
   placeStair(state, 3, 4);
   for (let floor = 2; floor <= 10; floor++) {
     if (floor <= 3) {
-      for (const x of [20, 24, 28]) placeTenant(state, 'fastfood', floor, x);
+      for (const x of [20]) placeTenant(state, 'fastfood', floor, x);
     } else if (floor <= 7) {
       for (const x of [20, 34]) placeTenant(state, 'office', floor, x);
     } else {
-      for (const x of [20, 26, 32, 38]) placeTenant(state, 'condo', floor, x);
+      for (const x of [20, 36]) placeTenant(state, 'condo', floor, x);
     }
   }
   // Finish construction, then open at the beginning of the next morning.

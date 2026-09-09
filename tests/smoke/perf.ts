@@ -1,7 +1,7 @@
 /**
  * Sim-side performance smoke: a 100-floor tower dense with offices and
- * condos (~3,000 people), ticking a full in-game day. The wall-clock budget
- * leaves headroom for the 5,000-person target at the realtime tick rate
+ * condos (over 15,000 people), ticking a full in-game day. The wall-clock budget
+ * leaves headroom for the 15,000-person endgame at the realtime tick rate
  * (100 ms per tick at 1x).
  */
 import { CONFIG } from '../../src/data/config';
@@ -21,24 +21,14 @@ state.money.balanceCents = 1_000_000_000_00; // $1B builds the test tower
 state.starLevel = 5;
 
 for (let i = 2; i <= 100; i++) buildFloor(state, i);
-// Local shafts stack in 28-floor segments up the tower (max 29 per shaft).
-for (const col of [15, 30, 45]) {
-  for (let lo = 2; lo <= 100; lo += 28) {
-    placeElevatorGroup(state, lo, Math.min(lo + 27, 100), col);
-  }
+// Express backbone and local banks make every office reachable from the lobby.
+for (let f = 15; f <= 90; f += 15) placeTenant(state, 'skyLobby', f, 0);
+placeElevatorGroup(state, 1, 90, 0, 'express');
+for (let lo = 1, bank = 0; lo < 100; lo = lo === 1 ? 15 : lo + 15, bank++) {
+  placeElevatorGroup(state, lo, Math.min(lo + 15, 100), 10 + bank * 3);
 }
-// Free bands between the shafts at cols 15/30/45: 2..13, 18..28, 33..43, 48..58.
 for (let f = 2; f <= 100; f++) {
-  if (f % 2 === 0) {
-    placeTenant(state, 'office', f, 18);
-    placeTenant(state, 'office', f, 33);
-    placeTenant(state, 'hotel', f, 48); // guests flow in through the day
-    placeTenant(state, 'fastfood', f, 2); // lunch-rush diners at scale
-  } else {
-    for (const x of [8, 18, 24, 33, 39, 48, 54]) {
-      placeTenant(state, 'condo', f, x);
-    }
-  }
+  for (let x = 50; x < 320; x += 9) placeTenant(state, 'office', f, x);
 }
 
 // Construction completes (offices take 1,300 ticks), then a full busy day.
@@ -66,7 +56,7 @@ console.log(
   ),
 );
 
-if (pop < 1_500) {
+if (pop < 15_000) {
   console.error(`perf FAILED: expected a dense population, got ${pop}`);
   process.exit(1);
 }

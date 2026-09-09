@@ -3,10 +3,10 @@ import { placeEscalator, placeStair, placeTenant, type GameState } from '../sim'
 import type { Tool } from './controller';
 
 export type RowBuildTool = Exclude<Tool,
-  'select' | 'demolish' | 'buildFloor' | 'lobby' | 'elevator' | 'serviceElevator' | 'expressElevator'>;
+  'select' | 'demolish' | 'buildFloor' | 'buildBasement' | 'lobby' | 'elevator' | 'serviceElevator' | 'expressElevator'>;
 
 export function isRowBuildTool(tool: Tool): tool is RowBuildTool {
-  return !['select', 'demolish', 'buildFloor', 'lobby', 'elevator', 'serviceElevator', 'expressElevator'].includes(tool);
+  return !['select', 'demolish', 'buildFloor', 'buildBasement', 'lobby', 'elevator', 'serviceElevator', 'expressElevator'].includes(tool);
 }
 
 /** A row is aligned to the first placement and stays on its starting floor. */

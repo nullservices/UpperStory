@@ -87,7 +87,7 @@ describe('routing tables', () => {
   it('groupsServing matches a brute-force recompute', () => {
     const state = newTestGame();
     scenarioTower(state);
-    placeElevatorGroup(state, 3, 5, 30);
+    placeElevatorGroup(state, 3, 5, 40);
     rebuildRouting(state);
     for (let f = 0; f <= 5; f++) {
       const expected = [...state.elevatorGroups.values()]
@@ -101,7 +101,7 @@ describe('routing tables', () => {
     const state = newTestGame();
     scenarioTower(state);
     const before = state.routing.revision;
-    placeElevatorGroup(state, 3, 5, 30); // bumps structureRevision
+    placeElevatorGroup(state, 3, 5, 40); // bumps structureRevision
     tick(state);
     expect(state.routing.revision).toBeGreaterThan(before);
     expect(state.routing.groupsServing.get(5)).toContain(

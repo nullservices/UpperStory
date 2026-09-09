@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUnlocked, population, stepProgression } from '../../src/sim';
+import { isUnlocked, population, stepProgression, buildFloor, placeTenant, placeElevatorGroup, rebuildRouting } from '../../src/sim';
 import { newTestGame, scenarioTower, tickN } from '../helpers/simHarness';
 
 describe('star progression', () => {
@@ -11,9 +11,12 @@ describe('star progression', () => {
     expect(state.starLevel).toBe(1);
   });
 
-  it('raises stars at the population gates and emits LEVEL_UP', () => {
+  it('requires facilities and VIP approval through the final cathedral wedding', () => {
     const state = newTestGame();
     state.starLevel = 1;
+    state.money.balanceCents = 1_000_000_000_00;
+    for (let f = 2; f <= 100; f++) buildFloor(state, f);
+    for (let f = -1; f >= -8; f--) buildFloor(state, f);
     // Fake the population directly: gates are pure population checks.
     const fakePopulation = (n: number) => {
       for (let i = state.people.size; i < n; i++) {
@@ -50,17 +53,41 @@ describe('star progression', () => {
     expect(state.events).toContainEqual({ type: 'LEVEL_UP', starLevel: 2 });
 
     fakePopulation(1_000);
+    stepProgression(state); expect(state.starLevel).toBe(2);
+    placeTenant(state, 'security', 2, 30).state = 'open';
     stepProgression(state);
     expect(state.starLevel).toBe(3);
 
     fakePopulation(5_000);
+    stepProgression(state); expect(state.starLevel).toBe(3);
+    placeTenant(state, 'hotelSuite', 3, 30).state = 'open';
+    placeTenant(state, 'medical', 4, 30).state = 'open';
+    placeTenant(state, 'recycling', -1, 30).state = 'open';
+    stepProgression(state); expect(state.starLevel).toBe(3);
+    state.campaign.vipApproved = true;
     stepProgression(state);
     expect(state.starLevel).toBe(4);
 
     fakePopulation(10_000);
+    stepProgression(state); expect(state.starLevel).toBe(4);
+    placeTenant(state, 'metro', -8, 30).state = 'open';
+    stepProgression(state); expect(state.starLevel).toBe(4);
+    placeElevatorGroup(state, -8, 1, 10);
+    rebuildRouting(state);
     stepProgression(state);
     expect(state.starLevel).toBe(5);
     expect(population(state)).toBe(10_000);
+    fakePopulation(15_001);
+    placeTenant(state, 'skyLobby', 90, 80).state = 'open';
+    placeElevatorGroup(state, 1, 90, 80, 'express');
+    placeElevatorGroup(state, 90, 100, 90);
+    placeTenant(state, 'cathedral', 97, 100).state = 'open';
+    rebuildRouting(state);
+    stepProgression(state); expect(state.starLevel).toBe(5);
+    state.calendar.day = 3; state.calendar.minuteOfDay = 720;
+    stepProgression(state);
+    expect(state.starLevel).toBe(6);
+    expect(state.campaign.weddingHeld).toBe(true);
   });
 
   it('unlocks follow the star level', () => {

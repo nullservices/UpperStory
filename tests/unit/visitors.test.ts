@@ -12,7 +12,7 @@ function livelyTower(): ReturnType<typeof newTestGame> {
   state.starLevel = 5; // M3: unlock everything by hand (M4 makes it real)
   scenarioTower(state);
   placeTenant(state, 'restaurant', 4, 20);
-  placeTenant(state, 'fastfood', 4, 40);
+  placeTenant(state, 'fastfood', 4, 50);
   placeTenant(state, 'shop', 5, 20);
   placeTenant(state, 'hotel', 5, 40);
   // Construction finishes by day 2 morning.

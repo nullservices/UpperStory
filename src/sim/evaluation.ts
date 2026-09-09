@@ -1,4 +1,4 @@
-import { CONFIG } from '../data/config';
+import { CONFIG, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
@@ -24,7 +24,7 @@ export function stepEvaluation(state: GameState): void {
   );
 
   for (const tenant of state.tenants.values()) {
-    if (tenant.type === 'lobby' || tenant.state === 'constructing') continue;
+    if (tenant.type === 'lobby' || (tenant.state === 'constructing' || tenant.state === 'damaged')) continue;
     if (tenant.capacity <= 0) continue;
 
     // Condos grade on stress (residents are home most of the day); offices
@@ -36,8 +36,10 @@ export function stepEvaluation(state: GameState): void {
       : 0;
 
     let score = 100 * ratio - avgStress * 0.6;
-    if (tenant.type === 'hotel') score -= (100 - tenant.cleanliness) * 0.5;
+    if (isHotel(tenant.type)) score -= (100 - tenant.cleanliness) * 0.5;
     if (hasSecurity) score += 5;
+    if ([...state.tenants.values()].some(t => t.type === 'medical' && t.state === 'open' && Math.abs(t.floor - tenant.floor) <= 20)) score += 5;
+    score -= Math.max(0, state.campaign.waste - 30) * 0.3;
     tenant.evalScore = Math.min(Math.max(Math.round(score), 0), 100);
     tenant.grade = gradeFromScore(tenant.evalScore);
 
@@ -77,7 +79,7 @@ export function stepEvaluation(state: GameState): void {
 
     // A filthy hotel loses guests.
     if (
-      tenant.type === 'hotel' &&
+      isHotel(tenant.type) &&
       tenant.cleanliness < CONFIG.DIRTY_HOTEL_THRESHOLD &&
       tenant.occupancy > 0
     ) {

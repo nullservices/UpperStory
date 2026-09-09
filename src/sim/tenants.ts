@@ -1,4 +1,4 @@
-import { CONFIG, KINSOKU_FORBIDDEN, TENANT_DATA, type TenantTypeData } from '../data/config';
+import { CONFIG, KINSOKU_FORBIDDEN, TENANT_DATA, facilityHeight, type TenantTypeData } from '../data/config';
 import { pushEvent } from './core/events';
 import { nextId } from './core/ids';
 import { demolishElevatorGroup, groupAt } from './elevators';
@@ -8,7 +8,7 @@ import type { GameState } from './state';
 import { demolishFloor, getFloor, topFloorIndex } from './tower';
 
 export type TenantType = keyof typeof TENANT_DATA;
-export type TenantState = 'constructing' | 'open' | 'vacant';
+export type TenantState = 'constructing' | 'open' | 'vacant' | 'damaged';
 
 export interface Tenant {
   id: number;
@@ -33,6 +33,10 @@ export interface Tenant {
   evalScore: number;
   daysVacant: number;
   daysGood: number;
+  sold?: boolean;
+  movieAge?: number;
+  visitsToday?: number;
+  reportedPopulation?: number;
 }
 
 export function isUnlocked(state: GameState, type: TenantType): boolean {
@@ -100,14 +104,18 @@ export function placementError(
   }
   if (type === 'lobby' && hasLobby(state)) return 'A lobby already exists';
   if (data.requiresFullFloor && x !== 0) return 'The lobby spans the whole floor';
-  if (type !== 'lobby' && floorIndex === CONFIG.BASEMENT_FLOOR_INDEX) {
-    return 'No tenants in the basement';
-  }
+  if (data.basementOnly && floorIndex + facilityHeight(type) - 1 > 0) return 'Build this facility entirely below ground';
+  if (!data.basementOnly && type !== 'lobby' && floorIndex <= 0) return 'No tenants in the basement';
+  if (data.limit && [...state.tenants.values()].filter(t => t.type === type).length >= data.limit) return `Maximum ${data.limit} of this facility`;
+  if (type === 'parkingSpace' && ![...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === floorIndex)) return 'Build a parking ramp on this basement first';
+  if (type === 'parkingRamp' && floorIndex < 0 && ![...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === floorIndex + 1 && t.x === x)) return 'Align the ramp with the basement above';
   if (x < 0 || x + data.sizeCells > CONFIG.FLOOR_WIDTH_CELLS) {
     return 'Does not fit on the floor';
   }
-  if (floor.cells.slice(x, x + data.sizeCells).some((c) => c.content !== 'empty')) {
-    return 'Space is occupied';
+  for (let f = floorIndex; f < floorIndex + facilityHeight(type); f++) {
+    const band = getFloor(state.tower, f);
+    if (!band) return `Build all ${facilityHeight(type)} floors first`;
+    if (band.cells.slice(x, x + data.sizeCells).some(c => c.content !== 'empty')) return 'Space is occupied';
   }
   const kinship = kinsokuViolation(state, type, floorIndex, x);
   if (kinship) return kinship;
@@ -150,10 +158,10 @@ export function placeTenant(
   };
   state.tenants.set(id, tenant);
 
-  const floor = getFloor(state.tower, floorIndex)!;
   const content = constructing ? 'scaffold' : 'tenant';
-  for (let i = x; i < x + data.sizeCells; i++) {
-    floor.cells[i] = { content, tenantId: id };
+  for (let f = floorIndex; f < floorIndex + facilityHeight(type); f++) {
+    const floor = getFloor(state.tower, f)!;
+    for (let i = x; i < x + data.sizeCells; i++) floor.cells[i] = { content, tenantId: id };
   }
   if (constructing) state.constructionQueue.push(id);
   state.tower.structureRevision++;
@@ -172,9 +180,9 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
   const tenant = getTenantAt(state, floorIndex, x);
   if (!tenant) throw new Error('Nothing to demolish here');
   removeTenantPeople(state, tenant.id);
-  const floor = getFloor(state.tower, floorIndex)!;
-  for (let i = tenant.x; i < tenant.x + tenant.sizeCells; i++) {
-    floor.cells[i] = { content: 'empty', tenantId: -1 };
+  for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
+    const floor = getFloor(state.tower, f)!;
+    for (let i = tenant.x; i < tenant.x + tenant.sizeCells; i++) floor.cells[i] = { content: 'empty', tenantId: -1 };
   }
   state.tenants.delete(tenant.id);
   const qi = state.constructionQueue.indexOf(tenant.id);
@@ -226,7 +234,7 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
   }
   if (
     floor.cells.every((c) => c.content === 'empty') &&
-    topFloorIndex(state.tower) === floorIndex
+    (topFloorIndex(state.tower) === floorIndex || state.tower.floors[0]?.index === floorIndex)
   ) {
     demolishFloor(state, floorIndex);
     return;
@@ -246,8 +254,10 @@ export function stepConstruction(state: GameState): void {
     tenant.constructionTicksLeft--;
     if (tenant.constructionTicksLeft > 0) continue;
     tenant.state = 'open';
-    const floor = getFloor(state.tower, tenant.floor);
-    if (floor) {
+    if (tenant.type === 'condo' && !tenant.sold) { tenant.dailyRevenue += 150_000_00; tenant.sold = true; }
+    for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
+      const floor = getFloor(state.tower, f);
+      if (!floor) continue;
       for (let c = tenant.x; c < tenant.x + tenant.sizeCells; c++) {
         floor.cells[c] = { content: 'tenant', tenantId: tenant.id };
       }
@@ -258,4 +268,22 @@ export function stepConstruction(state: GameState): void {
     // The occupants move in (6 workers per office, 3 residents per condo).
     spawnTenantPeople(state, tenant);
   }
+}
+
+/** Repair damaged space using the normal construction pipeline. */
+export function repairTenant(state: GameState, id: number): void {
+  const tenant = state.tenants.get(id);
+  if (!tenant || tenant.state !== 'damaged') throw new Error('This facility does not need repairs');
+  const data = TENANT_DATA[tenant.type];
+  if (!spend(state, Math.round(data.costDollars * 25))) throw new Error('Not enough funds');
+  tenant.state = 'constructing';
+  tenant.constructionTicksLeft = Math.max(100, Math.round(data.constructionTicks / 2));
+  state.constructionQueue.push(id);
+  state.tower.structureRevision++;
+}
+export function changeMovie(state: GameState, id: number): void {
+  const tenant = state.tenants.get(id);
+  if (!tenant || tenant.type !== 'cinema' || tenant.state !== 'open') throw new Error('Select an open cinema');
+  if (!spend(state, 5000 * 100)) throw new Error('Not enough funds');
+  tenant.movieAge = 0;
 }

@@ -32,7 +32,7 @@ export class Camera {
    */
   center(): void {
     const width = this.app.screen.width;
-    this.zoom = Math.min(1.8, Math.max(CONFIG.MIN_ZOOM, (width - 270) / (CONFIG.FLOOR_WIDTH_CELLS * CONFIG.CELL_WIDTH_PX)));
+    this.zoom = Math.min(1.8, Math.max(CONFIG.MIN_ZOOM, (width - 270) / (60 * CONFIG.CELL_WIDTH_PX)));
     this.x = width < 620 ? 184 : 230;
     this.y = this.app.screen.height * 0.79;
     this.apply();

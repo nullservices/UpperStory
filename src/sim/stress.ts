@@ -1,4 +1,4 @@
-import { CONFIG } from '../data/config';
+import { CONFIG, isHotel } from '../data/config';
 import type { GameState } from './state';
 
 /**
@@ -42,7 +42,7 @@ export function stepStress(state: GameState): void {
           const hotel = state.tenants.get(p.tenantId);
           if (
             hotel &&
-            hotel.type === 'hotel' &&
+            isHotel(hotel.type) &&
             hotel.cleanliness < CONFIG.DIRTY_HOTEL_THRESHOLD
           ) {
             delta = CONFIG.DIRTY_HOTEL_STRESS_PER_TICK;

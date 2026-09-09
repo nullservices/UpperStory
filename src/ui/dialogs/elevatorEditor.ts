@@ -220,5 +220,5 @@ function carText(id: number, speedLevel: number, passengers: number): string {
 }
 
 function floorLabel(floor: number): string {
-  return floor === CONFIG.BASEMENT_FLOOR_INDEX ? 'B1' : String(floor);
+  return floor <= 0 ? `B${1 - floor}` : String(floor);
 }

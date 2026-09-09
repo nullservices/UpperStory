@@ -1,4 +1,4 @@
-import { CONFIG, TENANT_DATA } from '../data/config';
+import { CONFIG, TENANT_DATA, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { rngInt, rngNext } from './core/rng';
 import { joinQueue, leaveQueue, pressCall } from './queues';
@@ -36,6 +36,7 @@ export type PersonEndState = 'offscreen' | 'inTenant' | 'cleaning';
 
 export interface Person {
   id: number;
+  vip?: boolean;
   kind: PersonKind;
   /** Home tenant (condo) / workplace (office, security, housekeeping) / hotel. */
   tenantId: number;
@@ -77,7 +78,10 @@ export function tenantCenter(state: GameState, tenantId: number): { floor: numbe
 
 /** Population = everyone tracked (off-screen workers included). */
 export function population(state: GameState): number {
-  return state.people.size;
+  let total = 0;
+  for (const person of state.people.values()) if (person.kind !== 'diner' && person.kind !== 'shopper') total++;
+  for (const tenant of state.tenants.values()) if (tenant.state === 'open') total += tenant.reportedPopulation ?? 0;
+  return total;
 }
 
 export function isStaff(kind: PersonKind): boolean {
@@ -156,7 +160,11 @@ export function spawnTenantPeople(state: GameState, tenant: Tenant): void {
 /** Remove every person attached to a tenant (demolish or vacancy). */
 export function removeTenantPeople(state: GameState, tenantId: number): void {
   for (const [id, p] of state.people) {
-    if (p.tenantId === tenantId) state.people.delete(id);
+    if (p.tenantId === tenantId) {
+      leaveQueue(state, id);
+      for (const group of state.elevatorGroups.values()) for (const car of group.cars) car.passengers = car.passengers.filter(pid => pid !== id);
+      state.people.delete(id);
+    } else if (p.activityTenantId === tenantId) giveUp(state, p);
   }
 }
 
@@ -179,21 +187,24 @@ function weightedPick(state: GameState, tenants: Tenant[]): Tenant {
  * People currently patronizing a commercial tenant — in transit included.
  * (Occupancy alone lags one tick and misses walkers, oversubscribing rooms.)
  */
-function patronsOf(state: GameState, tenant: Tenant): number {
-  let count = 0;
-  for (const p of state.people.values()) {
-    if (p.kind === 'hotelGuest' ? p.tenantId === tenant.id : p.activityTenantId === tenant.id) {
-      count++;
-    }
-  }
-  return count;
-}
-
 /** Spawn an external visitor on a trip to a suitable tenant (or do nothing). */
-function spawnVisitor(state: GameState, kind: PersonKind): void {
+const patronCache = new WeakMap<GameState, { tick: number; counts: Map<number, number> }>();
+function capacityCounts(state: GameState): Map<number, number> {
+  const cached = patronCache.get(state);
+  if (cached?.tick === state.tickCount) return cached.counts;
+  const counts = new Map<number, number>();
+  for (const person of state.people.values()) {
+    const id = person.kind === 'hotelGuest' ? person.tenantId : person.activityTenantId;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  patronCache.set(state, { tick: state.tickCount, counts });
+  return counts;
+}
+function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): number | undefined {
+  const counts = capacityCounts(state);
   const open = (type: string): Tenant[] =>
     [...state.tenants.values()].filter(
-      (t) => t.type === type && t.state === 'open' && patronsOf(state, t) < t.capacity,
+      (t) => t.type === type && t.state === 'open' && (counts.get(t.id) ?? 0) < t.capacity,
     );
   let target: Tenant | null = null;
   let activityTicks = 0;
@@ -203,12 +214,13 @@ function spawnVisitor(state: GameState, kind: PersonKind): void {
     target = weightedPick(state, eateries);
     activityTicks = CONFIG.EAT_TICKS;
   } else if (kind === 'shopper') {
-    const shops = open('shop');
+    const shops = [...open('shop'), ...(state.calendar.minuteOfDay >= 720 ? open('cinema') : []), ...(state.calendar.minuteOfDay >= 1080 ? open('partyHall') : [])];
     if (shops.length === 0) return;
     target = weightedPick(state, shops);
-    activityTicks = CONFIG.SHOP_TICKS;
+    activityTicks = target.type === 'cinema' ? 600 : target.type === 'partyHall' ? 900 : CONFIG.SHOP_TICKS;
+    if (target.type === 'cinema' && rngNext(state) < Math.min(0.9, (target.movieAge ?? 0) / 20)) return;
   } else {
-    const hotels = open('hotel');
+    const hotels = preferred ? [preferred] : [...open('hotel'), ...open('hotelTwin'), ...open('hotelSuite')];
     if (hotels.length === 0) return;
     target = hotels[rngInt(state, 0, hotels.length - 1)]!;
   }
@@ -238,22 +250,33 @@ function spawnVisitor(state: GameState, kind: PersonKind): void {
     activityTenantId: kind === 'hotelGuest' ? -1 : target.id,
   };
   state.people.set(id, person);
+  counts.set(target.id, (counts.get(target.id) ?? 0) + 1);
   beginTrip(state, person);
+  return id;
+}
+
+export function spawnVIP(state: GameState, tenant: Tenant): number | undefined {
+  const id = spawnVisitor(state, 'hotelGuest', tenant);
+  const person = id === undefined ? undefined : state.people.get(id);
+  if (person) person.vip = true;
+  return id;
 }
 
 /** Spawn external traffic for the current time of day (lunch rush etc.). */
 function spawnExternalVisitors(state: GameState): void {
   if (state.people.size >= CONFIG.MAX_PEOPLE) return;
   const now = state.calendar.minuteOfDay;
+  if (state.campaign.weather === 'rain' && rngNext(state) < 0.5) return;
   if (now >= 720 && now < 780 && rngNext(state) < CONFIG.DINER_SPAWN_RATE) {
     spawnVisitor(state, 'diner');
   }
   if (
     now >= CONFIG.SHOPPER_WINDOW_MIN &&
-    now < CONFIG.SHOPPER_WINDOW_MAX &&
+    now < 1380 &&
     rngNext(state) < CONFIG.SHOPPER_SPAWN_RATE
   ) {
     spawnVisitor(state, 'shopper');
+    if ([...state.tenants.values()].some(t => t.type === 'metro' && t.state === 'open')) spawnVisitor(state, 'shopper');
   }
   if (
     now >= CONFIG.GUEST_WINDOW_MIN &&
@@ -294,11 +317,12 @@ function chargePatron(state: GameState, p: Person): void {
   if (!tenant) return;
   const pricing = CONFIG.PRICING_LEVELS[tenant.pricing]!;
   const base =
-    tenant.type === 'fastfood'
+    tenant.type === 'cinema' ? 25 : tenant.type === 'partyHall' ? 75 : tenant.type === 'fastfood'
       ? CONFIG.FASTFOOD_MEAL_DOLLARS
       : tenant.type === 'restaurant'
         ? CONFIG.RESTAURANT_MEAL_DOLLARS
         : CONFIG.SHOP_SALE_DOLLARS;
+  tenant.visitsToday = (tenant.visitsToday ?? 0) + (p.kind === 'officeWorker' ? 0 : 1);
   tenant.dailyRevenue += Math.round(base * pricing.revenueMult * 100);
 }
 
@@ -451,7 +475,7 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
         (t) =>
           (t.type === 'restaurant' || t.type === 'fastfood') &&
           t.state === 'open' &&
-          patronsOf(state, t) < t.capacity,
+          (capacityCounts(state).get(t.id) ?? 0) < t.capacity,
       );
       if (eateries.length === 0) {
         // No food in the tower: hang around the lobby instead.
@@ -492,7 +516,7 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       // Housekeeper: head for the dirtiest open hotel, if any.
       let dirtiest: Tenant | null = null;
       for (const t of state.tenants.values()) {
-        if (t.type !== 'hotel' || t.state !== 'open') continue;
+        if (!isHotel(t.type) || t.state !== 'open') continue;
         if (!dirtiest || t.cleanliness < dirtiest.cleanliness) dirtiest = t;
       }
       if (!dirtiest || dirtiest.cleanliness >= 100) {
@@ -540,7 +564,7 @@ function refreshOccupancy(state: GameState): void {
 
 function stepHotels(state: GameState): void {
   for (const tenant of state.tenants.values()) {
-    if (tenant.type !== 'hotel' || tenant.state !== 'open') continue;
+    if (!isHotel(tenant.type) || tenant.state !== 'open') continue;
     if (tenant.occupancy > 0) {
       tenant.cleanliness = Math.max(
         0,
@@ -652,7 +676,7 @@ export function stepPeople(state: GameState): void {
       case 'cleaning': {
         p.stairsTicksLeft--;
         const hotel = state.tenants.get(p.activityTenantId);
-        if (hotel && hotel.type === 'hotel') {
+        if (hotel && isHotel(hotel.type)) {
           hotel.cleanliness = Math.min(
             100,
             hotel.cleanliness + CONFIG.HOUSEKEEPER_CLEAN_PER_TICK,

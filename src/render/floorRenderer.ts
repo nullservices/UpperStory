@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
-import { CONFIG } from '../data/config';
+import { facilityHeight, isHotel, CONFIG } from '../data/config';
 import { floorHeightPx, floorTopY, type GameState, type Tenant } from '../sim';
 
 /** Original procedural cutaway art. Structure is cached between building edits. */
@@ -43,7 +43,7 @@ export class TowerView {
     const g = this.structure; g.clear();
     for (const floor of floors) {
       const y = floorTopY(floor.index); const h = floorHeightPx(floor);
-      g.rect(0, y, width, h).fill(floor.index === 0 ? 0x979d8c : 0xdce0d3);
+      g.rect(0, y, width, h).fill(floor.index <= 0 ? 0x979d8c : 0xdce0d3);
       for (let x = 0; x < width; x += 12) {
         if (floor.cells[x / 12]?.content === 'empty') {
           g.rect(x, y + 2, 1, h - 4).fill({ color: 0xb5c1b4, alpha: 0.5 });
@@ -64,8 +64,18 @@ export class TowerView {
           for (let i = 0; i < 5; i++) g.rect(x + i * 2, y + h - 4 - i * 3, 4, 2).fill(0x6c8276);
         }
       });
-      g.rect(-2, y, width + 4, 2).fill(0x83958b);
-      g.rect(0, y + 2, width, 1).fill(0xf1f0df);
+      let segmentStart = 0;
+      for (let column = 0; column <= floor.cells.length; column++) {
+        const tenant = state.tenants.get(floor.cells[column]?.tenantId ?? -1);
+        const interior = tenant && floor.index < tenant.floor + facilityHeight(tenant.type) - 1;
+        if (interior || column === floor.cells.length) {
+          if (column > segmentStart) {
+            g.rect(segmentStart * CONFIG.CELL_WIDTH_PX, y, (column - segmentStart) * CONFIG.CELL_WIDTH_PX, 2).fill(0x83958b);
+            g.rect(segmentStart * CONFIG.CELL_WIDTH_PX, y + 2, (column - segmentStart) * CONFIG.CELL_WIDTH_PX, 1).fill(0xf1f0df);
+          }
+          segmentStart = column + 1;
+        }
+      }
       g.rect(-2, y, 2, h).fill(0x7e9183);
       g.rect(width, y, 2, h).fill(0x7e9183);
     }
@@ -75,14 +85,14 @@ export class TowerView {
     for (const label of this.labels) label.destroy();
     this.labels = [];
     for (const floor of floors) {
-      const text = new Text({ text: floor.index === 0 ? 'B1' : floor.index === 1 ? 'L' : String(floor.index), style: { fontSize: 9, fill: 0x496253, fontFamily: 'Tahoma', fontWeight: 'bold' } });
+      const text = new Text({ text: floor.index <= 0 ? `B${1 - floor.index}` : floor.index === 1 ? 'L' : String(floor.index), style: { fontSize: 9, fill: 0x496253, fontFamily: 'Tahoma', fontWeight: 'bold' } });
       text.position.set(-22, floorTopY(floor.index) + 5); this.labels.push(text); this.container.addChild(text);
     }
   }
   private room(g: Graphics, tenant: Tenant): void {
-    const x = tenant.x * CONFIG.CELL_WIDTH_PX, y = floorTopY(tenant.floor);
+    const x = tenant.x * CONFIG.CELL_WIDTH_PX, y = floorTopY(tenant.floor + facilityHeight(tenant.type) - 1);
     const w = tenant.sizeCells * CONFIG.CELL_WIDTH_PX;
-    const h = tenant.floor === 1 ? 40 : 20;
+    const h = tenant.floor === 1 ? 40 : 20 * facilityHeight(tenant.type);
     if (tenant.state === 'constructing') {
       g.rect(x + 1, y + 2, w - 2, h - 3).fill(0xd4d0b8);
       for (let sx = x + 3; sx < x + w - 3; sx += 12) {
@@ -118,10 +128,10 @@ export class TowerView {
         g.rect(sx + 16, y + 14, 4, 3).fill(0x738b8f);
       }
       this.plant(g, x + w - 8, y + h - 4);
-    } else if (tenant.type === 'condo' || tenant.type === 'hotel') {
+    } else if (tenant.type === 'condo' || isHotel(tenant.type)) {
       for (let sx = x + 5; sx < x + w - 24; sx += 34) {
         this.window(g, sx + 2, y + 4, 13, 7);
-        g.rect(sx, y + 12, 22, 5).fill(tenant.type === 'hotel' ? 0x9c85a4 : 0xb98267);
+        g.rect(sx, y + 12, 22, 5).fill(isHotel(tenant.type) ? 0x9c85a4 : 0xb98267);
         g.rect(sx + 1, y + 12, 6, 3).fill(0xf5eedf);
         g.rect(sx + 24, y + 11, 5, 6).fill(0x9d8965);
         g.rect(sx + 25, y + 7, 3, 4).fill(0xe2c88d);
@@ -135,12 +145,55 @@ export class TowerView {
         g.rect(sx - 2, y + 13, 3, 4).fill(0x9b7560);
         g.rect(sx + 11, y + 13, 3, 4).fill(0x9b7560);
       }
+    } else if (tenant.type === 'cinema') {
+      g.rect(x + 5, y + 4, w - 10, h - 10).fill(0x414e56);
+      g.rect(x + w / 4, y + 6, w / 2, h / 3).fill(0xc9d4c6);
+      for (let row = 0; row < 3; row++) for (let sx = x + 8; sx < x + w - 8; sx += 12) g.rect(sx, y + h / 2 + row * 5, 8, 4).fill(0xa46f68);
+    } else if (tenant.type === 'cathedral') {
+      g.rect(x + 4, y + 3, w - 8, h - 6).fill(0xd6c8a4);
+      for (let sx = x + 12; sx < x + w - 15; sx += 28) {
+        g.roundRect(sx, y + 10, 16, h / 2, 8).fill(0x809aab);
+        g.rect(sx + 7, y + 10, 2, h / 2).fill(0xd6b87b);
+        g.rect(sx, y + h / 3, 16, 2).fill(0xd6b87b);
+        g.rect(sx - 3, y + h - 14, 24, 6).fill(0x947d5c);
+      }
+    } else if (tenant.type === 'metro') {
+      g.rect(x + 3, y + 4, w - 6, h - 7).fill(0x596868);
+      g.roundRect(x + 8, y + h / 2, w - 16, h / 3, 5).fill(0xb5c9bd);
+      for (let sx = x + 15; sx < x + w - 20; sx += 22) g.rect(sx, y + h / 2 + 3, 14, 8).fill(0x5c8b93);
+      g.rect(x + 4, y + h - 6, w - 8, 2).fill(0xd7c490);
+    } else if (tenant.type === 'parkingSpace') {
+      g.roundRect(x + 4, y + 9, w - 8, 7, 2).fill([0x8d9da7, 0xb08068, 0x7f9981][tenant.id % 3]!);
+      g.rect(x + 12, y + 6, w - 24, 5).fill(0xbed2cb);
+      g.circle(x + 10, y + 17, 2).fill(0x52605c); g.circle(x + w - 10, y + 17, 2).fill(0x52605c);
+    } else if (tenant.type === 'parkingRamp') {
+      g.moveTo(x + 2, y + h - 3).lineTo(x + w - 2, y + 4).stroke({ width: 3, color: 0x7d8d81 });
+    } else if (tenant.type === 'partyHall') {
+      for (let sx = x + 14; sx < x + w - 12; sx += 25) {
+        g.circle(sx, y + h - 12, 7).fill(0xe7dcc7);
+        g.rect(sx - 9, y + h - 12, 3, 6).fill(0x9d7a68);
+        g.rect(sx + 7, y + h - 12, 3, 6).fill(0x9d7a68);
+      }
+      g.circle(x + w / 2, y + 8, 4).fill(0xd9bd71);
+    } else if (tenant.type === 'medical') {
+      for (let sx = x + 8; sx < x + w - 20; sx += 28) {
+        g.rect(sx, y + 11, 22, 5).fill(0xe8ecdd); g.rect(sx + 2, y + 10, 5, 3).fill(0xacc6ba);
+      }
+      g.rect(x + w - 11, y + 4, 3, 9).fill(0xad6056); g.rect(x + w - 14, y + 7, 9, 3).fill(0xad6056);
+    } else if (tenant.type === 'recycling') {
+      for (let sx = x + 8; sx < x + w - 20; sx += 28) {
+        g.rect(sx, y + 8, 20, h - 14).fill(0x7e9780); g.rect(sx - 1, y + 6, 22, 3).fill(0x536e60);
+      }
     } else {
       for (let sx = x + 5; sx < x + w - 10; sx += 19) {
         g.rect(sx, y + 5, 14, 12).fill(0xb3a384);
         for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) g.rect(sx + 2 + col * 4, y + 6 + row * 5, 3, 4).fill([0xa8b894, 0xb97f69, 0xe4cf92][col]!);
         g.rect(sx, y + 10, 14, 1).fill(0x897c61);
       }
+    }
+    if (tenant.state === 'damaged') {
+      g.rect(x + 1, y + 2, w - 2, h - 3).fill({ color: 0x433f38, alpha: 0.75 });
+      for (let sx = x + 4; sx < x + w - 8; sx += 14) g.moveTo(sx, y + 4).lineTo(sx + 8, y + h - 4).stroke({ width: 2, color: 0xb88e4b });
     }
     if (tenant.state === 'vacant') g.rect(x + 2, y + 3, w - 4, h - 6).fill({ color: 0xb0b0a0, alpha: 0.5 });
 

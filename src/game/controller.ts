@@ -29,11 +29,15 @@ import { QuarterReport } from '../ui/dialogs/quarterReport';
 import { TenantInfo } from '../ui/dialogs/tenantInfo';
 import type { Hud } from '../ui/hud';
 import { BuildStroke, isRowBuildTool } from './buildStroke';
+import { repairTenant, changeMovie } from '../sim/tenants';
 import { buildElevator, elevatorBuildPlan } from './elevatorBuild';
 
 /** Player-facing build/demolish tools. Tenant tools share TenantType names. */
 export type Tool =
   | 'buildFloor'
+  | 'buildBasement'
+  | 'hotelTwin' | 'hotelSuite' | 'partyHall' | 'cinema' | 'medical'
+  | 'parkingRamp' | 'parkingSpace' | 'recycling' | 'metro' | 'cathedral'
   | 'lobby'
   | 'stairs'
   | 'office'
@@ -243,6 +247,10 @@ export class Controller {
     }
     try {
       switch (tool) {
+        case 'buildBasement': {
+          buildFloor(state, state.tower.floors[0]!.index - 1);
+          break;
+        }
         case 'buildFloor': {
           const next = topFloorIndex(state.tower) + 1;
           buildFloor(state, next);
@@ -357,6 +365,14 @@ export class Controller {
             this.tenantInfo.setError(err instanceof Error ? err.message : String(err));
           }
         },
+        repair: () => {
+          try { repairTenant(this.state, tenant.id); this.tenantInfo.refresh(); }
+          catch (error) { this.tenantInfo.setError(error instanceof Error ? error.message : String(error)); }
+        },
+        changeMovie: () => {
+          try { changeMovie(this.state, tenant.id); this.tenantInfo.refresh(); }
+          catch (error) { this.tenantInfo.setError(error instanceof Error ? error.message : String(error)); }
+        },
         cyclePricing: () => {
           try {
             cyclePricing(this.state, tenant.id);
@@ -409,6 +425,8 @@ export class Controller {
     if (!tool || !hover) return null;
     const state = this.state;
     switch (tool) {
+      case 'buildBasement':
+        return buildFloorError(state, state.tower.floors[0]!.index - 1);
       case 'buildFloor':
         return buildFloorError(state, topFloorIndex(state.tower) + 1);
       case 'demolish':

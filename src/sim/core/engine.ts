@@ -1,3 +1,4 @@
+import { stepCampaign } from '../campaign';
 import { CONFIG } from '../../data/config';
 import { stepElevators } from '../elevators';
 import { stepEvaluation } from '../evaluation';
@@ -39,5 +40,6 @@ export function tick(state: GameState): void {
   if (state.calendar.tickOfDay === CONFIG.DAY_TICKS - 1) {
     stepDailySettlement(state);
   }
+  stepCampaign(state);
   stepProgression(state); // population-based star ratings
 }

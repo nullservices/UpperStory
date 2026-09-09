@@ -5,13 +5,15 @@ import {
   createInitialState,
   deserializeGame,
   serializeGame,
-  setupDemoTower,
-  placeTenant,
   setupNewGame,
   tick,
 } from './sim';
 import { Controller } from './game/controller';
+import { IncidentView } from './render/incidents';
+import { TowerMap } from './ui/towerMap';
+import { CampaignPanel } from './ui/campaignPanel';
 import { Motion } from './render/motion';
+import { setupShowcaseTower } from './sim/showcaseTower';
 import { setupReferenceTower } from './sim/referenceTower';
 import { SkyView } from './render/sky';
 import { Camera } from './render/camera';
@@ -47,18 +49,7 @@ async function main(): Promise<void> {
   if (new URLSearchParams(window.location.search).has('reference')) {
     setupReferenceTower(state);
   } else if (new URLSearchParams(window.location.search).has('demo')) {
-    setupDemoTower(state);
-    state.starLevel = 5;
-    // Upper-floor residents and offices create real demand for the lift.
-    placeTenant(state, 'office', 5, 20);
-    placeTenant(state, 'office', 5, 34);
-    placeTenant(state, 'condo', 6, 20);
-    placeTenant(state, 'condo', 6, 26);
-    placeTenant(state, 'condo', 6, 32);
-    placeTenant(state, 'fastfood', 6, 40);
-    // The tour opens with finished rooms and an active second-day commute.
-    for (let i = 0; i < CONFIG.DAY_TICKS + 150; i++) tick(state);
-    state.events.length = 0;
+    setupShowcaseTower(state);
   } else {
     setupNewGame(state);
   }
@@ -83,12 +74,25 @@ async function main(): Promise<void> {
     height: window.innerHeight,
   }));
   camera.view.addChild(peopleView.container);
+  const incidents = new IncidentView();
+  camera.view.addChild(incidents.world);
+  app.stage.addChild(incidents.weather);
   const preview = new PlacementPreview();
   camera.view.addChild(preview.graphics);
   app.stage.addChild(dayNight.screenTint);
 
   // --- UI: HUD, palette wired to the controller, tool highlight echo ---
   const hud = new Hud();
+  const campaignPanel = new CampaignPanel((floor, x) => {
+    camera.x = app.screen.width / 2 - x * CONFIG.CELL_WIDTH_PX * camera.zoom;
+    camera.y = app.screen.height / 2 - (floor <= 0 ? -floor * CONFIG.FLOOR_HEIGHT_PX : -(floor + 1) * CONFIG.FLOOR_HEIGHT_PX) * camera.zoom;
+    camera.apply();
+  }, text => hud.toast(text));
+  const towerMap = new TowerMap((x, y) => {
+    camera.x = app.screen.width / 2 - x * camera.zoom;
+    camera.y = app.screen.height / 2 - y * camera.zoom;
+    camera.apply();
+  });
   const controller = new Controller(app, camera, state, hud);
   const palette = new ToolPalette((tool) => controller.selectTool(tool));
   controller.onToolChange = (tool) => palette.setActive(tool);
@@ -162,6 +166,9 @@ async function main(): Promise<void> {
       controller.hoverError,
       controller.drag,
     );
+    incidents.draw(state, app.screen.width, app.screen.height, acc / CONFIG.TICK_MS);
+    campaignPanel.update(state);
+    towerMap.update(state);
     hud.update(state);
     palette.update(state);
     hud.setContext(controller.tool, controller.hover, controller.hoverError, camera.zoom);

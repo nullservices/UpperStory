@@ -1,4 +1,4 @@
-import { CONFIG } from '../data/config';
+import { CONFIG, TENANT_DATA, type TenantTypeData } from '../data/config';
 import { pushEvent } from './core/events';
 import type { GameState } from './state';
 
@@ -60,6 +60,14 @@ export function stepDailySettlement(state: GameState): void {
         CONFIG.CONDO_RENT_DAILY_DOLLARS * 100 * rentMultiplier(tenant.grade),
       );
     }
+    const data = TENANT_DATA[tenant.type] as TenantTypeData;
+    upkeep += (data.upkeepDaily ?? 0) * 100;
+    if (['shop', 'restaurant', 'fastfood', 'cinema', 'partyHall'].includes(tenant.type)) {
+      tenant.reportedPopulation = Math.min(tenant.capacity, tenant.visitsToday ?? 0);
+      tenant.visitsToday = 0;
+    }
+    if (tenant.type === 'cinema') tenant.movieAge = (tenant.movieAge ?? 0) + 1;
+    if (tenant.type === 'parkingSpace' && [...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === tenant.floor && t.state === 'open')) income += 5000;
     // Meals, shop sales and hotel nights accumulate here during the day.
     income += tenant.dailyRevenue;
     tenant.dailyRevenue = 0;

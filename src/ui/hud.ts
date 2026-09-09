@@ -1,5 +1,6 @@
 import type { StatusMode } from '../render/statusOverlay';
 import type { Tool } from '../game/controller';
+import { progressionRequirements } from '../sim/progression';
 import { PROGRESSION } from '../data/config';
 import { formatTimeOfDay, population, topFloorIndex, type GameState } from '../sim';
 import { TOOL_INFO } from './toolPalette';
@@ -80,7 +81,7 @@ export class Hud {
   setContext(tool: Tool | null, hover: { floor: number; cell: number } | null, error: string | null, zoom: number): void {
     this.message.textContent = error ?? TOOL_INFO[tool ?? 'select'].hint;
     this.message.classList.toggle('error', error !== null);
-    this.location.textContent = `${hover ? `${hover.floor === 0 ? 'B1' : 'F' + hover.floor} · Cell ${hover.cell + 1}   |   ` : ''}${Math.round(zoom * 100)}%`;
+    this.location.textContent = `${hover ? `${hover.floor <= 0 ? 'B' + (1 - hover.floor) : 'F' + hover.floor} · Cell ${hover.cell + 1}   |   ` : ''}${Math.round(zoom * 100)}%`;
   }
   update(state: GameState): void {
     const now = performance.now();
@@ -88,7 +89,7 @@ export class Hud {
     this.lastUpdate = now; this.lastState = state;
     const pop = population(state);
     const gate = PROGRESSION.find(g => g.star > state.starLevel);
-    this.status.innerHTML = `<div class="funds"><small>FUNDS</small><b>${cash(state.money.balanceCents)}</b></div><div><small>POPULATION</small><b>${pop.toLocaleString()}</b></div><div><small>RATING</small><b class="stars">${'★'.repeat(state.starLevel)}<span>${'☆'.repeat(5-state.starLevel)}</span></b></div><div class="clock"><small>DAY ${state.calendar.day}</small><b>${formatTimeOfDay(state.calendar.minuteOfDay)}</b></div>`;
+    this.status.innerHTML = `<div class="funds"><small>FUNDS</small><b>${cash(state.money.balanceCents)}</b></div><div><small>POPULATION</small><b>${pop.toLocaleString()}</b></div><div><small>RATING</small><b class="stars">${state.starLevel === 6 ? 'TOWER' : '★'.repeat(state.starLevel)}<span>${'☆'.repeat(Math.max(0, 5-state.starLevel))}</span></b></div><div class="clock"><small>DAY ${state.calendar.day}</small><b>${formatTimeOfDay(state.calendar.minuteOfDay)}</b></div>`;
     const firstConstruction = [...state.tenants.values()].find(t => t.state === 'constructing');
     const hasOffice = [...state.tenants.values()].some(t => t.type === 'office');
     this.brief.innerHTML = state.tower.floors.length <= 2
@@ -100,7 +101,7 @@ export class Hud {
     if (!this.inspector.hidden) {
       const tenants = [...state.tenants.values()];
       const waiting = Object.values(state.queues).reduce((n, q) => n + q.length, 0);
-      this.inspector.lastElementChild!.innerHTML = `<div class="report-section"><small>THE NEXT MILESTONE</small><h3>${gate ? `${gate.star}-star tower` : 'Top of the world'}</h3><progress max="${gate?.population ?? 1}" value="${gate ? pop : 1}"></progress><p>${gate ? `${pop.toLocaleString()} / ${gate.population.toLocaleString()} people` : 'Maximum tower rating'}</p></div><dl><dt>Upper floors</dt><dd>${topFloorIndex(state.tower)}</dd><dt>Open facilities</dt><dd>${tenants.filter(t => t.state === 'open').length}</dd><dt>Under construction</dt><dd>${state.constructionQueue.length}</dd><dt>Vacant facilities</dt><dd>${tenants.filter(t => t.state === 'vacant').length}</dd><dt>Waiting for a lift</dt><dd>${waiting}</dd></dl><div class="report-section"><small>THIS QUARTER</small><dl><dt>Income</dt><dd>${cash(state.money.quarterIncomeCents)}</dd><dt>Upkeep</dt><dd>${cash(state.money.quarterUpkeepCents)}</dd><dt>Net</dt><dd>${cash(state.money.quarterIncomeCents - state.money.quarterUpkeepCents)}</dd></dl></div>`;
+      this.inspector.lastElementChild!.innerHTML = `<div class="report-section"><small>THE NEXT MILESTONE</small><h3>${gate ? `${gate.star}-star tower` : 'Top of the world'}</h3><progress max="${gate?.population ?? 1}" value="${gate ? pop : 1}"></progress><p>${gate ? `${pop.toLocaleString()} / ${gate.population.toLocaleString()} people` : 'Maximum tower rating'}</p>${gate ? '<ul>' + progressionRequirements(state, gate.star).map(r => `<li>${r.met ? '✓' : '○'} ${r.label}</li>`).join('') + '</ul>' : ''}</div><dl><dt>Upper floors</dt><dd>${topFloorIndex(state.tower)}</dd><dt>Open facilities</dt><dd>${tenants.filter(t => t.state === 'open').length}</dd><dt>Under construction</dt><dd>${state.constructionQueue.length}</dd><dt>Vacant facilities</dt><dd>${tenants.filter(t => t.state === 'vacant').length}</dd><dt>Waiting for a lift</dt><dd>${waiting}</dd></dl><div class="report-section"><small>THIS QUARTER</small><dl><dt>Income</dt><dd>${cash(state.money.quarterIncomeCents)}</dd><dt>Upkeep</dt><dd>${cash(state.money.quarterUpkeepCents)}</dd><dt>Net</dt><dd>${cash(state.money.quarterIncomeCents - state.money.quarterUpkeepCents)}</dd></dl></div>`;
     }
   }
   toast(message: string): void {

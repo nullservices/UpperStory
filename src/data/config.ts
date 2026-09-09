@@ -11,13 +11,14 @@ export const CONFIG = {
 
   // --- Tower geometry ---
   /** Player-facing floor width in placement cells. (Original stored 375 fine tiles/floor.) */
-  FLOOR_WIDTH_CELLS: 60,
+  FLOOR_WIDTH_CELLS: 375,
   /** World-pixel height of one floor band at zoom 1. */
   FLOOR_HEIGHT_PX: 20,
   /** The lobby floor is visually this many floors tall. */
   LOBBY_HEIGHT_FLOORS: 2,
   /** Floor index of B1 (below ground). */
   BASEMENT_FLOOR_INDEX: 0,
+  MIN_FLOOR_INDEX: -8,
   /** Floor index of the ground/lobby floor. */
   LOBBY_FLOOR_INDEX: 1,
   /** Highest buildable floor. */
@@ -126,14 +127,14 @@ export const CONFIG = {
   GUEST_WINDOW_MIN: 660, // 11:00
   GUEST_WINDOW_MAX: 1380, // 23:00
   /** Hard cap on tracked people (M5 perf target: 5,000 at 60 fps). */
-  MAX_PEOPLE: 5_000,
+  MAX_PEOPLE: 30_000,
   EAT_TICKS: 250,
   SHOP_TICKS: 180,
   GUEST_CHECKIN_TICKS: 100,
 
   // --- Economy (approx — tune by playtest) ---
-  OFFICE_RENT_DAILY_DOLLARS: 400,
-  CONDO_RENT_DAILY_DOLLARS: 150,
+  OFFICE_RENT_DAILY_DOLLARS: 3_333,
+  CONDO_RENT_DAILY_DOLLARS: 0,
   HOTEL_RATE_NIGHTLY_DOLLARS: 120,
   RESTAURANT_MEAL_DOLLARS: 15,
   FASTFOOD_MEAL_DOLLARS: 8,
@@ -141,7 +142,7 @@ export const CONFIG = {
   GUARD_WAGE_DAILY_DOLLARS: 200,
   HOUSEKEEPER_WAGE_DAILY_DOLLARS: 200,
   ELEVATOR_CAR_UPKEEP_DAILY_DOLLARS: 50,
-  QUARTER_DAYS: 14,
+  QUARTER_DAYS: 3,
   /** Pricing levels: visitor volume multiplier vs revenue multiplier. */
   PRICING_LEVELS: [
     { label: 'very low', visitorMult: 1.6, revenueMult: 0.6 },
@@ -189,6 +190,10 @@ export interface TenantTypeData {
   requiresFullFloor?: boolean;
   /** If set, only placeable on this floor index. */
   floorRestriction?: number;
+  heightFloors?: number;
+  basementOnly?: boolean;
+  limit?: number;
+  upkeepDaily?: number;
 }
 
 /**
@@ -206,60 +211,60 @@ export const TENANT_DATA = {
     floorRestriction: CONFIG.LOBBY_FLOOR_INDEX,
   },
   office: {
-    sizeCells: 12,
-    costDollars: 9_000,
+    sizeCells: 9,
+    costDollars: 40_000,
     constructionTicks: 1_300,
     unlockedAtStar: 1,
     capacity: 6, // 6 workers per office (reverse-engineered save format)
   },
   condo: {
-    sizeCells: 6,
-    costDollars: 7_000,
+    sizeCells: 16,
+    costDollars: 80_000,
     constructionTicks: 800,
     unlockedAtStar: 1,
     capacity: 3, // 3 residents per condo (reverse-engineered save format)
   },
   fastfood: {
-    sizeCells: 4,
-    costDollars: 8_000,
+    sizeCells: 16,
+    costDollars: 100_000,
     constructionTicks: 600,
     unlockedAtStar: 1,
-    capacity: 10, // seats
+    capacity: 35, // seats
   },
   security: {
-    sizeCells: 8,
-    costDollars: 10_000,
+    sizeCells: 16,
+    costDollars: 100_000,
     constructionTicks: 900,
     unlockedAtStar: 2,
     capacity: 1, // 1 guard
   },
   housekeeping: {
-    sizeCells: 8,
-    costDollars: 10_000,
+    sizeCells: 15,
+    costDollars: 50_000,
     constructionTicks: 900,
     unlockedAtStar: 2,
-    capacity: 1, // 1 housekeeper
+    capacity: 6, // 1 housekeeper
   },
   hotel: {
-    sizeCells: 12,
-    costDollars: 40_000,
+    sizeCells: 4,
+    costDollars: 20_000,
     constructionTicks: 2_200,
     unlockedAtStar: 2,
-    capacity: 10, // 10 rooms
+    capacity: 1, // single hotel room
   },
   restaurant: {
-    sizeCells: 12,
-    costDollars: 30_000,
+    sizeCells: 24,
+    costDollars: 200_000,
     constructionTicks: 1_800,
     unlockedAtStar: 3,
-    capacity: 24, // seats
+    capacity: 35, // seats
   },
   shop: {
-    sizeCells: 8,
-    costDollars: 12_000,
+    sizeCells: 12,
+    costDollars: 100_000,
     constructionTicks: 1_000,
     unlockedAtStar: 3,
-    capacity: 6, // concurrent shoppers
+    capacity: 25, // concurrent shoppers
   },
   skyLobby: {
     sizeCells: 3, // wide enough for a 2-cell express shaft to run through
@@ -268,19 +273,30 @@ export const TENANT_DATA = {
     unlockedAtStar: 3,
     capacity: 0, // no fixed capacity; evaluation skips it
   },
+  hotelTwin: { sizeCells: 6, costDollars: 50_000, constructionTicks: 1600, unlockedAtStar: 2, capacity: 2 },
+  hotelSuite: { sizeCells: 10, costDollars: 100_000, constructionTicks: 2200, unlockedAtStar: 2, capacity: 2 },
+  partyHall: { sizeCells: 24, heightFloors: 2, costDollars: 100_000, constructionTicks: 2200, unlockedAtStar: 3, capacity: 50, limit: 16 },
+  cinema: { sizeCells: 31, heightFloors: 2, costDollars: 500_000, constructionTicks: 2600, unlockedAtStar: 3, capacity: 120, limit: 16 },
+  medical: { sizeCells: 26, costDollars: 500_000, constructionTicks: 1800, unlockedAtStar: 3, capacity: 0, limit: 10 },
+  parkingRamp: { sizeCells: 16, costDollars: 50_000, constructionTicks: 600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepDaily: 3333 },
+  parkingSpace: { sizeCells: 4, costDollars: 3_000, constructionTicks: 100, unlockedAtStar: 3, capacity: 0, basementOnly: true, limit: 512 },
+  recycling: { sizeCells: 25, heightFloors: 2, costDollars: 500_000, constructionTicks: 2600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepDaily: 16667 },
+  metro: { sizeCells: 30, heightFloors: 3, costDollars: 1_000_000, constructionTicks: 3900, unlockedAtStar: 4, capacity: 0, basementOnly: true, floorRestriction: -8, limit: 1, upkeepDaily: 33333 },
+  cathedral: { sizeCells: 28, heightFloors: 4, costDollars: 3_000_000, constructionTicks: 5200, unlockedAtStar: 5, capacity: 0, floorRestriction: 97, limit: 1 },
+
 } as const satisfies Record<string, TenantTypeData>;
 
 /**
  * Star progression. Original gates (allthetropes.org/wiki/SimTower): 2★@300,
- * 3★@1000, 4★@5000, 5★@10000. V1 adaptation: the original 4★/5★ gates also
- * required Metro/parking/recycling/VIPs (not in v1 yet) — for now they are
- * pure population gates; the facility requirements slot back in later.
+ * 3★@1000, 4★@5000, 5★@10000. Facility and event requirements are
+ * enforced by progression.ts; the final wedding requires over 15,000 people.
  */
 export const PROGRESSION: ReadonlyArray<{ star: number; population: number }> = [
   { star: 2, population: 300 },
   { star: 3, population: 1_000 },
   { star: 4, population: 5_000 },
   { star: 5, population: 10_000 },
+  { star: 6, population: 15_001 },
 ];
 
 /**
@@ -296,3 +312,11 @@ export const KINSOKU_FORBIDDEN: Partial<
   condo: ['restaurant', 'fastfood'], // smells and crowds
   hotel: ['fastfood'], // noise
 };
+
+/** Hotel IDs share guest, housekeeping and evaluation behavior. */
+export function isHotel(type: string): boolean {
+  return type === 'hotel' || type === 'hotelTwin' || type === 'hotelSuite';
+}
+export function facilityHeight(type: keyof typeof TENANT_DATA): number {
+  return (TENANT_DATA[type] as TenantTypeData).heightFloors ?? 1;
+}

@@ -45,6 +45,8 @@ Inspect an elevator to add cars, upgrade speed or choose each car's home floor. 
 
 Use **Floors served** to turn individual stops on or off. Existing trips finish normally; new passengers use the revised stop list. Disabled stops stay disabled when you extend the shaft, while newly added floors start in service.
 
+People can travel up to four consecutive stair flights or seven escalator flights. Stairs cost $5,000 and escalators $20,000. The tower supports 64 stairs and escalators combined, 16 cinemas and party halls combined, 512 food and retail facilities combined, and 10 security offices. Facilities under construction count toward these limits; demolition frees a slot.
+
 ## Controls
 
 Designed for a desktop browser with a mouse and keyboard.

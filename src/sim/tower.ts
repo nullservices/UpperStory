@@ -130,6 +130,13 @@ export function demolishFloor(state: GameState, index: number): void {
 
 // --- Stairs ---
 
+/** Escalator landing cells are shared; count installed links, not their cells. */
+export function stairEscalatorCount(state: GameState): number {
+  let count = state.escalators.size;
+  for (const floor of state.tower.floors) for (const cell of floor.cells) if (cell.content === 'stair') count++;
+  return count;
+}
+
 /** Human-readable reason a stair placement would fail, or null. */
 export function stairPlacementError(state: GameState, floorIndex: number, x: number): string | null {
   if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX) floorIndex++;
@@ -139,6 +146,7 @@ export function stairPlacementError(state: GameState, floorIndex: number, x: num
   if (x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const cell = floor.cells[x];
   if (!cell || cell.content !== 'empty') return 'Space is occupied';
+  if (stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   // Stairwell continuity: stair below (or the lobby floor beneath).
   const below = getFloor(state.tower, floorIndex - 1);
   if (below && below.index !== CONFIG.LOBBY_FLOOR_INDEX && below.cells[x]?.content !== 'stair') {

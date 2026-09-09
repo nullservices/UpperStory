@@ -106,6 +106,12 @@ export function placementError(
   if (data.requiresFullFloor && x !== 0) return 'The lobby spans the whole floor';
   if (data.basementOnly && floorIndex + facilityHeight(type) - 1 > 0) return 'Build this facility entirely below ground';
   if (!data.basementOnly && type !== 'lobby' && floorIndex <= 0) return 'No tenants in the basement';
+  const sharedTypes = type === 'cinema' || type === 'partyHall' ? ['cinema', 'partyHall'] : ['fastfood', 'restaurant', 'shop'].includes(type) ? ['fastfood', 'restaurant', 'shop'] : null;
+  if (sharedTypes) {
+    const limit = sharedTypes[0] === 'cinema' ? 16 : 512;
+    if ([...state.tenants.values()].filter(t => sharedTypes.includes(t.type)).length >= limit) return `Maximum ${limit} ${limit === 16 ? 'cinemas and party halls' : 'food and retail facilities'} combined`;
+  }
+  if (type === 'security' && [...state.tenants.values()].filter(t => t.type === 'security').length >= 10) return 'Maximum 10 security offices';
   if (data.limit && [...state.tenants.values()].filter(t => t.type === type).length >= data.limit) return `Maximum ${data.limit} of this facility`;
   if (type === 'parkingSpace' && ![...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === floorIndex)) return 'Build a parking ramp on this basement first';
   if (type === 'parkingRamp' && floorIndex < 0 && ![...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === floorIndex + 1 && t.x === x)) return 'Align the ramp with the basement above';

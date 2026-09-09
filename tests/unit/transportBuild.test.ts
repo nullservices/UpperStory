@@ -72,6 +72,6 @@ describe('transport construction gestures', () => {
     expect(getFloor(state.tower, 2)!.cells[4]!.content).toBe('stair');
     expect(getFloor(state.tower, 1)!.cells).toEqual(lobby);
     expect(() => placeStair(state, 2, 4)).toThrow('occupied');
-    expect(state.money.balanceCents).toBe(funds - 1000 * 100);
+    expect(state.money.balanceCents).toBe(funds - 5000 * 100);
   });
 });

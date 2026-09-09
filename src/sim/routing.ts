@@ -60,23 +60,21 @@ export function rebuildRouting(state: GameState): void {
     }
   }
 
-  for (const floor of state.tower.floors) {
-    floor.cells.forEach((cell, x) => {
-      if (cell.content !== 'escalator') return;
-      const dir = state.escalators.get(`${floor.index}:${x}`);
-      if (!dir) return;
+  // Lobby landings share the lobby's cells, so the installed link map is
+  // authoritative rather than the painted cell content.
+  for (const [key, dir] of state.escalators) {
+      const [floorIndex, x] = key.split(':').map(Number) as [number, number];
       if (dir === 'up') {
         // Rides from this floor up to floor.index+1.
-        const links = rt.escalatorLinks.get(floor.index) ?? { up: [], down: [] };
-        links.up.push({ x, to: floor.index + 1 });
-        rt.escalatorLinks.set(floor.index, links);
+        const links = rt.escalatorLinks.get(floorIndex) ?? { up: [], down: [] };
+        links.up.push({ x, to: floorIndex + 1 });
+        rt.escalatorLinks.set(floorIndex, links);
       } else {
         // Rides down from the upper floor (floor.index+1) to this floor.
-        const upperLinks = rt.escalatorLinks.get(floor.index + 1) ?? { up: [], down: [] };
-        upperLinks.down.push({ x, to: floor.index });
-        rt.escalatorLinks.set(floor.index + 1, upperLinks);
+        const upperLinks = rt.escalatorLinks.get(floorIndex + 1) ?? { up: [], down: [] };
+        upperLinks.down.push({ x, to: floorIndex });
+        rt.escalatorLinks.set(floorIndex + 1, upperLinks);
       }
-    });
   }
 
   state.routing = rt;

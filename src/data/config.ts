@@ -30,7 +30,8 @@ export const CONFIG = {
   FLOOR_COST_BASE_DOLLARS: 15_000,
   FLOOR_COST_STEP_DOLLARS: 5_000,
   /** One stair cell. */
-  STAIR_COST_DOLLARS: 1_000,
+  STAIR_COST_DOLLARS: 5_000,
+  MAX_STAIRS_ESCALATORS: 64,
 
   // --- Day cycle (reverse-engineered: 2600 ticks/day, day starts 7:00 AM) ---
   DAY_TICKS: 2600,
@@ -58,7 +59,7 @@ export const CONFIG = {
   ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS: 500,
   ELEVATOR_CAR_COST_DOLLARS: 2_000,
   ELEVATOR_SPEED_UPGRADE_COST_DOLLARS: 1_500,
-  ESCALATOR_COST_DOLLARS: 1_000,
+  ESCALATOR_COST_DOLLARS: 20_000,
   /** Waiting people per direction per floor (reverse-engineered cap). */
   QUEUE_MAX_PER_SIDE: 40,
 
@@ -67,8 +68,8 @@ export const CONFIG = {
   STAIR_TICKS_PER_FLOOR: 12,
   ESCALATOR_TICKS_PER_FLOOR: 8,
   /** People take stairs only for short hops. */
-  STAIR_MAX_FLOORS: 3,
-  ESCALATOR_MAX_FLOORS: 3,
+  STAIR_MAX_FLOORS: 4,
+  ESCALATOR_MAX_FLOORS: 7,
   PATIENCE_BASE_TICKS: 400,
   PATIENCE_STRESS_DIVISOR: 10,
   STRESS_WALK_PER_TICK: 0.02,

@@ -18,6 +18,7 @@ economic comparisons have not been completed.
 | Persistence | Versioned browser saves, campaign history and active incidents; deterministic replay |
 | Audio | Original synthesized construction, elevator, interface and event cues; motor and rain ambience; persistent volume/mute controls |
 | Elevator management | Per-car home floors, six weekday/weekend priority periods and individual stop controls; existing trips finish when a stop is disabled |
+| Construction limits | Shared caps of 64 stairs/escalators, 16 cinemas/party halls and 512 food/retail facilities; 10 security offices; unfinished facilities count |
 
 Catalogue dimensions, purchase costs and rating requirements draw on the
 reference below. Simulation formulas and event timing remain approximations.
@@ -34,7 +35,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
-- Reproduce the original lobby height options and detailed transport restrictions.
+- Reproduce the original lobby height options and transport footprints. Stair
+  and escalator trip limits are four and seven flights; their purchase costs
+  are $5,000 and $20,000. Elevator purchase and extension pricing still differ.
 - Replace procedural artwork and compare synthesized audio with the original sound design.
   The current renderer uses 20-pixel floor bands; the reference loader uses 24.
 - Original TDT save import/export is not implemented.

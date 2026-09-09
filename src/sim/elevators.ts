@@ -9,7 +9,7 @@ import {
   type QueueDir,
 } from './queues';
 import type { GameState } from './state';
-import { getFloor } from './tower';
+import { getFloor, stairEscalatorCount } from './tower';
 
 /**
  * Elevator groups, cars, calls and dispatch (ElevatorsT equivalent).
@@ -412,6 +412,7 @@ export function escalatorPlacementError(
   const lower = getFloor(state.tower, floorIndex);
   const upper = getFloor(state.tower, floorIndex + 1);
   if (!lower || !upper) return 'Build both floors first';
+  if (!state.escalators.has(`${floorIndex}:${x}`) && stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   // The lower cell may already be an escalator: chains share landing cells.
   if (lower.index !== CONFIG.LOBBY_FLOOR_INDEX) {
     const lowerCell = lower.cells[x];

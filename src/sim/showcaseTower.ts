@@ -15,7 +15,7 @@ export function setupShowcaseTower(state: GameState): void {
   for (let f = -1; f >= -8; f--) buildFloor(state, f);
   for (const floor of [2, 3]) placeStair(state, floor, 4);
   const local = placeElevatorGroup(state, -8, 15, 10);
-  addElevatorCar(state, local.id);
+  for (let i = 0; i < 5; i++) addElevatorCar(state, local.id);
   placeElevatorGroup(state, -8, 15, 14, 'service');
   placeTenant(state, 'skyLobby', 15, 18);
   placeElevatorGroup(state, -8, 15, 18, 'express');

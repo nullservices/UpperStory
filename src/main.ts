@@ -166,7 +166,7 @@ async function main(): Promise<void> {
       controller.hoverError,
       controller.drag,
     );
-    incidents.draw(state, app.screen.width, app.screen.height, acc / CONFIG.TICK_MS);
+    incidents.draw(state, app.screen.width, Math.min(app.screen.height, camera.y), acc / CONFIG.TICK_MS);
     campaignPanel.update(state);
     towerMap.update(state);
     hud.update(state);

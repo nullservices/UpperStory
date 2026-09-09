@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { placeTenant } from '../../src/sim';
+import { removeTenantPeople } from '../../src/sim/people';
 import { newTestGame, scenarioTower, setClock, tickN } from '../helpers/simHarness';
 
 describe('staff', () => {
@@ -48,9 +49,30 @@ describe('staff', () => {
     placeTenant(state, 'housekeeping', 4, 20);
     const hotel = placeTenant(state, 'hotel', 4, 40);
     tickN(state, 2_600 + 160);
+    removeTenantPeople(state, hotel.id);
+    hotel.capacity = 0; // Keep new guests from dirtying this room during the check.
+    hotel.occupancy = 0;
     hotel.cleanliness = 100;
     setClock(state, 480);
     tickN(state, 2_000);
     expect(hotel.cleanliness).toBe(100);
+  });
+
+  it('assigns different rooms to available housekeepers', () => {
+    const state = newTestGame(); state.starLevel = 5;
+    scenarioTower(state);
+    placeTenant(state, 'housekeeping', 4, 20);
+    const rooms = [40, 44, 48].map(x => placeTenant(state, 'hotel', 4, x));
+    tickN(state, 2600);
+    for (const room of rooms) room.cleanliness = 10;
+    let simultaneousJobs = 0;
+    for (let i = 0; i < 300; i++) {
+      tickN(state, 1);
+      const jobs = [...state.people.values()].filter(p => p.kind === 'housekeeper' && p.activityTenantId >= 0).map(p => p.activityTenantId);
+      expect(new Set(jobs).size).toBe(jobs.length);
+      simultaneousJobs = Math.max(simultaneousJobs, jobs.length);
+    }
+    expect(simultaneousJobs).toBe(3);
+    expect(rooms.every(room => room.cleanliness > 10)).toBe(true);
   });
 });

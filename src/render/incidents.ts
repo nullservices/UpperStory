@@ -31,11 +31,11 @@ export class IncidentView {
       }
     }
     const rain = this.weather; rain.clear();
-    if (state.campaign.weather === 'rain') {
+    if (state.campaign.weather === 'rain' && height > 103) {
       rain.rect(0, 94, width, height - 94).fill({ color: 0x5c7580, alpha: 0.12 });
       for (let i = 0; i < 90; i++) {
         const x = (i * 127 + time * 3) % width;
-        const y = 94 + (i * 83 + time * 13) % Math.max(1, height - 94);
+        const y = 94 + (i * 83 + time * 13) % (height - 103);
         rain.moveTo(x, y).lineTo(x - 3, y + 9).stroke({ width: 1, color: 0xc7dbe0, alpha: 0.35 });
       }
     }

@@ -419,7 +419,11 @@ export function giveUp(state: GameState, p: Person): void {
   p.destination = null;
   p.activityTicksLeft = 0;
   p.activityTenantId = -1;
-  if (p.kind === 'diner' || p.kind === 'shopper') {
+  if (p.kind === 'diner' || p.kind === 'shopper' || p.kind === 'hotelGuest') {
+    if (p.vip) {
+      const visit = state.campaign.incidents.find(incident => incident.personId === p.id);
+      if (visit) visit.stress = CONFIG.STRESS_MAX;
+    }
     state.people.delete(p.id); // visitors just leave
     return;
   }
@@ -429,7 +433,7 @@ export function giveUp(state: GameState, p: Person): void {
     p.pos = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
     return;
   }
-  // Residents, staff and guests retreat to their tenant.
+  // Residents and staff retreat to their tenant.
   p.state = 'inTenant';
   const t = state.tenants.get(p.tenantId);
   p.pos = t ? { floor: t.floor, x: t.x + 1 } : p.pos;
@@ -517,6 +521,8 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       let dirtiest: Tenant | null = null;
       for (const t of state.tenants.values()) {
         if (!isHotel(t.type) || t.state !== 'open') continue;
+        if ([...state.people.values()].some(other => other.id !== p.id && other.kind === 'housekeeper' && other.activityTenantId === t.id)) continue;
+        if (pickupRoute(state, p.pos.floor, t.floor, 'housekeeper') === null) continue;
         if (!dirtiest || t.cleanliness < dirtiest.cleanliness) dirtiest = t;
       }
       if (!dirtiest || dirtiest.cleanliness >= 100) {
@@ -556,7 +562,7 @@ function refreshOccupancy(state: GameState): void {
     const cell = floor?.cells[Math.round(p.pos.x)];
     if (!cell || cell.tenantId < 0) continue;
     const tenant = state.tenants.get(cell.tenantId);
-    if (tenant) tenant.occupancy++;
+    if (tenant && !(isHotel(tenant.type) && isStaff(p.kind))) tenant.occupancy++;
   }
 }
 
@@ -682,10 +688,11 @@ export function stepPeople(state: GameState): void {
             hotel.cleanliness + CONFIG.HOUSEKEEPER_CLEAN_PER_TICK,
           );
         }
-        if (p.stairsTicksLeft <= 0) {
+        if (p.stairsTicksLeft <= 0 || !hotel || hotel.state !== 'open' || hotel.cleanliness >= 100) {
           p.state = 'inTenant';
           p.stairsTicksLeft = 0;
           p.activityTenantId = -1;
+          if (state.calendar.minuteOfDay >= 480 && state.calendar.minuteOfDay < 1080) applyAction(state, p, 'goWork');
         }
         break;
       }

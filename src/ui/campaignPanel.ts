@@ -69,7 +69,10 @@ export class CampaignPanel {
         const item = document.createElement('li'); item.textContent = `${requirement.met ? '✓' : '○'} ${requirement.label}`; list.append(item);
       }
       const unlocks = document.createElement('p');
-      unlocks.textContent = 'Unlocks: ' + (Object.entries(TENANT_DATA).filter(([, data]) => data.unlockedAtStar === gate.star).map(([type]) => TOOL_INFO[type as keyof typeof TENANT_DATA].label).join(', ') || 'Final tower rating');
+      const facilities = Object.entries(TENANT_DATA).filter(([, data]) => data.unlockedAtStar === gate.star).map(([type]) => TOOL_INFO[type as keyof typeof TENANT_DATA].label);
+      if (gate.star === 2) facilities.push('Service elevator');
+      if (gate.star === 3) facilities.push('Express elevator');
+      unlocks.textContent = 'Unlocks: ' + (facilities.join(', ') || 'Final tower rating');
       section.append(title, list, unlocks); dialog.append(section);
     }
     const history = document.createElement('section'); history.className = 'rating-card';

@@ -1,44 +1,54 @@
 # SimTower fidelity
 
-Upper Story's simulation is an independent implementation. A passing internal
-test establishes consistency, not equivalence to SimTower.
+Upper Story is an independent implementation. Its tests establish internal
+consistency, not equivalence to the original game. Original-game timing and
+economic comparisons have not been completed.
+
+## Implemented systems
+
+| Area | Current behavior |
+| --- | --- |
+| Geometry | 375 cells per floor, floors 1–100 and B1–B9; multi-floor footprints; legacy saves expand without moving rooms |
+| Construction | Offices, condos, three hotel types, food, shops, cinema, party hall, medical, security, housekeeping, parking ramps and spaces, recycling, metro, cathedral and sky lobbies |
+| Transport | Standard, service and express elevators; stairs and directional escalators; 21/10/42 passenger capacities; eight cars per shaft and 24 shafts; operating shaft extension |
+| Population | Individual workers, residents, guests, visitors and staff; walking, queues, boarding, rides, activities and departures |
+| Economy | One-time condo sales, office rent, guest and visitor revenue, service upkeep, parking fees and film replacement |
+| Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
+| Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
+| Persistence | Versioned browser saves, campaign history and active incidents; deterministic replay |
+
+Catalogue dimensions, purchase costs and rating requirements draw on the
+reference below. Simulation formulas and event timing remain approximations.
+For example, parking income and waste treatment use simplified daily models.
+The facilities tour at `?demo=1` begins at five stars; normal games start at one.
+
+## Remaining fidelity work
+
+- Compare original PC gameplay against repeatable morning, lunch and evening
+  traffic scenarios. Calibrate dispatch, journey times, patience and stress.
+- Implement original elevator weekday/weekend schedules, priorities and home
+  floors. Current dispatch uses nearest calls with same-direction collection.
+- Compare facility demand, rents, upkeep, staffing coverage, event probabilities
+  and disaster response behavior against original gameplay.
+- Reproduce the original lobby height options and detailed transport restrictions.
+- Replace procedural artwork and add sound through an appropriate asset pipeline.
+  The current renderer uses 20-pixel floor bands; the reference loader uses 24.
+- Original TDT save import/export is not implemented.
 
 ## Reference scenario
 
-Open `?reference=1` to load a repeatable ten-floor tower using the default seed:
-one standard elevator, stairs near the lobby, food on floors 2–3, offices on
-4–7, and condos on 8–10. Construction completes during one simulated day before
-the scenario opens. Reload to repeat from the same state. This scenario uses
-normal simulation rules and does not raise the star rating artificially.
-
-Record morning arrivals, lunch trips, evening departures, queue lengths,
-occupancy and daily finances. The original-game comparison has not yet been
-performed; the scenario is a test fixture, not a parity claim.
-
-## Evidence and outstanding work
-
-| Area | Evidence | Upper Story |
-| --- | --- | --- |
-| Car capacities | TDT elevator header: standard 21, express 42, service 10 | Implemented and boarding tested |
-| Car count | TDT header records up to eight cars | Existing limit |
-| Elevator schedules | TDT describes weekday/weekend settings, priorities and home floors | Not implemented |
-| Geometry | TDT describes 375 tiles per floor; loader uses 24-pixel room bands | Current 60-cell, 20-pixel geometry still differs; requires coordinated placement, rendering and save migration |
-| Assets | SimTowerLoader extracts executable bitmaps, palettes and sound | Procedural artwork; importer not implemented |
-| Movement and stress | Save fields do not establish all timing/formulas | Approximate; must compare against original gameplay |
-| Star progression | Current implementation only checks population | Facility/event requirements remain to be established and implemented |
-| Original saves | Partial TDT specification | No TDT import/export |
-
-Transport fixes in this pass also synchronize boarding positions, stop cars
-exactly at intermediate pickups, serve the requested direction after an empty
-car arrives, and rebuild stops after resizing a shaft. Extensions preserve active cars and routes and charge only for added floors. These are local
-correctness fixes, not independently verified original dispatch algorithms.
+Open `?reference=1` for a seeded ten-floor tower: a standard elevator, stairs near
+the lobby, food on floors 2–3, offices on 4–7 and condos on 8–10. Construction
+completes during one simulated day before the scenario opens. Reloading repeats
+the initial state. Record the original game's platform and version alongside
+arrival times, queue lengths, occupancy, stress and finances when comparing.
 
 ## Sources
 
-- [TDT specification](https://github.com/dfloer/tower-docs/blob/main/tdt_spec.md)
-- [Asset loader](https://github.com/fabianschuiki/OpenSkyscraper/blob/master/source/SimTowerLoader.cpp)
-- [OpenSkyscraper](https://github.com/fabianschuiki/OpenSkyscraper)
+- [TDT specification](https://github.com/dfloer/tower-docs/blob/main/tdt_spec.md): partial save structure, geometry and elevator fields.
+- [SimTower reference](https://relentlessoptimizer.com/gaming/2021/03/13/simtower-reference/): PC 1.0 facility catalogue and progression reference, checked by its author against gameplay and help screens.
+- [Asset loader](https://github.com/fabianschuiki/OpenSkyscraper/blob/master/source/SimTowerLoader.cpp): bitmap, palette and sound extraction from the original executable.
+- [OpenSkyscraper](https://github.com/fabianschuiki/OpenSkyscraper): experimental implementation, not a complete behavioral specification.
 
-The documentation and reference implementations are incomplete. Use the original
-game as the behavioral reference. Record its platform/version with every capture.
-Original asset import should remain separate from the distributed art pack.
+No original game assets are bundled. No external implementation code was copied
+to implement these systems.

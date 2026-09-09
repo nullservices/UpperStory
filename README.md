@@ -10,7 +10,25 @@ Start with a lobby and a budget. Add floors, connect them with elevators, and mo
 
 As the tower grows, so do its demands. Long elevator queues frustrate tenants. Hotels need housekeeping. New facilities unlock as your population and star rating increase.
 
-Use the tower report to track vacancies, construction, lift queues, and finances. Click a room or elevator to inspect it and manage its settings.
+Use the tower report to track vacancies, construction, lift queues, and finances. Click a room or elevator to inspect it and manage its settings. Open **Map** to jump between the upper floors and basements.
+
+## Facilities and ratings
+
+Build up to 100 floors above ground and nine basement levels. Large facilities occupy several floors, so leave their entire footprint clear before placing them.
+
+| Rating | New facilities |
+| --- | --- |
+| 1 star | Offices, condos, fast food, elevators, stairs and escalators |
+| 2 stars | Single and twin hotel rooms, suites, housekeeping, security and service elevators |
+| 3 stars | Restaurants, shops, cinemas, party halls, medical centers, parking, recycling, sky lobbies and express elevators |
+| 4 stars | Metro station |
+| 5 stars | Cathedral |
+
+Population earns your second star at 300 people. Later ratings also require services: security at 1,000; a suite, favorable VIP inspection, recycling and medical care at 5,000; and an accessible metro at 10,000. Reach more than 15,000 people and connect a cathedral on floors 97–100 for the final weekend wedding.
+
+Open **Events & ratings** for your next requirements, active emergencies and tower journal. Fires need rescue, bomb threats need security or a ransom payment, and cockroaches need cleaning or pest control. Unanswered emergencies can close rooms; inspect damaged facilities to repair them. VIPs must actually reach a clean, well-served suite to approve the tower.
+
+Condos sell once when completed. Offices earn rent, visitors pay for their activities, and services incur running costs. Keep cinemas fresh by changing their films from the room inspection window. Parking requires aligned basement ramps; the three-floor metro starts in B9.
 
 ## Getting started
 
@@ -19,7 +37,7 @@ Use the tower report to track vacancies, construction, lift queues, and finances
 3. Place an **Office** or **Condo** upstairs and let construction finish. The time controls can speed things up.
 4. Watch your tenants arrive, then expand as your budget allows.
 
-The demo starts with an occupied tower if you'd rather explore before building.
+The demo starts with a furnished 15-floor tower, all nine basements, five-star tools and extra funds. It includes a fire to respond to and a visiting VIP. Its starting rating is provided for exploration; a new game earns each rating normally.
 
 To extend an elevator, build the new floors, select the matching elevator tool, and drag from the existing shaft into the new floors. Your cars keep running; you pay only for the added shaft floors.
 

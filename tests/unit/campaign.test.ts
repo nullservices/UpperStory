@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from '../../src/data/config';
-import { startIncident, respondToIncident, stepCampaign } from '../../src/sim/campaign';
+import { startIncident, respondToIncident } from '../../src/sim/campaign';
 import { buildFloor, createInitialState, deserializeGame, placeElevatorGroup, placeTenant, rebuildRouting, serializeGame, setupNewGame, tick } from '../../src/sim';
 import { repairTenant, changeMovie, demolishTenant } from '../../src/sim/tenants';
 import { progressionRequirements, stepProgression } from '../../src/sim/progression';
@@ -97,10 +97,31 @@ describe('incidents and recovery', () => {
     const visit = startIncident(state, 'vip', suite.id);
     expect(visit.personId).toBeDefined();
     expect(state.people.get(visit.personId!)!.vip).toBe(true);
-    suite.cleanliness = 100; suite.grade = 4;
-    visit.stayed = true; visit.stress = 0; visit.deadline = state.tickCount;
-    stepCampaign(state);
+    placeTenant(state, 'housekeeping', 2, 60);
+    tickN(state, CONFIG.DAY_TICKS);
+    expect(visit.stayed).toBe(true);
     expect(state.campaign.vipApproved).toBe(true);
+  });
+  it('rejects a VIP stay when the suite has no route from the entrance', () => {
+    const state = newTestGame(12); state.starLevel = 5;
+    buildFloor(state, 2);
+    const suite = placeTenant(state, 'hotelSuite', 2, 30);
+    tickN(state, 2200);
+    const visit = startIncident(state, 'vip', suite.id);
+    tickN(state, CONFIG.DAY_TICKS);
+    expect(visit.stayed).not.toBe(true);
+    expect(state.campaign.vipApproved).toBe(false);
+  });
+  it('lets reachable security resolve a bomb before its deadline', () => {
+    const state = fixture();
+    const office = placeTenant(state, 'office', 2, 30);
+    placeTenant(state, 'security', 2, 60);
+    tickN(state, 2200);
+    const incident = startIncident(state, 'bomb', office.id);
+    respondToIncident(state, incident.id, 'search');
+    tickN(state, 500);
+    expect(state.campaign.incidents).toHaveLength(0);
+    expect(office.state).toBe('open');
   });
 });
 

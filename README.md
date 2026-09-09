@@ -61,7 +61,11 @@ Designed for a desktop browser with a mouse and keyboard.
 | `Home` | Center the tower |
 | `Escape` | Close a window or return to inspection |
 
-## Saving
+## Sound
+
+Open **Sound** for master volume, elevator and weather ambience, or mute. Sound starts after your first click or key press. Elevator arrivals, construction, completed rooms, new ratings and incidents have distinct cues. Background sounds fade while paused, and hidden tabs are silent. Sound preferences are saved separately from your tower.
+
+## Saving your tower
 
 Open **Game → Save tower** to save your progress. Saves are stored in the browser you're playing in; they don't sync between devices. Clearing site data removes them.
 

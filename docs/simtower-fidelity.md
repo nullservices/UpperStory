@@ -16,6 +16,7 @@ economic comparisons have not been completed.
 | Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
 | Persistence | Versioned browser saves, campaign history and active incidents; deterministic replay |
+| Audio | Original synthesized construction, elevator, interface and event cues; motor and rain ambience; persistent volume/mute controls |
 
 Catalogue dimensions, purchase costs and rating requirements draw on the
 reference below. Simulation formulas and event timing remain approximations.
@@ -31,7 +32,7 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
 - Reproduce the original lobby height options and detailed transport restrictions.
-- Replace procedural artwork and add sound through an appropriate asset pipeline.
+- Replace procedural artwork and compare synthesized audio with the original sound design.
   The current renderer uses 20-pixel floor bands; the reference loader uses 24.
 - Original TDT save import/export is not implemented.
 

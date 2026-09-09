@@ -1,4 +1,6 @@
 import { Application } from 'pixi.js';
+import { TowerAudio } from './audio/towerAudio';
+import { installAudioPanel } from './ui/audioPanel';
 import './ui/style.css';
 import { CONFIG } from './data/config';
 import {
@@ -83,6 +85,8 @@ async function main(): Promise<void> {
 
   // --- UI: HUD, palette wired to the controller, tool highlight echo ---
   const hud = new Hud();
+  const audio = new TowerAudio();
+  installAudioPanel(audio);
   const campaignPanel = new CampaignPanel((floor, x) => {
     camera.x = app.screen.width / 2 - x * CONFIG.CELL_WIDTH_PX * camera.zoom;
     camera.y = app.screen.height / 2 - (floor <= 0 ? -floor * CONFIG.FLOOR_HEIGHT_PX : -(floor + 1) * CONFIG.FLOOR_HEIGHT_PX) * camera.zoom;
@@ -150,10 +154,12 @@ async function main(): Promise<void> {
     while (acc >= CONFIG.TICK_MS) {
       motion.capture(state);
       tick(state);
+      audio.events(state.events);
       controller.drainEvents();
       acc -= CONFIG.TICK_MS;
     }
     sky.draw();
+    audio.update(state, speed > 0 && !modalOpen, { x: camera.x, y: camera.y, zoom: camera.zoom, width: app.screen.width, height: app.screen.height });
     towerView.draw(state);
     dayNight.draw(state);
     statusOverlay.draw(state, hud.statusMode);

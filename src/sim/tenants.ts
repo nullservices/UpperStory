@@ -210,7 +210,8 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
     return;
   }
   if (cell.content === 'stair') {
-    floor.cells[x] = { content: 'empty', tenantId: -1 };
+    const anchor = cell.transportX ?? x;
+    for (let cx = anchor; cx < anchor + (cell.transportWidth ?? 1); cx++) floor.cells[cx] = { content: 'empty', tenantId: -1 };
     state.tower.structureRevision++;
     return;
   }
@@ -221,6 +222,8 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
     return;
   }
   if (cell.content === 'escalator') {
+    const width = cell.transportWidth ?? 1;
+    x = cell.transportX ?? x;
     // The escalator spans floor..floor+1; its key uses the lower floor.
     const keyFloor = state.escalators.has(`${floorIndex}:${x}`) ? floorIndex : floorIndex - 1;
     if (!state.escalators.has(`${keyFloor}:${x}`)) throw new Error('Nothing to demolish here');
@@ -231,9 +234,7 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
       const escFloor = getFloor(state.tower, f);
       if (!escFloor) continue;
       const stillUsed = state.escalators.has(`${f}:${x}`) || state.escalators.has(`${f - 1}:${x}`);
-      escFloor.cells[x] = stillUsed
-        ? { content: 'escalator', tenantId: -1 }
-        : { content: 'empty', tenantId: -1 };
+      if (!stillUsed) for (let cx = x; cx < x + width; cx++) escFloor.cells[cx] = { content: 'empty', tenantId: -1 };
     }
     state.tower.structureRevision++;
     return;

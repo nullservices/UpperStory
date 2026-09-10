@@ -26,6 +26,8 @@ it('runs the facilities tour through rescue, visitor spending and a VIP inspecti
   expect(vip.stayed).toBe(true);
   expect(cinemaRevenue).toBeGreaterThan(0);
   expect(partyRevenue).toBeGreaterThan(0);
-  expect(state.campaign.vipApproved).toBe(true);
+  expect(state.tenants.get(vip.tenantId)!.cleanliness).toBeLessThan(70);
+  expect(state.campaign.vipApproved).toBe(false);
+  expect(state.campaign.history.some(e => e.message.includes('VIP was disappointed'))).toBe(true);
   expect(state.campaign.history.some(e => e.message.includes('VIP'))).toBe(true);
 });

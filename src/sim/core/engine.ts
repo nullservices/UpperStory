@@ -23,7 +23,9 @@ import type { GameState } from '../state';
 export function tick(state: GameState): void {
   state.tickCount++;
   state.events.length = 0;
+  const previousDay = state.calendar.day;
   stepTime(state);
+  if (state.calendar.day !== previousDay) stepDailySettlement(state, previousDay);
   stepConstruction(state); // completes tenants and spawns their people
   checkRouting(state); // rebuild routing tables on structural changes
   stepPeople(state); // schedules, visitors, walking, queue joins, give-ups
@@ -31,14 +33,11 @@ export function tick(state: GameState): void {
   stepStress(state); // stress accrual/decay by state
   // Daily evaluation at 15:00 (everyone present), settlement at day end.
   if (
-    state.calendar.minuteOfDay >= CONFIG.EVAL_TIME_MIN &&
+    state.calendar.minuteOfDay % 1440 >= CONFIG.EVAL_TIME_MIN &&
     state.evaluationDay !== state.calendar.day
   ) {
     state.evaluationDay = state.calendar.day;
     stepEvaluation(state);
-  }
-  if (state.calendar.tickOfDay === CONFIG.DAY_TICKS - 1) {
-    stepDailySettlement(state);
   }
   stepCampaign(state);
   stepProgression(state); // population-based star ratings

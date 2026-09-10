@@ -23,16 +23,17 @@ it('allows four stair flights and seven escalator flights, but no longer trips',
 
 it('shares the 64-link limit between stairs and escalators and frees demolished slots', () => {
   const state = fixture(); const funds = state.money.balanceCents;
-  for (let x = 0; x < 63; x++) placeStair(state, 2, x);
-  placeEscalator(state, 1, 100, 'up');
+  for (let x = 0; x < 32; x++) placeStair(state, 2, x * 8);
+  for (let x = 0; x < 31; x++) placeStair(state, 3, x * 8);
+  placeEscalator(state, 1, 300, 'up');
   expect(stairEscalatorCount(state)).toBe(64);
   expect(state.money.balanceCents).toBe(funds - (63 * 5000 + 20000) * 100);
   const before = serializeGame(state);
-  expect(() => placeStair(state, 2, 200)).toThrow('64');
-  expect(() => placeEscalator(state, 2, 200, 'up')).toThrow('64');
+  expect(() => placeStair(state, 2, 280)).toThrow('64');
+  expect(() => placeEscalator(state, 2, 280, 'up')).toThrow('64');
   expect(serializeGame(state)).toBe(before);
   demolishAt(state, 2, 0);
-  placeEscalator(state, 2, 100, 'up');
+  placeEscalator(state, 2, 300, 'up');
   expect(stairEscalatorCount(state)).toBe(64);
 });
 

@@ -1,3 +1,4 @@
+import { operatingDay } from './time';
 import { CONFIG, TENANT_DATA, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { rngInt, rngNext } from './core/rng';
@@ -149,7 +150,7 @@ export function spawnTenantPeople(state: GameState, tenant: Tenant): void {
       dayStress: 0,
       failedTripsToday: 0,
       jitterTicks: rngInt(state, -CONFIG.ARRIVAL_JITTER_TICKS, CONFIG.ARRIVAL_JITTER_TICKS),
-      dayTracked: state.calendar.day,
+      dayTracked: operatingDay(state),
       activityTicksLeft: 0,
       activityTenantId: -1,
     };
@@ -245,7 +246,7 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
     dayStress: 0,
     failedTripsToday: 0,
     jitterTicks: 0,
-    dayTracked: state.calendar.day,
+    dayTracked: operatingDay(state),
     activityTicksLeft: activityTicks,
     activityTenantId: kind === 'hotelGuest' ? -1 : target.id,
   };
@@ -583,7 +584,7 @@ function stepHotels(state: GameState): void {
 // --- Simulation step ---
 
 export function stepPeople(state: GameState): void {
-  const day = state.calendar.day;
+  const day = operatingDay(state);
   spawnExternalVisitors(state);
   stepHotels(state);
   for (const p of state.people.values()) {

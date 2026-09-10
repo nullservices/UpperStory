@@ -59,9 +59,13 @@ export class TowerView {
         const x = index * CONFIG.CELL_WIDTH_PX;
         const lobbyStair = floor.index === CONFIG.LOBBY_FLOOR_INDEX &&
           floors.find(f => f.index === CONFIG.LOBBY_FLOOR_INDEX + 1)?.cells[index]?.content === 'stair';
-        if (cell.content === 'stair' || cell.content === 'escalator' || lobbyStair) {
-          g.rect(x, y + 1, 12, h - 2).fill(0xc1c9bc);
-          for (let i = 0; i < 5; i++) g.rect(x + i * 2, y + h - 4 - i * 3, 4, 2).fill(0x6c8276);
+        const lobbyEscalator = floor.index === 1 && state.escalators.has(`1:${index}`);
+        if (cell.content === 'stair' || cell.content === 'escalator' || lobbyStair || lobbyEscalator) {
+          const transport = lobbyStair || lobbyEscalator ? floors.find(f => f.index === 2)!.cells[index]! : cell;
+          if ((transport.transportX ?? index) !== index) return;
+          const width = (transport.transportWidth ?? 1) * CONFIG.CELL_WIDTH_PX;
+          g.rect(x, y + 1, width, h - 2).fill(0xc1c9bc);
+          for (let i = 0; i < 8; i++) g.rect(x + i * width / 8, y + h - 4 - i * (h - 6) / 8, width / 8 + 1, 2).fill(0x6c8276);
         }
       });
       let segmentStart = 0;

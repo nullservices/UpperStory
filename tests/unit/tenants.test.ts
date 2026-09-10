@@ -129,8 +129,8 @@ describe('tenant lifecycle', () => {
     for (const s of [a, b]) {
       buildFloor(s, 2);
       buildFloor(s, 3);
-      placeStair(s, 2, 5);
-      placeStair(s, 3, 5);
+      placeStair(s, 2, 0);
+      placeStair(s, 3, 0);
       placeTenant(s, 'office', 2, 10);
       placeTenant(s, 'condo', 3, 10);
     }

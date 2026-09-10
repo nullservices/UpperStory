@@ -13,7 +13,7 @@ export function setupShowcaseTower(state: GameState): void {
   state.money.balanceCents = 20_000_000_00;
   for (let f = 2; f <= 15; f++) buildFloor(state, f);
   for (let f = -1; f >= -8; f--) buildFloor(state, f);
-  for (const floor of [2, 3]) placeStair(state, floor, 4);
+  for (const floor of [2, 3]) placeStair(state, floor, 0);
   const local = placeElevatorGroup(state, -8, 15, 10);
   for (let i = 0; i < 5; i++) addElevatorCar(state, local.id);
   placeElevatorGroup(state, -8, 15, 14, 'service');

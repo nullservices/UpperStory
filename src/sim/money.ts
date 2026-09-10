@@ -45,7 +45,7 @@ export function rentMultiplier(grade: number): number {
 }
 
 /** End-of-day settlement: rent, commercial revenue, wages and upkeep. */
-export function stepDailySettlement(state: GameState): void {
+export function stepDailySettlement(state: GameState, settledDay = state.calendar.day): void {
   let income = 0;
   let upkeep = 0;
 
@@ -80,7 +80,7 @@ export function stepDailySettlement(state: GameState): void {
   for (const group of state.elevatorGroups.values()) {
     const prices = CONFIG.ELEVATOR_PRICES[group.kind];
     const quarterCents = (prices.shaftUpkeepQuarter + group.cars.length * prices.carUpkeepQuarter) * 100;
-    upkeep += Math.floor(quarterCents / CONFIG.QUARTER_DAYS) + (state.calendar.day % CONFIG.QUARTER_DAYS === 0 ? quarterCents % CONFIG.QUARTER_DAYS : 0);
+    upkeep += Math.floor(quarterCents / CONFIG.QUARTER_DAYS) + (settledDay % CONFIG.QUARTER_DAYS === 0 ? quarterCents % CONFIG.QUARTER_DAYS : 0);
   }
 
   state.money.balanceCents += income - upkeep;
@@ -94,10 +94,10 @@ export function stepDailySettlement(state: GameState): void {
     delta: income - upkeep,
   });
 
-  if (state.calendar.day % CONFIG.QUARTER_DAYS === 0) {
+  if (settledDay % CONFIG.QUARTER_DAYS === 0) {
     pushEvent(state, {
       type: 'QUARTER_REPORT',
-      quarter: Math.floor(state.calendar.day / CONFIG.QUARTER_DAYS),
+      quarter: Math.floor(settledDay / CONFIG.QUARTER_DAYS),
       income: state.money.quarterIncomeCents,
       upkeep: state.money.quarterUpkeepCents,
     });

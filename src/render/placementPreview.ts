@@ -109,12 +109,12 @@ export class PlacementPreview {
         const h = bandBottomPx(hover.floor, state.tower.lobbyHeight) - y;
         const err = hoverError ?? escalatorPlacementError(state, hover.floor, hover.cell);
         const ok = err === null;
-        g.rect(x, y, cell, h).fill(
+        g.rect(x, y, cell * 8, h).fill(
           ok ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (!ok) this.showError(err, x + cell, y, cell);
+        if (!ok) this.showError(err, x, y, cell * 8);
         // Direction glyph, tinted with the rect's validity.
-        const cx = x + cell / 2;
+        const cx = x + cell * 4;
         const cy = y + h / 2;
         const half = 3;
         const tipY = tool === 'escalatorUp' ? cy - half : cy + half;
@@ -130,7 +130,7 @@ export class PlacementPreview {
         if (!hover) break;
         const width =
           tool === 'stairs'
-            ? cell
+            ? cell * 8
             : TENANT_DATA[tool].sizeCells * cell;
         const x = hover.cell * cell;
         const stairFromLobby = tool === 'stairs' && hover.floor === CONFIG.LOBBY_FLOOR_INDEX;

@@ -57,10 +57,10 @@ describe('drag construction', () => {
     expect(stroke.placed).toBe(Math.floor(CONFIG.FLOOR_WIDTH_CELLS / TENANT_DATA.condo.sizeCells));
     stroke.extend(state, -1000000); expect(stroke.placed).toBe(Math.floor(CONFIG.FLOOR_WIDTH_CELLS / TENANT_DATA.condo.sizeCells));
   });
-  it('paints stairs and escalators one column at a time', () => {
+  it('paints stairs and escalators eight cells at a time', () => {
     const state = fixture(), stairs = new BuildStroke('stairs', 2, 0);
-    stairs.extend(state, 3); expect(stairs.placed).toBe(4);
-    const escalators = new BuildStroke('escalatorUp', 2, 10);
-    escalators.extend(state, 12); expect(escalators.placed).toBe(3);
+    stairs.extend(state, 24); expect(stairs.placed).toBe(4);
+    const escalators = new BuildStroke('escalatorUp', 2, 40);
+    escalators.extend(state, 56); expect(escalators.placed).toBe(3);
   });
 });

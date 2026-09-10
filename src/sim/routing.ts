@@ -83,7 +83,8 @@ export function rebuildRouting(state: GameState): void {
 // --- Stairs ---
 
 function stairAt(state: GameState, floorIndex: number, x: number): boolean {
-  return getFloor(state.tower, floorIndex)?.cells[x]?.content === 'stair';
+  const cell = getFloor(state.tower, floorIndex)?.cells[x];
+  return cell?.content === 'stair' && (cell.transportX ?? x) === x;
 }
 
 /** Adjacent floors a,b linked by a stair at column c (lobby = ground level). */
@@ -107,7 +108,7 @@ function stairRoute(state: GameState, from: number, to: number): RouteLeg[] | nu
   const candidateColumns: number[] = [];
   const candidateFloor = from === CONFIG.LOBBY_FLOOR_INDEX ? getFloor(state.tower, from + 1) ?? fromFloor : fromFloor;
   candidateFloor.cells.forEach((cell, x) => {
-    if (cell.content === 'stair') candidateColumns.push(x);
+    if (cell.content === 'stair' && (cell.transportX ?? x) === x) candidateColumns.push(x);
   });
   for (const c of candidateColumns) {
     let ok = true;

@@ -12,11 +12,11 @@ import { newTestGame, scenarioTower } from '../helpers/simHarness';
 describe('pickupRoute', () => {
   it('stairs for short hops: continuous column reaches the lobby', () => {
     const state = newTestGame();
-    scenarioTower(state); // stairs at col 4 on floors 2-3
+    scenarioTower(state); // stairs at col 0 on floors 2-3
     const route = pickupRoute(state, 3, 1, 'officeWorker');
     expect(route).toEqual([
-      { mode: 'stair', from: 3, to: 2, dir: -1, x: 4 },
-      { mode: 'stair', from: 2, to: 1, dir: -1, x: 4 },
+      { mode: 'stair', from: 3, to: 2, dir: -1, x: 0 },
+      { mode: 'stair', from: 2, to: 1, dir: -1, x: 0 },
     ]);
   });
 

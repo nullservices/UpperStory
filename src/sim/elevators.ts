@@ -144,7 +144,17 @@ export function elevatorPlacementError(
     const floor = getFloor(state.tower, f);
     if (!floor) return 'Build the floors first';
     if (existing && f >= existing.serviceLo && f <= existing.serviceHi) continue;
-    if (f === CONFIG.LOBBY_FLOOR_INDEX) continue; // shafts pass through the lobby
+    if (f === CONFIG.LOBBY_FLOOR_INDEX) {
+      const upper = getFloor(state.tower, f + 1);
+      if (upper?.cells.slice(x, x + width).some(c => c.content === 'stair')) return 'Space is occupied';
+      for (const key of state.escalators.keys()) {
+        const [lowerFloor, anchor] = key.split(':').map(Number) as [number, number];
+        if (lowerFloor !== f && lowerFloor + 1 !== f) continue;
+        const landing = getFloor(state.tower, lowerFloor === f ? f + 1 : lowerFloor)?.cells[anchor];
+        if (x < anchor + (landing?.transportWidth ?? 1) && x + width > anchor) return 'Space is occupied';
+      }
+      continue;
+    }
     const sky = kind === 'express' ? skyLobbyOn(state, f) : null;
     if (sky) {
       // The express shaft must physically run through the sky lobby; its
@@ -414,22 +424,19 @@ export function escalatorPlacementError(
   floorIndex: number,
   x: number,
 ): string | null {
-  if (x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
+  if (!Number.isInteger(x) || x < 0 || x + 8 > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const lower = getFloor(state.tower, floorIndex);
   const upper = getFloor(state.tower, floorIndex + 1);
   if (!lower || !upper) return 'Build both floors first';
   if (!state.escalators.has(`${floorIndex}:${x}`) && stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
-  // The lower cell may already be an escalator: chains share landing cells.
-  if (lower.index !== CONFIG.LOBBY_FLOOR_INDEX) {
-    const lowerCell = lower.cells[x];
-    if (!lowerCell || (lowerCell.content !== 'empty' && lowerCell.content !== 'escalator')) {
-      return 'Space is occupied';
+  for (const floor of [lower, upper]) {
+    if (floor.index === CONFIG.LOBBY_FLOOR_INDEX) {
+      for (const group of state.elevatorGroups.values()) if (group.serviceLo <= floor.index && group.serviceHi >= floor.index && x < group.x + shaftWidth(group) && x + 8 > group.x) return 'Space is occupied';
+      continue;
     }
-  }
-  if (upper.index !== CONFIG.LOBBY_FLOOR_INDEX) {
-    const upperCell = upper.cells[x];
-    if (!upperCell || (upperCell.content !== 'empty' && upperCell.content !== 'escalator')) {
-      return 'Space is occupied';
+    for (let cx = x; cx < x + 8; cx++) {
+      const cell = floor.cells[cx];
+      if (!cell || (cell.content !== 'empty' && !(cell.content === 'escalator' && cell.transportX === x && cell.transportWidth === 8))) return 'Space is occupied';
     }
   }
   if (CONFIG.ESCALATOR_COST_DOLLARS * 100 > state.money.balanceCents) return 'Not enough funds';
@@ -446,15 +453,9 @@ export function placeEscalator(
   const error = escalatorPlacementError(state, floorIndex, x);
   if (error) throw new Error(error);
   if (!spendHelper(state, CONFIG.ESCALATOR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
-  if (floorIndex !== CONFIG.LOBBY_FLOOR_INDEX) {
-    const lowerCell = getFloor(state.tower, floorIndex)!.cells[x];
-    if (lowerCell?.content !== 'escalator') {
-      getFloor(state.tower, floorIndex)!.cells[x] = { content: 'escalator', tenantId: -1 };
-    }
-  }
-  const upperCell = getFloor(state.tower, floorIndex + 1)!.cells[x];
-  if (upperCell?.content !== 'escalator') {
-    getFloor(state.tower, floorIndex + 1)!.cells[x] = { content: 'escalator', tenantId: -1 };
+  for (const f of [floorIndex, floorIndex + 1]) {
+    if (f === CONFIG.LOBBY_FLOOR_INDEX) continue;
+    for (let cx = x; cx < x + 8; cx++) getFloor(state.tower, f)!.cells[cx] = { content: 'escalator', tenantId: -1, transportX: x, transportWidth: 8 };
   }
   state.escalators.set(`${floorIndex}:${x}`, dir);
   state.tower.structureRevision++;

@@ -46,8 +46,8 @@ export function setClock(state: GameState, minuteOfDay: number): void {
  */
 export function scenarioTower(state: GameState): void {
   for (let i = 2; i <= 5; i++) buildFloor(state, i);
-  placeStair(state, 2, 4);
-  placeStair(state, 3, 4);
+  placeStair(state, 2, 0);
+  placeStair(state, 3, 0);
   placeElevatorGroup(state, 1, 5, 10);
   placeTenant(state, 'office', 2, 20);
   placeTenant(state, 'condo', 3, 20);

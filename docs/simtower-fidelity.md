@@ -15,6 +15,7 @@ economic comparisons have not been completed.
 | Economy | One-time condo sales, office rent, guest and visitor revenue, service upkeep, parking fees and film replacement |
 | Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
+| Clock | Date changes and daily settlement at midnight; schedule cycles reset at 07:00 |
 | Persistence | Versioned browser saves, campaign history and active incidents; deterministic replay |
 | Audio | Original synthesized construction, elevator, interface and event cues; motor and rain ambience; persistent volume/mute controls |
 | Elevator management | Per-car home floors, six weekday/weekend priority periods and individual stop controls; existing trips finish when a stop is disabled |
@@ -35,7 +36,8 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
-- Complete stair/escalator footprints and original lobby construction rules.
+- Compare original lobby construction rules. New stairs and escalators occupy
+  eight cells; legacy single-cell installations remain usable.
   New standard/service shafts occupy four cells and express shafts six;
   saved two-cell shafts retain their dimensions, including extensions. New sky
   lobbies occupy six cells to fit express shafts; original lobby sizing rules

@@ -18,6 +18,8 @@ export interface GridCell {
   content: CellContent;
   /** Entity id when content is 'tenant'/'scaffold'/'facility'; -1 otherwise. */
   tenantId: number;
+  transportX?: number;
+  transportWidth?: number;
 }
 
 export interface Floor {
@@ -134,7 +136,7 @@ export function demolishFloor(state: GameState, index: number): void {
 /** Escalator landing cells are shared; count installed links, not their cells. */
 export function stairEscalatorCount(state: GameState): number {
   let count = state.escalators.size;
-  for (const floor of state.tower.floors) for (const cell of floor.cells) if (cell.content === 'stair') count++;
+  for (const floor of state.tower.floors) for (const cell of floor.cells) if (cell.content === 'stair' && (cell.transportX === undefined || floor.cells[cell.transportX] === cell)) count++;
   return count;
 }
 
@@ -144,13 +146,12 @@ export function stairPlacementError(state: GameState, floorIndex: number, x: num
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) return 'Build this floor first';
   if (floorIndex <= CONFIG.LOBBY_FLOOR_INDEX) return 'Stairs start above the lobby';
-  if (x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
-  const cell = floor.cells[x];
-  if (!cell || cell.content !== 'empty') return 'Space is occupied';
+  if (!Number.isInteger(x) || x < 0 || x + 8 > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
+  if (floor.cells.slice(x, x + 8).some(cell => cell.content !== 'empty')) return 'Space is occupied';
   if (stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   // Stairwell continuity: stair below (or the lobby floor beneath).
   const below = getFloor(state.tower, floorIndex - 1);
-  if (below && below.index !== CONFIG.LOBBY_FLOOR_INDEX && below.cells[x]?.content !== 'stair') {
+  if (below && below.index !== CONFIG.LOBBY_FLOOR_INDEX && (below.cells[x]?.content !== 'stair' || (below.cells[x]?.transportX ?? x) !== x || (below.cells[x]?.transportWidth ?? 1) !== 8)) {
     return 'Needs a stair directly below';
   }
   if (CONFIG.STAIR_COST_DOLLARS * 100 > state.money.balanceCents) return 'Not enough funds';
@@ -163,7 +164,7 @@ export function placeStair(state: GameState, floorIndex: number, x: number): voi
   if (error) throw new Error(error);
   if (!spend(state, CONFIG.STAIR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
   const floor = getFloor(state.tower, floorIndex === CONFIG.LOBBY_FLOOR_INDEX ? floorIndex + 1 : floorIndex)!;
-  floor.cells[x] = { content: 'stair', tenantId: -1 };
+  for (let cx = x; cx < x + 8; cx++) floor.cells[cx] = { content: 'stair', tenantId: -1, transportX: x, transportWidth: 8 };
   state.tower.structureRevision++;
 }
 

@@ -51,9 +51,10 @@ export function stepTime(state: GameState): void {
   c.tickOfDay++;
   if (c.tickOfDay >= CONFIG.DAY_TICKS) {
     c.tickOfDay = 0;
-    c.day++;
+
   }
   c.minuteOfDay = tickToMinute(c.tickOfDay);
+  if (c.tickOfDay === minuteToTick(1440)) c.day++;
 }
 
 /** "07:30" style display string from a minute-of-day. */
@@ -62,4 +63,9 @@ export function formatTimeOfDay(minuteOfDay: number): string {
   const hh = Math.floor(m / 60);
   const mm = Math.floor(m % 60);
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+/** Schedule cycles run from 07:00 to 07:00 across the midnight date change. */
+export function operatingDay(state: GameState): number {
+  return state.calendar.day - (state.calendar.minuteOfDay >= 1440 ? 1 : 0);
 }

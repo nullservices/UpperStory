@@ -19,7 +19,7 @@ export class BuildStroke {
 
   constructor(readonly tool: RowBuildTool, readonly floor: number, readonly anchor: number) {
     this.width = tool === 'stairs' || tool === 'escalatorUp' || tool === 'escalatorDown'
-      ? 1 : TENANT_DATA[tool].sizeCells;
+      ? 8 : TENANT_DATA[tool].sizeCells;
   }
 
   extend(state: GameState, cell: number): void {

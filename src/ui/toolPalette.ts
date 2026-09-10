@@ -36,11 +36,11 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   expressElevator: { label: 'Express lift', hint: 'Click or drag between floors; drag an existing express shaft to extend it. Connects lobby and sky lobbies.', icon: 'express' },
 
-  stairs: { label: 'Stairs', hint: 'Click the lobby to connect floor 2, or an upper floor to connect the floor below.', icon: 'stairs' },
+  stairs: { label: 'Stairs', hint: '8 cells. Click the lobby to connect floor 2, or an upper floor to connect the floor below.', icon: 'stairs' },
 
-  escalatorUp: { label: 'Escalator ↑', hint: 'Place on a floor to carry people to the next floor up.', icon: 'up' },
+  escalatorUp: { label: 'Escalator ↑', hint: '8 cells. Place on a floor to carry people to the next floor up.', icon: 'up' },
 
-  escalatorDown: { label: 'Escalator ↓', hint: 'Place on a floor to carry people down from the next floor.', icon: 'down' },
+  escalatorDown: { label: 'Escalator ↓', hint: '8 cells. Place on a floor to carry people down from the next floor.', icon: 'down' },
 
   skyLobby: { label: 'Sky lobby', hint: '6 cells. A transfer point for express elevators.', icon: 'lobby' },
 

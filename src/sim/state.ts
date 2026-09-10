@@ -93,7 +93,7 @@ export function setupNewGame(state: GameState): void {
 export function setupDemoTower(state: GameState): void {
   setupNewGame(state);
   for (let i = 2; i <= 7; i++) buildFloor(state, i);
-  for (let i = 2; i <= 7; i++) placeStair(state, i, 4);
+  for (let i = 2; i <= 7; i++) placeStair(state, i, 0);
   placeElevatorGroup(state, 1, 7, 10);
   placeTenant(state, 'office', 2, 20);
   placeTenant(state, 'office', 2, 34);

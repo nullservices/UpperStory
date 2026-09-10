@@ -10,8 +10,8 @@ export function setupReferenceTower(state: GameState): void {
   setupNewGame(state);
   for (let floor = 2; floor <= 10; floor++) buildFloor(state, floor);
   placeElevatorGroup(state, 1, 10, 10);
-  placeStair(state, 2, 4);
-  placeStair(state, 3, 4);
+  placeStair(state, 2, 0);
+  placeStair(state, 3, 0);
   for (let floor = 2; floor <= 10; floor++) {
     if (floor <= 3) {
       for (const x of [20]) placeTenant(state, 'fastfood', floor, x);

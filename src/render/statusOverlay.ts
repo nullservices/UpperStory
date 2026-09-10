@@ -40,8 +40,8 @@ export class StatusOverlayView {
       const style = this.styleFor(state, tenant, mode);
       if (!style || style.alpha <= 0.001) continue;
       const floor = getFloor(state.tower, tenant.floor);
-      const height = floor ? floorHeightPx(floor) : CONFIG.FLOOR_HEIGHT_PX;
-      g.rect(tenant.x * cell, floorTopY(tenant.floor), tenant.sizeCells * cell, height).fill(
+      const height = floor ? floorHeightPx(floor, state.tower.lobbyHeight) : CONFIG.FLOOR_HEIGHT_PX;
+      g.rect(tenant.x * cell, floorTopY(tenant.floor, state.tower.lobbyHeight), tenant.sizeCells * cell, height).fill(
         style,
       );
     }

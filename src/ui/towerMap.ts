@@ -34,23 +34,23 @@ export class TowerMap {
   private draw(): void {
     const state = this.state; if (!state) return;
     const ctx = this.canvas.getContext('2d')!;
-    this.top = floorTopY(state.tower.floors.at(-1)!.index) - 20;
-    this.bottom = floorTopY(state.tower.floors[0]!.index) + 40;
+    this.top = floorTopY(state.tower.floors.at(-1)!.index, state.tower.lobbyHeight) - 20;
+    this.bottom = floorTopY(state.tower.floors[0]!.index, state.tower.lobbyHeight) + 40;
     const scaleX = this.canvas.width / (CONFIG.FLOOR_WIDTH_CELLS * CONFIG.CELL_WIDTH_PX);
     const scaleY = this.canvas.height / (this.bottom - this.top);
     ctx.clearRect(0, 0, 600, 400);
     ctx.fillStyle = '#b7c2b1';
-    for (const floor of state.tower.floors) ctx.fillRect(0, (floorTopY(floor.index) - this.top) * scaleY, 600, 1);
+    for (const floor of state.tower.floors) ctx.fillRect(0, (floorTopY(floor.index, state.tower.lobbyHeight) - this.top) * scaleY, 600, 1);
     for (const tenant of state.tenants.values()) {
       ctx.fillStyle = tenant.state === 'damaged' ? '#9c493f' : '#' + TENANT_COLORS[tenant.type].toString(16).padStart(6, '0');
       const height = facilityHeight(tenant.type);
       ctx.fillRect(tenant.x * CONFIG.CELL_WIDTH_PX * scaleX,
-        (floorTopY(tenant.floor + height - 1) - this.top) * scaleY,
-        tenant.sizeCells * CONFIG.CELL_WIDTH_PX * scaleX, Math.max(2, height * 20 * scaleY));
+        (floorTopY(tenant.floor + height - 1, state.tower.lobbyHeight) - this.top) * scaleY,
+        tenant.sizeCells * CONFIG.CELL_WIDTH_PX * scaleX, Math.max(2, (tenant.type === 'lobby' ? state.tower.lobbyHeight : height) * 20 * scaleY));
     }
     ctx.fillStyle = '#425e5d';
     for (const group of state.elevatorGroups.values()) ctx.fillRect(group.x * CONFIG.CELL_WIDTH_PX * scaleX,
-      (floorTopY(group.serviceHi) - this.top) * scaleY, 3, (floorTopY(group.serviceLo) + 20 - floorTopY(group.serviceHi)) * scaleY);
-    ctx.fillStyle = '#c5a04f'; ctx.fillRect(0, (floorTopY(1) - this.top) * scaleY, 600, 2);
+      (floorTopY(group.serviceHi, state.tower.lobbyHeight) - this.top) * scaleY, 3, (floorTopY(group.serviceLo, state.tower.lobbyHeight) + 20 * (group.serviceLo === 1 ? state.tower.lobbyHeight : 1) - floorTopY(group.serviceHi, state.tower.lobbyHeight)) * scaleY);
+    ctx.fillStyle = '#c5a04f'; ctx.fillRect(0, (floorTopY(1, state.tower.lobbyHeight) - this.top) * scaleY, 600, 2);
   }
 }

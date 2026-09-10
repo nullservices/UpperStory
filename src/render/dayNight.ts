@@ -99,9 +99,9 @@ export class DayNightView {
     for (const tenant of state.tenants.values()) {
       if (tenant.state !== 'open' || tenant.occupancy <= 0) continue;
       const floor = getFloor(state.tower, tenant.floor);
-      const height = floor ? floorHeightPx(floor) : CONFIG.FLOOR_HEIGHT_PX;
+      const height = floor ? floorHeightPx(floor, state.tower.lobbyHeight) : CONFIG.FLOOR_HEIGHT_PX;
       if (height <= 0) continue;
-      const y = floorTopY(tenant.floor) + height - 4;
+      const y = floorTopY(tenant.floor, state.tower.lobbyHeight) + height - 4;
       const width = tenant.sizeCells * cell - 4;
       g.rect(tenant.x * cell + 2, y, width, 2).fill({
         color: tenant.type === 'hotel' ? LIGHT_HOTEL : LIGHT_WARM,

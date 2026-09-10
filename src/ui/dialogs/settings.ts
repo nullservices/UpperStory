@@ -3,7 +3,7 @@ import { configureDialog } from './accessibility';
 // Keep the existing save key so the rebrand preserves users' saved towers.
 export const SAVE_KEY = 'towerproject-save-v1';
 export interface SettingsCallbacks {
-  onNewGame: (seed: number) => void;
+  onNewGame: (seed: number, lobbyHeight: 1 | 2 | 3) => void;
   onSave: () => string | null;
   onLoad: () => string | null;
 }
@@ -13,6 +13,7 @@ export class SettingsDialog {
   private loadButton: HTMLButtonElement;
   private newButton: HTMLButtonElement;
   private seed = document.createElement('input');
+  private lobbyHeight = document.createElement('select');
   private armed: 'new' | 'load' | null = null;
   constructor(private callbacks: SettingsCallbacks) {
     this.overlay.style.cssText = 'position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:#263e342e';
@@ -46,19 +47,23 @@ export class SettingsDialog {
       if (!Number.isSafeInteger(seed) || seed < 0 || seed > 0xffffffff) {
         this.status.textContent = 'Use a whole number from 0 to 4,294,967,295.'; return;
       }
-      this.callbacks.onNewGame(seed); this.close();
+      this.callbacks.onNewGame(seed, Number(this.lobbyHeight.value) as 1 | 2 | 3); this.close();
     });
     const actions = document.createElement('div'); actions.className = 'settings-actions';
     actions.append(save, this.loadButton, this.newButton);
     const advanced = document.createElement('details'); advanced.innerHTML = '<summary>World seed (optional)</summary>';
     this.seed.placeholder = 'Random'; this.seed.setAttribute('aria-label', 'World seed'); this.seed.inputMode = 'numeric';
     advanced.append(this.seed);
+    const heightLabel = document.createElement('label'); heightLabel.style.cssText = 'display:grid;gap:8px;margin:16px 0';
+    heightLabel.append('Lobby height for a new tower');
+    for (const height of [1, 2, 3]) this.lobbyHeight.add(new Option(`${height} ${height === 1 ? 'story' : 'stories'}`, String(height)));
+    this.lobbyHeight.setAttribute('aria-label', 'Lobby height for a new tower'); heightLabel.append(this.lobbyHeight);
     this.status.className = 'settings-message'; this.status.setAttribute('role', 'status');
     const resume = this.button('Return to tower', () => this.close()); resume.className = 'resume-button';
     const tour = document.createElement('a');
     tour.href = '?demo=1'; tour.target = '_blank'; tour.rel = 'noopener';
     tour.className = 'tour-link'; tour.textContent = 'Explore a populated tower ↗';
-    panel.append(actions, tour, advanced, this.status, resume);
+    panel.append(heightLabel, actions, tour, advanced, this.status, resume);
     this.overlay.append(panel); document.body.append(this.overlay);
     configureDialog(this.overlay, panel, 'Game options', () => this.close());
     this.overlay.addEventListener('pointerdown', e => { if (e.target === this.overlay) this.close(); });

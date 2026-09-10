@@ -15,7 +15,7 @@ export const CONFIG = {
   /** World-pixel height of one floor band at zoom 1. */
   FLOOR_HEIGHT_PX: 20,
   /** The lobby floor is visually this many floors tall. */
-  LOBBY_HEIGHT_FLOORS: 2,
+  LOBBY_HEIGHT_FLOORS: 1,
   /** Floor index of B1 (below ground). */
   BASEMENT_FLOOR_INDEX: 0,
   MIN_FLOOR_INDEX: -8,

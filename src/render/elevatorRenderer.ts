@@ -49,9 +49,9 @@ export class ElevatorView {
     // ground line; the lobby band is included whenever the group serves it,
     // because the lobby's cells stay lobby cells).
     const cell = CONFIG.CELL_WIDTH_PX;
-    const top = floorTopY(group.serviceHi);
+    const top = floorTopY(group.serviceHi, state.tower.lobbyHeight);
     const loFloor = getFloor(state.tower, group.serviceLo);
-    const bottom = floorTopY(group.serviceLo) + (loFloor ? floorHeightPx(loFloor) : bandFallbackPx(group.serviceLo));
+    const bottom = floorTopY(group.serviceLo, state.tower.lobbyHeight) + (loFloor ? floorHeightPx(loFloor, state.tower.lobbyHeight) : bandFallbackPx(group.serviceLo, state.tower.lobbyHeight));
     const housingX = group.x * cell - 1;
     const housingW = cell * 2 + 2;
     g.rect(housingX, top, housingW, bottom - top).fill({
@@ -73,7 +73,7 @@ export class ElevatorView {
     g.rect(housingX + 2, top, 1, bottom - top).fill(0xd2d8c5);
     g.rect(housingX + housingW - 3, top, 1, bottom - top).fill(0xd2d8c5);
     for (const car of group.cars) {
-      const carTop = (motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y)) + 3;
+      const carTop = (motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y, state.tower.lobbyHeight)) + 3;
       const left = group.x * cell + 1, width = cell * 2 - 2;
       g.rect(left, carTop - 1, width, CAR_H + 2).fill(0x405e59);
       g.rect(left + 1, carTop, width - 2, CAR_H).fill(0xf2d49a);
@@ -101,7 +101,7 @@ export class ElevatorView {
       const call = state.floorCalls.get(f);
       if (!call || (!call.up && !call.down)) continue;
       if (!getFloor(state.tower, f)) continue;
-      const bandTop = floorTopY(f);
+      const bandTop = carWorldY(f, state.tower.lobbyHeight);
       if (call.up) g.rect(group.x * cell - 5, bandTop + 2, 3, 3).fill({ color: ELEVATOR_COLORS.callLight, alpha: 1 });
       if (call.down) g.rect(group.x * cell - 5, bandTop + 15, 3, 3).fill({ color: ELEVATOR_COLORS.callLight, alpha: 1 });
     }
@@ -125,8 +125,8 @@ export class ElevatorView {
 }
 
 /** Band height for an index whose Floor object may not be at hand. */
-function bandFallbackPx(index: number): number {
+function bandFallbackPx(index: number, lobbyHeight: number): number {
   return index === CONFIG.LOBBY_FLOOR_INDEX
-    ? CONFIG.FLOOR_HEIGHT_PX * CONFIG.LOBBY_HEIGHT_FLOORS
+    ? CONFIG.FLOOR_HEIGHT_PX * lobbyHeight
     : CONFIG.FLOOR_HEIGHT_PX;
 }

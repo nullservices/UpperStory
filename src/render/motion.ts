@@ -19,7 +19,7 @@ export class Motion {
   }
   carY(state: GameState, id: number, current: number, alpha: number): number {
     const previous = this.owner === state ? this.cars.get(id) : undefined;
-    const from = carWorldY(previous ?? current), to = carWorldY(current);
+    const from = carWorldY(previous ?? current, state.tower.lobbyHeight), to = carWorldY(current, state.tower.lobbyHeight);
     return from + (to - from) * Math.min(1, Math.max(0, alpha));
   }
 }

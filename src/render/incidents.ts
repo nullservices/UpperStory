@@ -14,7 +14,7 @@ export class IncidentView {
       const tenant = state.tenants.get(incident.tenantId);
       if (!tenant) continue;
       const x = tenant.x * CONFIG.CELL_WIDTH_PX;
-      const y = floorTopY(tenant.floor);
+      const y = floorTopY(tenant.floor, state.tower.lobbyHeight);
       const w = tenant.sizeCells * CONFIG.CELL_WIDTH_PX;
       if (incident.kind === 'fire') {
         for (let i = 0; i < Math.min(16, tenant.sizeCells); i++) {

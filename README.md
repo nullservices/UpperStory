@@ -8,6 +8,8 @@ A tower-building game inspired by SimTower. Build offices, homes, hotels, and sh
 
 Start with a lobby and a budget. Add floors, connect them with elevators, and move in your first tenants. Offices bring the morning commute; restaurants draw lunchtime crowds; homes and hotels keep the building occupied after hours.
 
+Choose a one-, two- or three-story lobby in the **Game** menu before starting a new tower. Existing saves keep their lobby height.
+
 As the tower grows, so do its demands. Long elevator queues frustrate tenants. Hotels need housekeeping. New facilities unlock as your population and star rating increase.
 
 Use the tower report to track vacancies, construction, lift queues, and finances. Click a room or elevator to inspect it and manage its settings. Open **Map** to jump between the upper floors and basements.

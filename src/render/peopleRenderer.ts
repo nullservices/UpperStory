@@ -69,7 +69,7 @@ export class PeopleView {
     const riders = new Map<number, { x: number; y: number }>();
     for (const group of state.elevatorGroups.values()) {
       for (const car of group.cars) {
-        const y = motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y);
+        const y = motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y, state.tower.lobbyHeight);
         car.passengers.forEach((id, index) => riders.set(id, {
           x: group.x * CONFIG.CELL_WIDTH_PX + 3 + (index % 5) * 3,
           y: y + 6 + Math.floor(index / 5) % 2,
@@ -91,7 +91,7 @@ export class PeopleView {
           const position = ((person.id * 37) % 101) / 100;
           const roam = person.id % 3 === 0 ? Math.sin(time / 28 + person.id) * 7 : Math.sin(time / 10 + person.id) * 0.6;
           px = tenant.x * CONFIG.CELL_WIDTH_PX + Math.min(width - 7, Math.max(4, 5 + position * (width - 13) + roam));
-          py = floorTopY(tenant.floor) + (tenant.floor === 1 ? 40 : 20) - FIGURE_H - 3;
+          py = floorTopY(tenant.floor, state.tower.lobbyHeight) + (tenant.floor === 1 ? 20 * state.tower.lobbyHeight : 20) - FIGURE_H - 3;
         }
       }
       if (rect && !overlapsRect(px, py, rect)) continue;
@@ -160,12 +160,12 @@ function personY(
     // The car itself is where the person is; pos.floor is only the boarding
     // floor until disembarkation (spec formula used as a safety fallback).
     const y = p.pos.floor;
-    return carWorldY(y) + 4;
+    return carWorldY(y, state.tower.lobbyHeight) + 4;
   }
   const floorIndex = Math.round(p.pos.floor);
   const floor = getFloor(state.tower, floorIndex);
-  const height = floor ? floorHeightPx(floor) : CONFIG.FLOOR_HEIGHT_PX;
-  return floorTopY(floorIndex) + height - FIGURE_H - 2;
+  const height = floor ? floorHeightPx(floor, state.tower.lobbyHeight) : CONFIG.FLOOR_HEIGHT_PX;
+  return floorTopY(floorIndex, state.tower.lobbyHeight) + height - FIGURE_H - 2;
 }
 
 /** Kind color; waiting people blend toward red as their patience runs out. */

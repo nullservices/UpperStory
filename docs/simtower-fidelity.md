@@ -8,7 +8,7 @@ economic comparisons have not been completed.
 
 | Area | Current behavior |
 | --- | --- |
-| Geometry | 375 cells per floor, floors 1–100 and B1–B9; multi-floor footprints; legacy saves expand without moving rooms |
+| Geometry | 375 cells per floor, floors 1–100 and B1–B9; one-, two- or three-story lobbies selected at new-game creation; multi-floor footprints; legacy saves retain their two-story lobby |
 | Construction | Offices, condos, three hotel types, food, shops, cinema, party hall, medical, security, housekeeping, parking ramps and spaces, recycling, metro, cathedral and sky lobbies |
 | Transport | Standard, service and express elevators; stairs and directional escalators; 21/10/42 passenger capacities; eight cars per shaft and 24 shafts; operating shaft extension |
 | Population | Individual workers, residents, guests, visitors and staff; walking, queues, boarding, rides, activities and departures |
@@ -35,7 +35,8 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
-- Reproduce the original lobby height options and transport footprints. Stair
+- Reproduce the original transport footprints and lobby construction rules.
+  Lobby height is currently selected when creating a tower, without later resizing. Stair
   and escalator trip limits are four and seven flights; their purchase costs
   are $5,000 and $20,000. Elevator shaft/car purchase and quarterly upkeep now
   use the reference's type-specific amounts. New shafts include one car;

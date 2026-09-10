@@ -92,8 +92,10 @@ export function carSpeed(car: ElevatorCar): number {
 }
 
 /** World-pixel y of a car at continuous floor-unit position y. */
-export function carWorldY(y: number): number {
-  return y <= 0 ? -y * CONFIG.FLOOR_HEIGHT_PX : -(y + 1) * CONFIG.FLOOR_HEIGHT_PX;
+export function carWorldY(y: number, lobbyHeight: number = CONFIG.LOBBY_HEIGHT_FLOORS): number {
+  if (y <= 1) return -y * CONFIG.FLOOR_HEIGHT_PX;
+  if (y < 2) return -(1 + (y - 1) * lobbyHeight) * CONFIG.FLOOR_HEIGHT_PX;
+  return -(y + lobbyHeight - 1) * CONFIG.FLOOR_HEIGHT_PX;
 }
 
 export function groupAt(state: GameState, floorIndex: number, x: number): ElevatorGroup | undefined {
@@ -499,13 +501,18 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
     car.state = 'idle';
     return;
   }
-  const dist = target - car.y;
+  const height = state.tower.lobbyHeight;
+  const position = height === 1 ? car.y : -carWorldY(car.y, height) / CONFIG.FLOOR_HEIGHT_PX;
+  const destination = height === 1 ? target : -carWorldY(target, height) / CONFIG.FLOOR_HEIGHT_PX;
+  const dist = destination - position;
   if (Math.abs(dist) <= speed) {
     car.y = target;
     arrive(state, group, car);
     return;
   }
-  car.y += Math.sign(dist) * speed;
+  // Move a fixed physical distance, including through a taller lobby.
+  const next = position + Math.sign(dist) * speed;
+  car.y = height === 1 || next <= 1 ? next : next < 1 + height ? 1 + (next - 1) / height : next - height + 1;
   // Riders move with the car.
   for (const pid of car.passengers) {
     const p = state.people.get(pid);

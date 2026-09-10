@@ -220,7 +220,7 @@ export class Controller {
   private onPointerMove(e: FederatedPointerEvent, finishing = false): void {
     const world = this.camera.screenToWorld(e.global.x, e.global.y);
     this.hover = {
-      floor: floorIndexAtWorldY(world.y),
+      floor: floorIndexAtWorldY(world.y, this.state.tower.lobbyHeight),
       cell: cellIndexAtWorldX(world.x),
     };
     if (this.buildStroke && (finishing || (e.buttons & 1) !== 0)) {

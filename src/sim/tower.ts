@@ -27,6 +27,7 @@ export interface Floor {
 }
 
 export interface Tower {
+  lobbyHeight: 1 | 2 | 3;
   /** Sorted ascending by index. */
   floors: Floor[];
   /** Bumped by EVERY structural mutation; render/dirty-checking keys off this. */
@@ -34,7 +35,7 @@ export interface Tower {
 }
 
 export function createTower(): Tower {
-  return { floors: [], structureRevision: 0 };
+  return { floors: [], structureRevision: 0, lobbyHeight: 1 };
 }
 
 export function emptyCell(): GridCell {
@@ -171,33 +172,33 @@ export function placeStair(state: GameState, floorIndex: number, x: number): voi
 /**
  * World y of a floor band's TOP edge. World coordinates: ground level is y=0,
  * basement extends downward (positive y), floors extend upward (negative y).
- * Lobby floor (index 1) spans y -40..0 (2 floors tall); floor N≥2 tops at
- * -40 - 20·(N-1).
+ * Lobby floor (index 1) spans one to three floor bands and ends at y=0.
+ * Upper floors are offset by the selected lobby height.
  */
-export function floorTopY(index: number): number {
+export function floorTopY(index: number, lobbyHeight: number = CONFIG.LOBBY_HEIGHT_FLOORS): number {
   if (index <= CONFIG.BASEMENT_FLOOR_INDEX) return index === 0 ? 0 : -index * CONFIG.FLOOR_HEIGHT_PX;
   return (
-    -CONFIG.FLOOR_HEIGHT_PX * CONFIG.LOBBY_HEIGHT_FLOORS -
+    -CONFIG.FLOOR_HEIGHT_PX * lobbyHeight -
     CONFIG.FLOOR_HEIGHT_PX * (index - 1)
   );
 }
 
 /** World-pixel height of a floor band at zoom 1 (lobby is taller). */
-export function floorHeightPx(floor: Floor): number {
+export function floorHeightPx(floor: Floor, lobbyHeight: number = CONFIG.LOBBY_HEIGHT_FLOORS): number {
   return floor.index === CONFIG.LOBBY_FLOOR_INDEX
-    ? CONFIG.FLOOR_HEIGHT_PX * CONFIG.LOBBY_HEIGHT_FLOORS
+    ? CONFIG.FLOOR_HEIGHT_PX * lobbyHeight
     : CONFIG.FLOOR_HEIGHT_PX;
 }
 
 /** Floor index whose band contains world y (clamped to B1 for deep y). */
-export function floorIndexAtWorldY(y: number): number {
+export function floorIndexAtWorldY(y: number, lobbyHeight: number = CONFIG.LOBBY_HEIGHT_FLOORS): number {
   const h = CONFIG.FLOOR_HEIGHT_PX;
   // Deep underground clamps to B1: the tower has no floors below the basement.
   if (y >= 0) return (Math.max(CONFIG.MIN_FLOOR_INDEX, -Math.floor(y / h)) || 0);
-  if (y >= -h * CONFIG.LOBBY_HEIGHT_FLOORS) return CONFIG.LOBBY_FLOOR_INDEX;
+  if (y >= -h * lobbyHeight) return CONFIG.LOBBY_FLOOR_INDEX;
   return (
     CONFIG.LOBBY_FLOOR_INDEX +
-    Math.ceil((-h * CONFIG.LOBBY_HEIGHT_FLOORS - y) / h)
+    Math.ceil((-h * lobbyHeight - y) / h)
   );
 }
 

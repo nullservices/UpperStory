@@ -65,24 +65,24 @@ export class PlacementPreview {
       case 'buildBasement': {
         const floor = state.tower.floors[0]!.index - 1;
         const error = buildFloorError(state, floor);
-        g.rect(0, floorTopY(floor), towerWidth, CONFIG.FLOOR_HEIGHT_PX).fill({ color: error ? RED : GREEN, alpha: GREEN_ALPHA });
-        if (error) this.showError(error, hover ? hover.cell * cell : 0, floorTopY(floor), cell);
+        g.rect(0, floorTopY(floor, state.tower.lobbyHeight), towerWidth, CONFIG.FLOOR_HEIGHT_PX).fill({ color: error ? RED : GREEN, alpha: GREEN_ALPHA });
+        if (error) this.showError(error, hover ? hover.cell * cell : 0, floorTopY(floor, state.tower.lobbyHeight), cell);
         break;
       }
       case 'buildFloor': {
         if (state.tower.floors.length === 0) break;
         const canBuild = buildFloorError(state, nextIndex) === null;
-        g.rect(0, floorTopY(nextIndex), towerWidth, bandHeightPx(nextIndex)).fill(
+        g.rect(0, floorTopY(nextIndex, state.tower.lobbyHeight), towerWidth, bandHeightPx(nextIndex, state.tower.lobbyHeight)).fill(
           canBuild ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (hoverError) this.showError(hoverError, 0, floorTopY(nextIndex), towerWidth);
+        if (hoverError) this.showError(hoverError, 0, floorTopY(nextIndex, state.tower.lobbyHeight), towerWidth);
         break;
       }
       case 'select':
       case 'demolish': {
         if (!hover) break;
         const color = tool === 'select' ? WHITE : RED;
-        g.rect(hover.cell * cell, floorTopY(hover.floor), cell, bandHeightPx(hover.floor))
+        g.rect(hover.cell * cell, floorTopY(hover.floor, state.tower.lobbyHeight), cell, bandHeightPx(hover.floor, state.tower.lobbyHeight))
           .stroke({ width: 1, color, alpha: 0.9 });
         break;
       }
@@ -93,8 +93,8 @@ export class PlacementPreview {
         const kind = tool === 'expressElevator' ? 'express' : tool === 'serviceElevator' ? 'service' : 'standard';
         const plan = elevatorBuildPlan(state, drag?.fromFloor ?? hover.floor, hover.floor, drag?.cell ?? hover.cell, kind);
         const x = plan.x * cell;
-        const y = floorTopY(plan.hi);
-        const h = bandBottomPx(plan.lo) - y;
+        const y = floorTopY(plan.hi, state.tower.lobbyHeight);
+        const h = bandBottomPx(plan.lo, state.tower.lobbyHeight) - y;
         g.rect(x, y, cell * 2, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
@@ -105,8 +105,8 @@ export class PlacementPreview {
       case 'escalatorDown': {
         if (!hover) break;
         const x = hover.cell * cell;
-        const y = floorTopY(hover.floor + 1);
-        const h = bandBottomPx(hover.floor) - y;
+        const y = floorTopY(hover.floor + 1, state.tower.lobbyHeight);
+        const h = bandBottomPx(hover.floor, state.tower.lobbyHeight) - y;
         const err = hoverError ?? escalatorPlacementError(state, hover.floor, hover.cell);
         const ok = err === null;
         g.rect(x, y, cell, h).fill(
@@ -135,8 +135,8 @@ export class PlacementPreview {
         const x = hover.cell * cell;
         const stairFromLobby = tool === 'stairs' && hover.floor === CONFIG.LOBBY_FLOOR_INDEX;
         const height = tool === 'stairs' ? 1 : facilityHeight(tool);
-        const y = floorTopY(stairFromLobby ? hover.floor + 1 : hover.floor + height - 1);
-        const h = stairFromLobby ? bandBottomPx(hover.floor) - y : height * bandHeightPx(hover.floor);
+        const y = floorTopY(stairFromLobby ? hover.floor + 1 : hover.floor + height - 1, state.tower.lobbyHeight);
+        const h = stairFromLobby ? bandBottomPx(hover.floor, state.tower.lobbyHeight) - y : height * bandHeightPx(hover.floor, state.tower.lobbyHeight);
         g.rect(x, y, width, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
@@ -155,13 +155,13 @@ export class PlacementPreview {
 }
 
 /** Height of a floor band that may not exist yet (index-driven, like sim). */
-function bandHeightPx(index: number): number {
+function bandHeightPx(index: number, lobbyHeight: number): number {
   return index === CONFIG.LOBBY_FLOOR_INDEX
-    ? CONFIG.FLOOR_HEIGHT_PX * CONFIG.LOBBY_HEIGHT_FLOORS
+    ? CONFIG.FLOOR_HEIGHT_PX * lobbyHeight
     : CONFIG.FLOOR_HEIGHT_PX;
 }
 
 /** World y of the bottom edge of floor `index`'s band. */
-function bandBottomPx(index: number): number {
-  return floorTopY(index) + bandHeightPx(index);
+function bandBottomPx(index: number, lobbyHeight: number): number {
+  return floorTopY(index, lobbyHeight) + bandHeightPx(index, lobbyHeight);
 }

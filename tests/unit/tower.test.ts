@@ -116,7 +116,7 @@ describe('stairs', () => {
 });
 
 describe('grid math', () => {
-  it('floor heights: lobby is double, others single', () => {
+  it('floor heights default to a single-story lobby', () => {
     const state = newTestGame();
     const b1 = getFloor(state.tower, 0)!;
     const lobby = getFloor(state.tower, 1)!;
@@ -128,9 +128,9 @@ describe('grid math', () => {
 
   it('floorTopY: B1 at ground level, floors stack upward without overlap', () => {
     expect(floorTopY(0)).toBe(0);
-    expect(floorTopY(1)).toBe(-40);
-    expect(floorTopY(2)).toBe(-60);
-    expect(floorTopY(5)).toBe(-120);
+    expect(floorTopY(1)).toBe(-20);
+    expect(floorTopY(2)).toBe(-40);
+    expect(floorTopY(5)).toBe(-100);
     for (let i = 2; i < 50; i++) {
       expect(floorTopY(i)).toBe(floorTopY(i - 1) - CONFIG.FLOOR_HEIGHT_PX);
     }
@@ -140,9 +140,9 @@ describe('grid math', () => {
     expect(floorIndexAtWorldY(10)).toBe(0); // B1
     expect(floorIndexAtWorldY(0)).toBe(0);
     expect(floorIndexAtWorldY(-20)).toBe(1); // lobby
-    expect(floorIndexAtWorldY(-50)).toBe(2);
-    expect(floorIndexAtWorldY(-60)).toBe(2); // boundary belongs to floor 2
-    expect(floorIndexAtWorldY(-200)).toBe(9);
+    expect(floorIndexAtWorldY(-50)).toBe(3);
+    expect(floorIndexAtWorldY(-60)).toBe(3); // boundary belongs to floor 3
+    expect(floorIndexAtWorldY(-200)).toBe(10);
     expect(floorIndexAtWorldY(500)).toBe(CONFIG.MIN_FLOOR_INDEX); // deep underground clamps to B1
   });
 

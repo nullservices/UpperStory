@@ -9,6 +9,7 @@ import {
   serializeGame,
   setupNewGame,
   tick,
+  floorTopY,
 } from './sim';
 import { Controller } from './game/controller';
 import { IncidentView } from './render/incidents';
@@ -89,7 +90,7 @@ async function main(): Promise<void> {
   installAudioPanel(audio);
   const campaignPanel = new CampaignPanel((floor, x) => {
     camera.x = app.screen.width / 2 - x * CONFIG.CELL_WIDTH_PX * camera.zoom;
-    camera.y = app.screen.height / 2 - (floor <= 0 ? -floor * CONFIG.FLOOR_HEIGHT_PX : -(floor + 1) * CONFIG.FLOOR_HEIGHT_PX) * camera.zoom;
+    camera.y = app.screen.height / 2 - floorTopY(floor, state.tower.lobbyHeight) * camera.zoom;
     camera.apply();
   }, text => hud.toast(text));
   const towerMap = new TowerMap((x, y) => {
@@ -106,8 +107,9 @@ async function main(): Promise<void> {
   // --- Menu: new game / save / load. The dialog only calls back; the sim
   // work happens here so the live state swap lands in one place. ---
   const settings = new SettingsDialog({
-    onNewGame: (seed: number) => {
+    onNewGame: (seed: number, lobbyHeight: 1 | 2 | 3) => {
       state = createInitialState(seed);
+      state.tower.lobbyHeight = lobbyHeight;
       setupNewGame(state);
       controller.setState(state);
       camera.center();

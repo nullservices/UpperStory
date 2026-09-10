@@ -9,7 +9,7 @@ import type { GameState } from './state';
  * Version bumps go through the migration chain in `deserialize`.
  */
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface SaveEnvelope {
   version: number;
@@ -76,7 +76,7 @@ export function deserializeGame(json: string): GameState {
   if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
     throw new Error('Not a TowerProject save file');
   }
-  if (envelope.version !== 1 && envelope.version !== SAVE_VERSION) {
+  if (![1, 2, SAVE_VERSION].includes(envelope.version)) {
     // Migration chain slot: handle older versions here as they appear.
     throw new Error(
       `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
@@ -86,6 +86,8 @@ export function deserializeGame(json: string): GameState {
     throw new Error('Save file is missing its state');
   }
   const state = envelope.state as GameState;
+  if (envelope.version < 3) state.tower.lobbyHeight = 2;
+  if (![1, 2, 3].includes(state.tower.lobbyHeight)) throw new Error('Invalid lobby height');
   if (envelope.version === 1) {
     state.campaign = newCampaign();
     state.campaign.lastDay = state.calendar.day;

@@ -19,7 +19,7 @@ export class TowerView {
     const width = CONFIG.FLOOR_WIDTH_CELLS * CONFIG.CELL_WIDTH_PX;
     const b = this.backdrop; b.clear();
     // Ground level is the lobby's foot, not the basement floor.
-    const ground = floorTopY(1) + CONFIG.FLOOR_HEIGHT_PX * CONFIG.LOBBY_HEIGHT_FLOORS;
+    const ground = 0;
     b.rect(-6000, ground, 12000, 5000).fill(0xbcb99d);
     b.rect(-6000, ground, 12000, 5).fill(0x809b66);
     b.rect(-6000, ground + 5, 12000, 5).fill(0xc7c6b5);
@@ -42,7 +42,7 @@ export class TowerView {
     }
     const g = this.structure; g.clear();
     for (const floor of floors) {
-      const y = floorTopY(floor.index); const h = floorHeightPx(floor);
+      const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
       g.rect(0, y, width, h).fill(floor.index <= 0 ? 0x979d8c : 0xdce0d3);
       for (let x = 0; x < width; x += 12) {
         if (floor.cells[x / 12]?.content === 'empty') {
@@ -52,9 +52,9 @@ export class TowerView {
       }
     }
     // Draw a whole room at once; cells are placement units, not dividing walls.
-    for (const tenant of state.tenants.values()) this.room(g, tenant);
+    for (const tenant of state.tenants.values()) this.room(g, tenant, state);
     for (const floor of floors) {
-      const y = floorTopY(floor.index); const h = floorHeightPx(floor);
+      const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
       floor.cells.forEach((cell, index) => {
         const x = index * CONFIG.CELL_WIDTH_PX;
         const lobbyStair = floor.index === CONFIG.LOBBY_FLOOR_INDEX &&
@@ -79,20 +79,20 @@ export class TowerView {
       g.rect(-2, y, 2, h).fill(0x7e9183);
       g.rect(width, y, 2, h).fill(0x7e9183);
     }
-    const roof = floorTopY(floors[floors.length - 1]!.index);
+    const roof = floorTopY(floors[floors.length - 1]!.index, state.tower.lobbyHeight);
     g.rect(-5, roof - 4, width + 10, 4).fill(0x6e847d);
     g.rect(-5, roof - 5, width + 10, 1).fill(0xe6e9da);
     for (const label of this.labels) label.destroy();
     this.labels = [];
     for (const floor of floors) {
       const text = new Text({ text: floor.index <= 0 ? `B${1 - floor.index}` : floor.index === 1 ? 'L' : String(floor.index), style: { fontSize: 9, fill: 0x496253, fontFamily: 'Tahoma', fontWeight: 'bold' } });
-      text.position.set(-22, floorTopY(floor.index) + 5); this.labels.push(text); this.container.addChild(text);
+      text.position.set(-22, floorTopY(floor.index, state.tower.lobbyHeight) + 5); this.labels.push(text); this.container.addChild(text);
     }
   }
-  private room(g: Graphics, tenant: Tenant): void {
-    const x = tenant.x * CONFIG.CELL_WIDTH_PX, y = floorTopY(tenant.floor + facilityHeight(tenant.type) - 1);
+  private room(g: Graphics, tenant: Tenant, state: GameState): void {
+    const x = tenant.x * CONFIG.CELL_WIDTH_PX, y = floorTopY(tenant.floor + facilityHeight(tenant.type) - 1, state.tower.lobbyHeight);
     const w = tenant.sizeCells * CONFIG.CELL_WIDTH_PX;
-    const h = tenant.floor === 1 ? 40 : 20 * facilityHeight(tenant.type);
+    const h = tenant.floor === 1 ? 20 * state.tower.lobbyHeight : 20 * facilityHeight(tenant.type);
     if (tenant.state === 'constructing') {
       g.rect(x + 1, y + 2, w - 2, h - 3).fill(0xd4d0b8);
       for (let sx = x + 3; sx < x + w - 3; sx += 12) {

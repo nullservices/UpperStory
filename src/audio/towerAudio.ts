@@ -1,4 +1,5 @@
 import type { GameState } from '../sim/state';
+import { carWorldY } from '../sim/elevators';
 import type { SimEvent } from '../sim/core/events';
 
 const KEY = 'upper-story-audio';
@@ -139,7 +140,7 @@ export class TowerAudio {
     for (const group of state.elevatorGroups.values()) for (const car of group.cars) {
       present.add(car.id);
       const x = view.x + group.x * 12 * view.zoom;
-      const y = view.y + (car.y <= 0 ? -car.y * 20 : -(car.y + 1) * 20) * view.zoom;
+      const y = view.y + carWorldY(car.y, state.tower.lobbyHeight) * view.zoom;
       const visible = x > 200 && x < view.width && y > 94 && y < view.height;
       if (visible && active) {
         if (car.state === 'moving') moving++;

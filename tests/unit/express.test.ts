@@ -26,7 +26,7 @@ function tallTower(): ReturnType<typeof newTestGame> {
   placeElevatorGroup(state, 1, 15, 10);
   placeElevatorGroup(state, 15, 30, 20);
   placeElevatorGroup(state, 30, 40, 30);
-  placeElevatorGroup(state, 1, 40, 45, 'express');
+  placeElevatorGroup(state, 1, 40, 44, 'express');
   rebuildRouting(state);
   return state;
 }
@@ -45,7 +45,7 @@ describe('express elevators', () => {
     expect(elevatorPlacementError(state, 1, 40, 10, 'express')).toBe(
       'An elevator is already here',
     );
-    expect(elevatorPlacementError(state, 1, 40, 45, 'express')).toBe(
+    expect(elevatorPlacementError(state, 1, 40, 44, 'express')).toBe(
       'An elevator is already here',
     );
     expect(elevatorPlacementError(state, 1, 40, 44, 'express')).toBe('An elevator is already here');

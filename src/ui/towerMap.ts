@@ -1,4 +1,5 @@
 import { CONFIG } from '../data/config';
+import { shaftWidth } from '../sim/elevators';
 import { TENANT_COLORS } from '../render/palette';
 import { floorTopY } from '../sim/tower';
 import { facilityHeight } from '../data/config';
@@ -50,7 +51,7 @@ export class TowerMap {
     }
     ctx.fillStyle = '#425e5d';
     for (const group of state.elevatorGroups.values()) ctx.fillRect(group.x * CONFIG.CELL_WIDTH_PX * scaleX,
-      (floorTopY(group.serviceHi, state.tower.lobbyHeight) - this.top) * scaleY, 3, (floorTopY(group.serviceLo, state.tower.lobbyHeight) + 20 * (group.serviceLo === 1 ? state.tower.lobbyHeight : 1) - floorTopY(group.serviceHi, state.tower.lobbyHeight)) * scaleY);
+      (floorTopY(group.serviceHi, state.tower.lobbyHeight) - this.top) * scaleY, shaftWidth(group) * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(group.serviceLo, state.tower.lobbyHeight) + 20 * (group.serviceLo === 1 ? state.tower.lobbyHeight : 1) - floorTopY(group.serviceHi, state.tower.lobbyHeight)) * scaleY);
     ctx.fillStyle = '#c5a04f'; ctx.fillRect(0, (floorTopY(1, state.tower.lobbyHeight) - this.top) * scaleY, 600, 2);
   }
 }

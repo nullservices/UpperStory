@@ -1,3 +1,4 @@
+import { shaftWidth } from '../sim/elevators';
 import type { Application, FederatedPointerEvent } from 'pixi.js';
 import type { Camera } from '../render/camera';
 import {
@@ -335,7 +336,7 @@ export class Controller {
   /** 'select' click: open the info dialog for the thing under the pointer. */
   private selectAt(hover: { floor: number; cell: number }): void {
     const group = this.groupUnder(hover.floor, hover.cell)
-      ?? [...this.state.elevatorGroups.values()].find(g => hover.floor >= g.serviceLo && hover.floor <= g.serviceHi && hover.cell >= g.x && hover.cell < g.x + 2);
+      ?? [...this.state.elevatorGroups.values()].find(g => hover.floor >= g.serviceLo && hover.floor <= g.serviceHi && hover.cell >= g.x && hover.cell < g.x + shaftWidth(g));
     if (group) { this.openElevatorEditor(group); return; }
     const tenant = getTenantAt(this.state, hover.floor, hover.cell);
     if (tenant) this.openTenantInfo(tenant);

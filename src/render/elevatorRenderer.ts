@@ -1,3 +1,4 @@
+import { shaftWidth } from '../sim/elevators';
 import { Container, Graphics } from 'pixi.js';
 import { CONFIG } from '../data/config';
 import {
@@ -53,7 +54,7 @@ export class ElevatorView {
     const loFloor = getFloor(state.tower, group.serviceLo);
     const bottom = floorTopY(group.serviceLo, state.tower.lobbyHeight) + (loFloor ? floorHeightPx(loFloor, state.tower.lobbyHeight) : bandFallbackPx(group.serviceLo, state.tower.lobbyHeight));
     const housingX = group.x * cell - 1;
-    const housingW = cell * 2 + 2;
+    const housingW = cell * shaftWidth(group) + 2;
     g.rect(housingX, top, housingW, bottom - top).fill({
       color:
         group.kind === 'service'
@@ -64,7 +65,7 @@ export class ElevatorView {
       alpha: 0.8,
     });
     // Thin darker shaft between the two door columns.
-    g.rect(group.x * cell + cell - 3, top, 6, bottom - top).fill({
+    g.rect((group.x + shaftWidth(group) / 2) * cell - 3, top, 6, bottom - top).fill({
       color: SHAFT_INNER,
       alpha: 1,
     });
@@ -74,7 +75,7 @@ export class ElevatorView {
     g.rect(housingX + housingW - 3, top, 1, bottom - top).fill(0xd2d8c5);
     for (const car of group.cars) {
       const carTop = (motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y, state.tower.lobbyHeight)) + 3;
-      const left = group.x * cell + 1, width = cell * 2 - 2;
+      const left = group.x * cell + 1, width = cell * shaftWidth(group) - 2;
       g.rect(left, carTop - 1, width, CAR_H + 2).fill(0x405e59);
       g.rect(left + 1, carTop, width - 2, CAR_H).fill(0xf2d49a);
       if (car.passengers.length > 0) this.drawPips(g, group, carTop, car.passengers.length);

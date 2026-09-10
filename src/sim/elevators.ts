@@ -20,6 +20,8 @@ import { getFloor, stairEscalatorCount } from './tower';
  */
 
 export type ElevatorKind = 'standard' | 'service' | 'express';
+export function elevatorWidth(kind: ElevatorKind): number { return kind === 'express' ? 6 : 4; }
+export function shaftWidth(group: ElevatorGroup): number { return group.widthCells ?? 2; }
 export type ElevatorPriority = 'normal' | 'up' | 'down';
 export const SERVICE_PERIODS = [
   { start: 420, label: '07:00–10:00' }, { start: 600, label: '10:00–12:00' },
@@ -59,6 +61,8 @@ export interface ElevatorGroup {
   kind: ElevatorKind;
   /** Shaft cell column; the adjacent boarding cell is x+1. */
   x: number;
+  /** Missing on legacy saves, whose two-cell shafts retain their footprint. */
+  widthCells?: number;
   serviceLo: number;
   serviceHi: number;
   /**
@@ -100,7 +104,7 @@ export function carWorldY(y: number, lobbyHeight: number = CONFIG.LOBBY_HEIGHT_F
 
 export function groupAt(state: GameState, floorIndex: number, x: number): ElevatorGroup | undefined {
   for (const group of state.elevatorGroups.values()) {
-    if (group.x === x && group.serviceLo <= floorIndex && floorIndex <= group.serviceHi) {
+    if (x >= group.x && x < group.x + shaftWidth(group) && group.serviceLo <= floorIndex && floorIndex <= group.serviceHi) {
       return group;
     }
   }
@@ -127,11 +131,12 @@ export function elevatorPlacementError(
   if (span < 2) return 'Shaft must span at least 2 floors';
   const maxSpan = kind === 'express' ? CONFIG.MAX_FLOORS - CONFIG.MIN_FLOOR_INDEX + 1 : CONFIG.MAX_SHAFT_FLOORS;
   if (span > maxSpan) return `Shaft max ${maxSpan} floors`;
-  if (x < 0 || x + 1 >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const existing = existingGroupId === undefined ? undefined : state.elevatorGroups.get(existingGroupId);
+  const width = existing ? shaftWidth(existing) : elevatorWidth(kind);
+  if (x < 0 || x + width > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   for (const other of state.elevatorGroups.values()) {
     if (other.id === existingGroupId) continue;
-    if (floorLo <= other.serviceHi && floorHi >= other.serviceLo && x < other.x + 2 && x + 2 > other.x) {
+    if (floorLo <= other.serviceHi && floorHi >= other.serviceLo && x < other.x + shaftWidth(other) && x + width > other.x) {
       return 'An elevator is already here';
     }
   }
@@ -144,10 +149,10 @@ export function elevatorPlacementError(
     if (sky) {
       // The express shaft must physically run through the sky lobby; its
       // cells (tenant or scaffold) are shared, never overwritten.
-      if (x < sky.x || x + 1 >= sky.x + sky.sizeCells) {
+      if (x < sky.x || x + width > sky.x + sky.sizeCells) {
         return 'The express shaft must run through the sky lobby';
       }
-      for (const cx of [x, x + 1]) {
+      for (let cx = x; cx < x + width; cx++) {
         const cell = floor.cells[cx];
         if (!cell) return 'Space is occupied';
         if (cell.content === 'empty') continue;
@@ -156,7 +161,7 @@ export function elevatorPlacementError(
       }
       continue;
     }
-    for (const cx of [x, x + 1]) {
+    for (let cx = x; cx < x + width; cx++) {
       const cell = floor.cells[cx];
       if (!cell || cell.content !== 'empty') return 'Space is occupied';
     }
@@ -248,6 +253,7 @@ function makeGroup(
     id,
     kind,
     x,
+    widthCells: elevatorWidth(kind),
     serviceLo: floorLo,
     serviceHi: floorHi,
     stops: stopsFor(state, kind, floorLo, floorHi),
@@ -265,11 +271,10 @@ function paintCells(state: GameState, group: ElevatorGroup): void {
     if (f === CONFIG.LOBBY_FLOOR_INDEX) continue; // the lobby hosts the doors
     const floor = getFloor(state.tower, f)!;
     // Tenant cells (sky lobbies) are shared with the shaft — never overwrite.
-    if (floor.cells[group.x]?.content === 'empty') {
-      floor.cells[group.x] = { content: 'elevatorShaft', tenantId: -1 };
-    }
-    if (floor.cells[group.x + 1]?.content === 'empty') {
-      floor.cells[group.x + 1] = { content: 'elevatorLobby', tenantId: -1 };
+    for (let cx = group.x; cx < group.x + shaftWidth(group); cx++) {
+      if (floor.cells[cx]?.content === 'empty') {
+        floor.cells[cx] = { content: cx === group.x + 1 ? 'elevatorLobby' : 'elevatorShaft', tenantId: -1 };
+      }
     }
   }
 }
@@ -279,7 +284,7 @@ function clearCells(state: GameState, group: ElevatorGroup): void {
     if (f === CONFIG.LOBBY_FLOOR_INDEX) continue;
     const floor = getFloor(state.tower, f);
     if (!floor) continue;
-    for (const cx of [group.x, group.x + 1]) {
+    for (let cx = group.x; cx < group.x + shaftWidth(group); cx++) {
       const content = floor.cells[cx]?.content;
       if (content === 'elevatorShaft' || content === 'elevatorLobby') {
         floor.cells[cx] = { content: 'empty', tenantId: -1 };

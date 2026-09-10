@@ -42,7 +42,7 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   escalatorDown: { label: 'Escalator ↓', hint: 'Place on a floor to carry people down from the next floor.', icon: 'down' },
 
-  skyLobby: { label: 'Sky lobby', hint: '3 cells. A transfer point for express elevators.', icon: 'lobby' },
+  skyLobby: { label: 'Sky lobby', hint: '6 cells. A transfer point for express elevators.', icon: 'lobby' },
 
   security: { label: 'Security', hint: '16 cells. Security staff patrol your building.', icon: 'security' },
 

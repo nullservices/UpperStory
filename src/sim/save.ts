@@ -9,7 +9,7 @@ import type { GameState } from './state';
  * Version bumps go through the migration chain in `deserialize`.
  */
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 export interface SaveEnvelope {
   version: number;
@@ -76,7 +76,7 @@ export function deserializeGame(json: string): GameState {
   if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
     throw new Error('Not a TowerProject save file');
   }
-  if (![1, 2, SAVE_VERSION].includes(envelope.version)) {
+  if (![1, 2, 3, SAVE_VERSION].includes(envelope.version)) {
     // Migration chain slot: handle older versions here as they appear.
     throw new Error(
       `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
@@ -94,6 +94,10 @@ export function deserializeGame(json: string): GameState {
     state.campaign.nextIncidentTick = state.tickCount + CONFIG.DAY_TICKS * 3;
     for (const floor of state.tower.floors) while (floor.cells.length < CONFIG.FLOOR_WIDTH_CELLS) floor.cells.push(emptyCell());
     state.tower.structureRevision++;
+  }
+  for (const group of state.elevatorGroups.values()) {
+    group.widthCells ??= 2;
+    if (![2, group.kind === 'express' ? 6 : 4].includes(group.widthCells)) throw new Error('Invalid elevator width');
   }
   return state;
 }

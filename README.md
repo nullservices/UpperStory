@@ -35,7 +35,7 @@ Condos sell once when completed. Offices earn rent, visitors pay for their activ
 ## Getting started
 
 1. Select **Floor** and click above the lobby to build an upper floor.
-2. Select **Elevator** and click the lobby to connect the floor above, or drag across several floors. Leave two cells clear for the shaft. **Stairs** can also be placed by clicking the lobby.
+2. Select **Elevator** and click the lobby to connect the floor above, or drag across several floors. Leave four cells clear for standard/service shafts, or six for express shafts. **Stairs** can also be placed by clicking the lobby.
 3. Place an **Office** or **Condo** upstairs and let construction finish. The time controls can speed things up.
 4. Watch your tenants arrive, then expand as your budget allows.
 

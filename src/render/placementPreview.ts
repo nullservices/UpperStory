@@ -95,10 +95,10 @@ export class PlacementPreview {
         const x = plan.x * cell;
         const y = floorTopY(plan.hi, state.tower.lobbyHeight);
         const h = bandBottomPx(plan.lo, state.tower.lobbyHeight) - y;
-        g.rect(x, y, cell * 2, h).fill(
+        g.rect(x, y, cell * plan.width, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (hoverError) this.showError(hoverError, x, y, cell * 2);
+        if (hoverError) this.showError(hoverError, x, y, cell * plan.width);
         break;
       }
       case 'escalatorUp':

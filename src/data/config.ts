@@ -271,7 +271,7 @@ export const TENANT_DATA = {
     capacity: 25, // concurrent shoppers
   },
   skyLobby: {
-    sizeCells: 3, // wide enough for a 2-cell express shaft to run through
+    sizeCells: 6, // accommodates a full express shaft
     costDollars: 5_000,
     constructionTicks: 400,
     unlockedAtStar: 3,

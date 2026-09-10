@@ -35,7 +35,11 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
-- Reproduce the original transport footprints and lobby construction rules.
+- Complete stair/escalator footprints and original lobby construction rules.
+  New standard/service shafts occupy four cells and express shafts six;
+  saved two-cell shafts retain their dimensions, including extensions. New sky
+  lobbies occupy six cells to fit express shafts; original lobby sizing rules
+  still need comparison.
   Lobby height is currently selected when creating a tower, without later resizing. Stair
   and escalator trip limits are four and seven flights; their purchase costs
   are $5,000 and $20,000. Elevator shaft/car purchase and quarterly upkeep now

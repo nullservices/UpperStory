@@ -78,7 +78,9 @@ export function stepDailySettlement(state: GameState): void {
     if (p.kind === 'housekeeper') upkeep += CONFIG.HOUSEKEEPER_WAGE_DAILY_DOLLARS * 100;
   }
   for (const group of state.elevatorGroups.values()) {
-    upkeep += group.cars.length * CONFIG.ELEVATOR_CAR_UPKEEP_DAILY_DOLLARS * 100;
+    const prices = CONFIG.ELEVATOR_PRICES[group.kind];
+    const quarterCents = (prices.shaftUpkeepQuarter + group.cars.length * prices.carUpkeepQuarter) * 100;
+    upkeep += Math.floor(quarterCents / CONFIG.QUARTER_DAYS) + (state.calendar.day % CONFIG.QUARTER_DAYS === 0 ? quarterCents % CONFIG.QUARTER_DAYS : 0);
   }
 
   state.money.balanceCents += income - upkeep;

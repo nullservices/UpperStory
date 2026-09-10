@@ -160,7 +160,7 @@ export function elevatorPlacementError(
     }
   }
   const overlap = existing ? Math.max(0, Math.min(floorHi, existing.serviceHi) - Math.max(floorLo, existing.serviceLo) + 1) : 0;
-  const cost = (span - overlap) * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100;
+  const cost = (existing ? (span - overlap) * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS : CONFIG.ELEVATOR_PRICES[kind].shaft) * 100;
   if (cost > state.money.balanceCents) return 'Not enough funds';
   return null;
 }
@@ -218,8 +218,7 @@ export function placeElevatorGroup(
 ): ElevatorGroup {
   const error = elevatorPlacementError(state, floorLo, floorHi, x, kind);
   if (error) throw new Error(error);
-  const span = floorHi - floorLo + 1;
-  const cost = span * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100;
+  const cost = CONFIG.ELEVATOR_PRICES[kind].shaft * 100;
   if (!spendHelper(state, cost)) throw new Error('Not enough funds');
   return makeGroup(state, floorLo, floorHi, x, kind);
 }
@@ -292,7 +291,7 @@ export function addElevatorCar(state: GameState, groupId: number): void {
   const group = state.elevatorGroups.get(groupId);
   if (!group) throw new Error('Elevator not found');
   if (group.cars.length >= CONFIG.MAX_CARS_PER_SHAFT) throw new Error('Max cars reached');
-  const cost = CONFIG.ELEVATOR_CAR_COST_DOLLARS * 100;
+  const cost = CONFIG.ELEVATOR_PRICES[group.kind].car * 100;
   if (cost > state.money.balanceCents) throw new Error('Not enough funds');
   state.money.balanceCents -= cost;
   group.cars.push({

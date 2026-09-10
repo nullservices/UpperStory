@@ -37,7 +37,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   and disaster response behavior against original gameplay.
 - Reproduce the original lobby height options and transport footprints. Stair
   and escalator trip limits are four and seven flights; their purchase costs
-  are $5,000 and $20,000. Elevator purchase and extension pricing still differ.
+  are $5,000 and $20,000. Elevator shaft/car purchase and quarterly upkeep now
+  use the reference's type-specific amounts. New shafts include one car;
+  extensions still use our $500-per-floor rule. Speed upgrades remain custom.
 - Replace procedural artwork and compare synthesized audio with the original sound design.
   The current renderer uses 20-pixel floor bands; the reference loader uses 24.
 - Original TDT save import/export is not implemented.

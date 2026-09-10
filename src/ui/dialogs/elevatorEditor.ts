@@ -47,6 +47,7 @@ export class ElevatorEditor {
   private readonly addCarBtn: HTMLButtonElement;
   private readonly schedules = document.createElement('details');
   private readonly stops = document.createElement('details');
+  private readonly runningCost = document.createElement('p');
   private readonly rowEls = new Map<
     number,
     {
@@ -101,7 +102,7 @@ export class ElevatorEditor {
     this.errorEl.style.cssText = `color:${C.danger};font-size:11px;margin-top:8px;min-height:0;`;
     this.errorEl.textContent = ' ';
 
-    this.addCarBtn = this.button(`Add car ($${fmt(CONFIG.ELEVATOR_CAR_COST_DOLLARS)})`);
+    this.addCarBtn = this.button('Add car');
     this.addCarBtn.style.marginTop = '6px';
     this.addCarBtn.addEventListener('click', () => this.actions?.addCar());
 
@@ -111,7 +112,8 @@ export class ElevatorEditor {
 
     this.schedules.style.cssText = 'margin:16px 0;line-height:1.7';
     this.stops.style.cssText = 'margin:16px 0;line-height:1.7';
-    panel.append(closeBtn, this.title, body, this.schedules, this.stops, this.errorEl, footer);
+    this.runningCost.style.cssText = 'font-size:11px;line-height:1.6';
+    panel.append(closeBtn, this.title, body, this.runningCost, this.schedules, this.stops, this.errorEl, footer);
     this.overlay.appendChild(panel);
     document.body.appendChild(this.overlay);
   }
@@ -157,6 +159,9 @@ export class ElevatorEditor {
     if (!group || !this.visible) return;
     this.title.textContent = `Elevator — floors ${floorLabel(group.serviceLo)}–${floorLabel(group.serviceHi)}`;
     this.addCarBtn.hidden = group.cars.length >= CONFIG.MAX_CARS_PER_SHAFT;
+    this.addCarBtn.textContent = `Add car ($${fmt(CONFIG.ELEVATOR_PRICES[group.kind].car)})`;
+    const prices = CONFIG.ELEVATOR_PRICES[group.kind];
+    this.runningCost.textContent = `Quarterly upkeep: $${fmt(prices.shaftUpkeepQuarter)} for the shaft + $${fmt(prices.carUpkeepQuarter)} per car. Total: $${fmt(prices.shaftUpkeepQuarter + group.cars.length * prices.carUpkeepQuarter)}. Charged across the three days of the quarter.`;
 
     // One row per car; rows are keyed by car id so buttons stay stable.
     const seen = new Set<number>();

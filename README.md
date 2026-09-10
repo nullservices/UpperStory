@@ -47,6 +47,14 @@ Use **Floors served** to turn individual stops on or off. Existing trips finish 
 
 People can travel up to four consecutive stair flights or seven escalator flights. Stairs cost $5,000 and escalators $20,000. The tower supports 64 stairs and escalators combined, 16 cinemas and party halls combined, 512 food and retail facilities combined, and 10 security offices. Facilities under construction count toward these limits; demolition frees a slot.
 
+| Elevator | New shaft, including first car | Additional car | Quarterly upkeep |
+| --- | --- | --- | --- |
+| Standard | $200,000 | $80,000 | $10,000 shaft + $10,000 per car |
+| Service | $100,000 | $50,000 | $10,000 shaft + $10,000 per car |
+| Express | $400,000 | $150,000 | $20,000 shaft + $20,000 per car |
+
+Shaft extensions cost $500 per added floor. Inspect a shaft to see its total upkeep before adding more cars.
+
 ## Controls
 
 Designed for a desktop browser with a mouse and keyboard.

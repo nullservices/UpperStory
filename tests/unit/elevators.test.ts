@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { CONFIG } from '../../src/data/config';
 import {
   addElevatorCar,
   demolishElevatorGroup,
@@ -20,7 +19,7 @@ describe('elevator placement', () => {
     scenarioTower(state);
     const before = state.money.balanceCents;
     const group = placeElevatorGroup(state, 1, 5, 40);
-    expect(state.money.balanceCents).toBe(before - 5 * 500 * 100);
+    expect(state.money.balanceCents).toBe(before - 200_000 * 100);
     expect(group.serviceLo).toBe(1);
     expect(group.serviceHi).toBe(5);
     expect(group.cars).toHaveLength(1);
@@ -61,7 +60,7 @@ describe('elevator management', () => {
     const group = state.elevatorGroups.values().next().value!;
     const before = state.money.balanceCents;
     addElevatorCar(state, group.id);
-    expect(state.money.balanceCents).toBe(before - CONFIG.ELEVATOR_CAR_COST_DOLLARS * 100);
+    expect(state.money.balanceCents).toBe(before - 80_000 * 100);
     expect(group.cars).toHaveLength(2);
     removeElevatorCar(state, group.id, group.cars[1]!.id);
     expect(group.cars).toHaveLength(1);

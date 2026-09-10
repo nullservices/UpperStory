@@ -57,7 +57,11 @@ export const CONFIG = {
   MAX_CARS_PER_SHAFT: 8,
   MAX_SHAFT_FLOORS: 29,
   ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS: 500,
-  ELEVATOR_CAR_COST_DOLLARS: 2_000,
+  ELEVATOR_PRICES: {
+    standard: { shaft: 200_000, car: 80_000, shaftUpkeepQuarter: 10_000, carUpkeepQuarter: 10_000 },
+    service: { shaft: 100_000, car: 50_000, shaftUpkeepQuarter: 10_000, carUpkeepQuarter: 10_000 },
+    express: { shaft: 400_000, car: 150_000, shaftUpkeepQuarter: 20_000, carUpkeepQuarter: 20_000 },
+  },
   ELEVATOR_SPEED_UPGRADE_COST_DOLLARS: 1_500,
   ESCALATOR_COST_DOLLARS: 20_000,
   /** Waiting people per direction per floor (reverse-engineered cap). */
@@ -142,7 +146,6 @@ export const CONFIG = {
   SHOP_SALE_DOLLARS: 8,
   GUARD_WAGE_DAILY_DOLLARS: 200,
   HOUSEKEEPER_WAGE_DAILY_DOLLARS: 200,
-  ELEVATOR_CAR_UPKEEP_DAILY_DOLLARS: 50,
   QUARTER_DAYS: 3,
   /** Pricing levels: visitor volume multiplier vs revenue multiplier. */
   PRICING_LEVELS: [

@@ -254,7 +254,7 @@ export class ToolPalette {
 
       const locked = required > state.starLevel;
 
-      const cost = data?.costDollars ?? (tool === 'buildBasement' ? floorCostDollars(state.tower.floors[0]!.index - 1) : tool === 'buildFloor' ? floorCostDollars(topFloorIndex(state.tower) + 1) : tool === 'stairs' ? CONFIG.STAIR_COST_DOLLARS : tool.startsWith('escalator') ? CONFIG.ESCALATOR_COST_DOLLARS : null);
+      const cost = data?.costDollars ?? (tool === 'buildBasement' ? floorCostDollars(state.tower.floors[0]!.index - 1) : tool === 'buildFloor' ? floorCostDollars(topFloorIndex(state.tower) + 1) : tool === 'stairs' ? CONFIG.STAIR_COST_DOLLARS : tool.startsWith('escalator') ? CONFIG.ESCALATOR_COST_DOLLARS : tool === 'elevator' ? CONFIG.ELEVATOR_PRICES.standard.shaft : tool === 'serviceElevator' ? CONFIG.ELEVATOR_PRICES.service.shaft : tool === 'expressElevator' ? CONFIG.ELEVATOR_PRICES.express.shaft : null);
 
       button.disabled = locked;
 
@@ -279,4 +279,3 @@ export class ToolPalette {
   }
 
 }
-

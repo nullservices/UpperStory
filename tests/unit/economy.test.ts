@@ -52,7 +52,7 @@ describe('daily settlement', () => {
     stepDailySettlement(state);
 
     const expectedUpkeep =
-      CONFIG.GUARD_WAGE_DAILY_DOLLARS * 100 + CONFIG.ELEVATOR_CAR_UPKEEP_DAILY_DOLLARS * 100;
+      CONFIG.GUARD_WAGE_DAILY_DOLLARS * 100 + Math.floor(20_000_00 / 3);
     expect(state.money.dailyUpkeepCents).toBe(expectedUpkeep);
     expect(state.money.balanceCents).toBe(before - expectedUpkeep);
   });

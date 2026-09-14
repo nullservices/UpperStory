@@ -37,6 +37,7 @@ export interface Tenant {
   movieAge?: number;
   visitsToday?: number;
   reportedPopulation?: number;
+  populationUpdatedDay?: number;
 }
 
 export function isUnlocked(state: GameState, type: TenantType): boolean {

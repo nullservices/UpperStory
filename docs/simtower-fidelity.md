@@ -14,6 +14,7 @@ economic comparisons have not been completed.
 | Population | Individual workers, residents, guests, visitors and staff; walking, queues, boarding, rides, activities and departures |
 | Service upkeep | Exact quarterly totals for housekeeping, security, parking ramps, recycling, metro and escalators; collected in daily shares with final-day rounding |
 | Hotel income | Single/twin/suite full-room baselines of $2k/$3k/$6k per night; guest shares paid at checkout with the selected pricing multiplier |
+| Commercial population | Fast food, shops and restaurants update at opening from preceding external visits; office lunch visits earn revenue without counting twice in population |
 | Economy | One-time condo sales, office rent, guest and visitor revenue, service upkeep, parking fees and film replacement |
 | Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
@@ -42,6 +43,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Hotel nightly baselines are derived from reference quarterly income, not a
   verified reproduction of original checkout accounting. Partial occupancy is
   proportional to guest count; pricing multipliers remain our own model.
+  Fast-food population updates at 10:00. Shop (09:00) and restaurant (12:00)
+  update times retain our visitor windows pending original-game verification.
+  Commercial income and the visitor demand ramp remain approximate.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy

@@ -1,5 +1,7 @@
 import { configureDialog } from './accessibility';
 import { hotelCheckoutCents } from '../../sim/hotelEconomy';
+import { commercialOpeningMinute } from '../../sim/commercialPopulation';
+import { formatTimeOfDay } from '../../sim/time';
 import { CONFIG, TENANT_DATA, isHotel } from '../../data/config';
 import type { Tenant, TenantType } from '../../sim';
 
@@ -185,6 +187,11 @@ export class TenantInfo {
       rows.push(this.line('Extra coverage', 'Build another office to share a floor'));
     }
     if (tenant.type === 'cinema') rows.push(this.line('Film age', `${tenant.movieAge ?? 0} days`));
+    const opening = commercialOpeningMinute(tenant.type);
+    if (opening !== null) {
+      rows.push(this.line('Tower population', String(tenant.reportedPopulation ?? 0)));
+      rows.push(this.line('Population update', `${formatTimeOfDay(opening)} · preceding patron count`));
+    }
     this.body.replaceChildren(...rows);
     if (tenant.state === 'damaged') {
       const repair = this.button(`Repair · $${Math.round(TENANT_DATA[tenant.type].costDollars / 4).toLocaleString()}`);

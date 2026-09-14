@@ -1,4 +1,5 @@
 import { stepCampaign } from '../campaign';
+import { stepCommercialPopulation } from '../commercialPopulation';
 import { CONFIG } from '../../data/config';
 import { stepElevators } from '../elevators';
 import { stepEvaluation } from '../evaluation';
@@ -27,6 +28,7 @@ export function tick(state: GameState): void {
   stepTime(state);
   if (state.calendar.day !== previousDay) stepDailySettlement(state, previousDay);
   stepConstruction(state); // completes tenants and spawns their people
+  stepCommercialPopulation(state);
   checkRouting(state); // rebuild routing tables on structural changes
   stepPeople(state); // schedules, visitors, walking, queue joins, give-ups
   stepElevators(state); // dispatch, movement, doors, boarding

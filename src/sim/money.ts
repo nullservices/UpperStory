@@ -62,7 +62,7 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
     }
     const data = TENANT_DATA[tenant.type] as TenantTypeData;
     upkeep += quarterlyShare((data.upkeepQuarter ?? 0) * 100, settledDay);
-    if (['shop', 'restaurant', 'fastfood', 'cinema', 'partyHall'].includes(tenant.type)) {
+    if (['cinema', 'partyHall'].includes(tenant.type)) {
       tenant.reportedPopulation = Math.min(tenant.capacity, tenant.visitsToday ?? 0);
       tenant.visitsToday = 0;
     }

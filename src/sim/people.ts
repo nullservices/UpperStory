@@ -481,15 +481,17 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       return;
     }
     case 'gotoLunch': {
+      if (p.state === 'offscreen') return;
       const eateries = [...state.tenants.values()].filter(
         (t) =>
           (t.type === 'restaurant' || t.type === 'fastfood') &&
           t.state === 'open' &&
+          pickupRoute(state, p.pos.floor, t.floor, p.kind) !== null &&
           (capacityCounts(state).get(t.id) ?? 0) < t.capacity,
       );
       if (eateries.length === 0) {
-        // No food in the tower: hang around the lobby instead.
-        p.destination = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: rngInt(state, 2, 20) };
+        // Take a break at the office when no reachable eatery has space.
+        p.destination = tenantCenter(state, p.tenantId);
         p.activityTicksLeft = CONFIG.EAT_TICKS;
         p.activityTenantId = -1;
       } else {
@@ -503,6 +505,7 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       return;
     }
     case 'returnToOffice': {
+      if (p.state === 'offscreen') return;
       p.destination = tenantCenter(state, p.tenantId);
       p.endState = 'inTenant';
       p.activityTicksLeft = 0;
@@ -618,9 +621,11 @@ export function stepPeople(state: GameState): void {
         if (p.activityTicksLeft > 0) {
           p.activityTicksLeft--;
           if (p.activityTicksLeft === 0) {
-            // Finished eating/shopping: leave the tower.
-            p.destination = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
-            p.endState = 'offscreen';
+            // Workers return to work; external customers leave the tower.
+            p.destination = p.kind === 'officeWorker'
+              ? tenantCenter(state, p.tenantId)
+              : { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
+            p.endState = p.kind === 'officeWorker' ? 'inTenant' : 'offscreen';
             p.activityTenantId = -1;
             beginTrip(state, p);
             break;

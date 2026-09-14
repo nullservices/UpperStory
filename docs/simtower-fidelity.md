@@ -13,6 +13,7 @@ economic comparisons have not been completed.
 | Transport | Standard, service and express elevators; stairs and directional escalators; 21/10/42 passenger capacities; eight cars per shaft and 24 shafts; operating shaft extension |
 | Population | Individual workers, residents, guests, visitors and staff; walking, queues, boarding, rides, activities and departures |
 | Service upkeep | Exact quarterly totals for housekeeping, security, parking ramps, recycling, metro and escalators; collected in daily shares with final-day rounding |
+| Hotel income | Single/twin/suite full-room baselines of $2k/$3k/$6k per night; guest shares paid at checkout with the selected pricing multiplier |
 | Economy | One-time condo sales, office rent, guest and visitor revenue, service upkeep, parking fees and film replacement |
 | Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
@@ -38,6 +39,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
+  Hotel nightly baselines are derived from reference quarterly income, not a
+  verified reproduction of original checkout accounting. Partial occupancy is
+  proportional to guest count; pricing multipliers remain our own model.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy

@@ -140,7 +140,8 @@ export const CONFIG = {
   // --- Economy (approx — tune by playtest) ---
   OFFICE_RENT_DAILY_DOLLARS: 3_333,
   CONDO_RENT_DAILY_DOLLARS: 0,
-  HOTEL_RATE_NIGHTLY_DOLLARS: 120,
+  /** Full-occupancy room income calibrated from $6k/$9k/$18k per quarter. */
+  HOTEL_ROOM_NIGHTLY_DOLLARS: { hotel: 2000, hotelTwin: 3000, hotelSuite: 6000 },
   RESTAURANT_MEAL_DOLLARS: 15,
   FASTFOOD_MEAL_DOLLARS: 8,
   SHOP_SALE_DOLLARS: 8,

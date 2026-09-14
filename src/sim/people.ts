@@ -1,4 +1,5 @@
 import { operatingDay } from './time';
+import { hotelCheckoutCents } from './hotelEconomy';
 import { CONFIG, TENANT_DATA, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { rngInt, rngNext } from './core/rng';
@@ -375,7 +376,7 @@ function arrive(state: GameState, p: Person): void {
   // the simulation entirely.
   if (p.endState === 'offscreen' && p.kind === 'hotelGuest' && p.state !== 'offscreen') {
     const hotel = state.tenants.get(p.tenantId);
-    if (hotel) hotel.dailyRevenue += CONFIG.HOTEL_RATE_NIGHTLY_DOLLARS * 100;
+    if (hotel) hotel.dailyRevenue += hotelCheckoutCents(hotel);
     p.route = null;
     p.target = null;
     p.destination = null;

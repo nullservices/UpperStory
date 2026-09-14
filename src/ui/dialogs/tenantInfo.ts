@@ -1,4 +1,5 @@
 import { configureDialog } from './accessibility';
+import { hotelCheckoutCents } from '../../sim/hotelEconomy';
 import { CONFIG, TENANT_DATA, isHotel } from '../../data/config';
 import type { Tenant, TenantType } from '../../sim';
 
@@ -175,6 +176,8 @@ export class TenantInfo {
     if (operatingCost) rows.push(this.line('Operating cost', `$${operatingCost.toLocaleString()} / quarter`));
     if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
+      rows.push(this.line('Checkout per guest', `$${(hotelCheckoutCents(tenant) / 100).toLocaleString()}`));
+      rows.push(this.line('Full room / night', `$${(hotelCheckoutCents(tenant) * TENANT_DATA[tenant.type].capacity / 100).toLocaleString()}`));
     }
     if (tenant.type === 'housekeeping') {
       rows.push(this.line('Assigned floors', data.housekeepingFloors?.length ? data.housekeepingFloors.map(floorLabel).join(', ') : 'None'));

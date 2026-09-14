@@ -482,9 +482,15 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
     }
     case 'gotoLunch': {
       if (p.state === 'offscreen') return;
+      // Five workers per six-person office buy weekday fast-food lunches.
+      // Stable roster order keeps participation consistent across save/load.
+      const coworkers = [...state.people.values()]
+        .filter(other => other.kind === 'officeWorker' && other.tenantId === p.tenantId)
+        .sort((a, b) => a.id - b.id);
+      if (operatingDay(state) % 3 === 0 || coworkers.findIndex(other => other.id === p.id) % 6 === 5) return;
       const eateries = [...state.tenants.values()].filter(
         (t) =>
-          (t.type === 'restaurant' || t.type === 'fastfood') &&
+          t.type === 'fastfood' &&
           t.state === 'open' &&
           pickupRoute(state, p.pos.floor, t.floor, p.kind) !== null &&
           (capacityCounts(state).get(t.id) ?? 0) < t.capacity,

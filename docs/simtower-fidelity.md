@@ -55,6 +55,10 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   weekends add 20%; rain halves the target; pricing scales it. This simplified
   ramp omits the reference's later transient values. Arrival budgets persist
   through saves and exclude office lunches; actual turnout may be lower.
+  Five of each six office workers now seek reachable fast food on weekdays,
+  subject to available capacity. The nonparticipating worker is chosen by stable
+  roster order; destination selection remains random, not a recovered original
+  algorithm. Workers without an eligible destination take a break at the office.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy

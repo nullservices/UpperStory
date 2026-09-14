@@ -41,3 +41,35 @@ it('does not bring an absent worker into the tower at lunchtime', () => {
   expect(worker.state).toBe('offscreen');
   expect(worker.destination).toBeNull();
 });
+
+it('sends five of six office workers to fast food on weekdays', () => {
+  const { state, office } = fixture();
+  state.people.clear(); spawnTenantPeople(state, office);
+  const workers = [...state.people.values()];
+  for (const worker of workers) {
+    worker.state = 'inTenant'; worker.pos = tenantCenter(state, office.id);
+    worker.scheduleIndex = 1; worker.jitterTicks = 0;
+  }
+  const food = placeTenant(state, 'fastfood', 2, 60); food.state = 'open';
+  rebuildRouting(state); stepPeople(state);
+  expect(workers.filter(worker => worker.activityTenantId === food.id)).toHaveLength(5);
+  expect(workers.filter(worker => worker.activityTenantId === -1)).toHaveLength(1);
+});
+
+it('does not send workers to fast food on weekends', () => {
+  const { state, worker } = fixture();
+  const food = placeTenant(state, 'fastfood', 2, 60); food.state = 'open';
+  state.calendar.day = 3; worker.dayTracked = 3;
+  rebuildRouting(state); stepPeople(state);
+  expect(worker.activityTenantId).toBe(-1);
+  expect(worker.activityTicksLeft).toBe(0);
+});
+
+it('does not substitute restaurants for office fast-food demand', () => {
+  const { state, worker } = fixture();
+  state.starLevel = 3;
+  const restaurant = placeTenant(state, 'restaurant', 2, 60); restaurant.state = 'open';
+  rebuildRouting(state); stepPeople(state);
+  expect(worker.activityTenantId).toBe(-1);
+  expect(restaurant.dailyRevenue).toBe(0);
+});

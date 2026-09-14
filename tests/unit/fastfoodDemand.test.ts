@@ -36,3 +36,20 @@ it('does not restart established legacy businesses at first-day demand', () => {
   const loaded = deserializeGame(JSON.stringify(saved)); stepCommercialPopulation(loaded);
   expect(loaded.tenants.get(room.id)!.externalDemand).toBe(35);
 });
+
+it('supplies each fast-food business independently and does not double-reduce rainy demand', () => {
+  const { state, room } = fixture();
+  const second = placeTenant(state, 'fastfood', 2, 60); second.state = 'open';
+  state.campaign.weather = 'rain'; stepCommercialPopulation(state);
+  // Clear departing customers to isolate demand from transport and capacity.
+  for (let minute = 720; minute < 780; minute++) {
+    state.people.clear(); state.tickCount++; state.calendar.minuteOfDay = minute;
+    stepPeople(state);
+    if (minute === 720) {
+      expect(room.externalArrivals).toBe(1);
+      expect(second.externalArrivals).toBe(1);
+    }
+  }
+  expect(room.externalArrivals).toBe(5);
+  expect(second.externalArrivals).toBe(5);
+});

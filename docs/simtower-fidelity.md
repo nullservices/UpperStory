@@ -54,7 +54,10 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   three trading days, then settles at 35 (48 on established weekends). Early
   weekends add 20%; rain halves the target; pricing scales it. This simplified
   ramp omits the reference's later transient values. Arrival budgets persist
-  through saves and exclude office lunches; actual turnout may be lower.
+  through saves and exclude office lunches. Each fast-food business releases
+  its own budget gradually during the lunch hour, without the additional global
+  rain throttle. This arrival timing is an approximation; capacity, transport,
+  and the simulation population limit can still reduce actual turnout.
   Five of each six office workers now seek reachable fast food on weekdays,
   subject to available capacity. The nonparticipating worker is chosen by stable
   roster order; destination selection remains random, not a recovered original

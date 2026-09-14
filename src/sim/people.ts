@@ -204,6 +204,7 @@ function capacityCounts(state: GameState): Map<number, number> {
   return counts;
 }
 function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): number | undefined {
+  if (state.people.size >= CONFIG.MAX_PEOPLE) return;
   const counts = capacityCounts(state);
   const open = (type: string): Tenant[] =>
     [...state.tenants.values()].filter(
@@ -213,7 +214,9 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
   let target: Tenant | null = null;
   let activityTicks = 0;
   if (kind === 'diner') {
-    const eateries = [...open('restaurant'), ...open('fastfood')];
+    const eateries = preferred
+      ? open('fastfood').filter(t => t.id === preferred.id)
+      : [...open('restaurant'), ...open('fastfood').filter(t => t.externalDemand === undefined)];
     if (eateries.length === 0) return;
     target = weightedPick(state, eateries);
     activityTicks = CONFIG.EAT_TICKS;
@@ -271,6 +274,16 @@ export function spawnVIP(state: GameState, tenant: Tenant): number | undefined {
 function spawnExternalVisitors(state: GameState): void {
   if (state.people.size >= CONFIG.MAX_PEOPLE) return;
   const now = state.calendar.minuteOfDay;
+  if (now >= 720 && now < 780) {
+    // Each business releases its own demand gradually through lunch. Rain and
+    // pricing already scale these budgets when the business opens.
+    for (const tenant of state.tenants.values()) {
+      if (state.people.size >= CONFIG.MAX_PEOPLE) return;
+      if (tenant.type !== 'fastfood' || tenant.state !== 'open' || tenant.externalDemand === undefined) continue;
+      const due = Math.min(tenant.externalDemand, Math.floor((now - 720) / 60 * tenant.externalDemand) + 1);
+      if ((tenant.externalArrivals ?? 0) < due) spawnVisitor(state, 'diner', tenant);
+    }
+  }
   if (state.campaign.weather === 'rain' && rngNext(state) < 0.5) return;
   if (now >= 720 && now < 780 && rngNext(state) < CONFIG.DINER_SPAWN_RATE) {
     spawnVisitor(state, 'diner');

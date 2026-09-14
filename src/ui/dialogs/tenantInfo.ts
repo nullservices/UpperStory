@@ -189,6 +189,7 @@ export class TenantInfo {
     if (tenant.type === 'cinema') rows.push(this.line('Film age', `${tenant.movieAge ?? 0} days`));
     const opening = commercialOpeningMinute(tenant.type);
     if (opening !== null) {
+      if (tenant.type === 'fastfood') rows.push(this.line('External arrivals / target', `${tenant.externalArrivals ?? 0} / ${tenant.externalDemand ?? 'opens at 10:00'}`));
       rows.push(this.line('Revenue today', `$${(tenant.dailyRevenue / 100).toLocaleString()}`));
       rows.push(this.line('External / office visits', `${tenant.paidExternalVisits ?? 0} / ${tenant.paidOfficeVisits ?? 0}`));
       rows.push(this.line('Tower population', String(tenant.reportedPopulation ?? 0)));

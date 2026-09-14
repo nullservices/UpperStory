@@ -50,6 +50,11 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   per trading day at average pricing. These curves and the visitor demand ramp
   remain approximations, not recovered original formulas. Existing saves retain
   accrued revenue; their new receipt counters begin from zero for the first day.
+  Fast-food demand now starts at 10 external arrivals, rises to 20 for the next
+  three trading days, then settles at 35 (48 on established weekends). Early
+  weekends add 20%; rain halves the target; pricing scales it. This simplified
+  ramp omits the reference's later transient values. Arrival budgets persist
+  through saves and exclude office lunches; actual turnout may be lower.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy

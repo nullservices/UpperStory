@@ -9,7 +9,7 @@ import type { GameState } from './state';
  * Version bumps go through the migration chain in `deserialize`.
  */
 
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 export interface SaveEnvelope {
   version: number;
@@ -76,7 +76,7 @@ export function deserializeGame(json: string): GameState {
   if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
     throw new Error('Not a TowerProject save file');
   }
-  if (![1, 2, 3, 4, 5, 6, SAVE_VERSION].includes(envelope.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, SAVE_VERSION].includes(envelope.version)) {
     // Migration chain slot: handle older versions here as they appear.
     throw new Error(
       `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
@@ -107,6 +107,11 @@ export function deserializeGame(json: string): GameState {
     // Older saves have already published population at settlement. Preserve it
     // for this date rather than replacing it with an incomplete visitor count.
     for (const tenant of state.tenants.values()) tenant.populationUpdatedDay = state.calendar.day;
+  }
+  if (envelope.version < 8) {
+    for (const tenant of state.tenants.values()) {
+      if (tenant.type === 'fastfood' && tenant.state === 'open') tenant.tradingDays ??= 5;
+    }
   }
   return state;
 }

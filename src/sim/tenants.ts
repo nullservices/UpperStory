@@ -40,6 +40,9 @@ export interface Tenant {
   paidOfficeVisits?: number;
   reportedPopulation?: number;
   populationUpdatedDay?: number;
+  tradingDays?: number;
+  externalDemand?: number;
+  externalArrivals?: number;
 }
 
 export function isUnlocked(state: GameState, type: TenantType): boolean {

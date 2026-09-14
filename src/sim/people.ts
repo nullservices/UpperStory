@@ -207,7 +207,8 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
   const counts = capacityCounts(state);
   const open = (type: string): Tenant[] =>
     [...state.tenants.values()].filter(
-      (t) => t.type === type && t.state === 'open' && (counts.get(t.id) ?? 0) < t.capacity,
+      (t) => t.type === type && t.state === 'open' && (counts.get(t.id) ?? 0) < t.capacity
+        && (t.type !== 'fastfood' || t.externalDemand === undefined || (t.externalArrivals ?? 0) < t.externalDemand),
     );
   let target: Tenant | null = null;
   let activityTicks = 0;
@@ -253,6 +254,7 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
     activityTenantId: kind === 'hotelGuest' ? -1 : target.id,
   };
   state.people.set(id, person);
+  if (kind === 'diner' && target.type === 'fastfood') target.externalArrivals = (target.externalArrivals ?? 0) + 1;
   counts.set(target.id, (counts.get(target.id) ?? 0) + 1);
   beginTrip(state, person);
   return id;

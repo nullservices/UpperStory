@@ -22,5 +22,14 @@ export function stepCommercialPopulation(state: GameState): void {
     tenant.reportedPopulation = Math.min(cap, tenant.visitsToday ?? 0);
     tenant.visitsToday = 0;
     tenant.populationUpdatedDay = day;
+    tenant.tradingDays = (tenant.tradingDays ?? 0) + 1;
+    if (tenant.type === 'fastfood') {
+      const age = tenant.tradingDays;
+      const base = age === 1 ? 10 : age <= 4 ? 20 : 35;
+      const demand = day % 3 === 0 ? (age > 4 ? 48 : Math.round(base * 1.2)) : base;
+      tenant.externalDemand = Math.round(demand * (state.campaign.weather === 'rain' ? 0.5 : 1)
+        * CONFIG.PRICING_LEVELS[tenant.pricing]!.visitorMult);
+      tenant.externalArrivals = 0;
+    }
   }
 }

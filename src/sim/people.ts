@@ -518,11 +518,16 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       return;
     }
     case 'goWork': {
-      // Housekeeper: head for the dirtiest open hotel, if any.
+      // A housekeeping office sends at most one cleaner to each floor.
+      // Other offices may help on that floor, but never in the same room.
       let dirtiest: Tenant | null = null;
       for (const t of state.tenants.values()) {
         if (!isHotel(t.type) || t.state !== 'open') continue;
-        if ([...state.people.values()].some(other => other.id !== p.id && other.kind === 'housekeeper' && other.activityTenantId === t.id)) continue;
+        if ([...state.people.values()].some(other => {
+          if (other.id === p.id || other.kind !== 'housekeeper' || other.activityTenantId < 0 || other.state === 'offscreen') return false;
+          const assigned = state.tenants.get(other.activityTenantId);
+          return assigned?.state === 'open' && (assigned.id === t.id || (other.tenantId === p.tenantId && assigned.floor === t.floor));
+        })) continue;
         if (pickupRoute(state, p.pos.floor, t.floor, 'housekeeper') === null) continue;
         if (!dirtiest || t.cleanliness < dirtiest.cleanliness) dirtiest = t;
       }

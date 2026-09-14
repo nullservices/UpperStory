@@ -18,6 +18,7 @@ economic comparisons have not been completed.
 | Clock | Date changes and daily settlement at midnight; schedule cycles reset at 07:00 |
 | Persistence | Versioned browser saves, campaign history and active incidents; deterministic replay |
 | Audio | Original synthesized construction, elevator, interface and event cues; motor and rain ambience; persistent volume/mute controls |
+| Housekeeping | Six staff per office; one active cleaner per floor from each office; separate offices can share a floor without duplicating room assignments |
 | Elevator management | Per-car home floors, six weekday/weekend priority periods and individual stop controls; existing trips finish when a stop is disabled |
 | Construction limits | Shared caps of 64 stairs/escalators, 16 cinemas/party halls and 512 food/retail facilities; 10 security offices; unfinished facilities count |
 
@@ -36,6 +37,8 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   Original waiting-car response and standard-floor departure settings remain.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
+  Housekeeping floor assignments follow the PC reference; daily room quotas,
+  work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy
   eight cells; legacy single-cell installations remain usable.
   New standard/service shafts occupy four cells and express shafts six;

@@ -357,6 +357,11 @@ export class Controller {
       {
         avgStress: occupancy > 0 ? stressSum / occupancy : 0,
         occupancy,
+        housekeepingFloors: tenant.type === 'housekeeping' ? [...new Set(
+          [...this.state.people.values()].filter(p => p.tenantId === tenant.id && p.kind === 'housekeeper' && p.activityTenantId >= 0 && p.state !== 'offscreen')
+            .map(p => this.state.tenants.get(p.activityTenantId))
+            .filter(t => t?.state === 'open').map(t => t!.floor),
+        )].sort((a, b) => a - b) : undefined,
       },
       {
         demolish: () => {

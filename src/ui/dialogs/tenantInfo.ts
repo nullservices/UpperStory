@@ -8,6 +8,7 @@ export interface TenantInfoData {
   avgStress: number;
   /** People currently attached to the tenant. */
   occupancy: number;
+  housekeepingFloors?: number[];
 }
 
 /**
@@ -172,6 +173,11 @@ export class TenantInfo {
     }
     if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
+    }
+    if (tenant.type === 'housekeeping') {
+      rows.push(this.line('Assigned floors', data.housekeepingFloors?.length ? data.housekeepingFloors.map(floorLabel).join(', ') : 'None'));
+      rows.push(this.line('Assignments', 'One cleaner per floor from this office'));
+      rows.push(this.line('Extra coverage', 'Build another office to share a floor'));
     }
     if (tenant.type === 'cinema') rows.push(this.line('Film age', `${tenant.movieAge ?? 0} days`));
     this.body.replaceChildren(...rows);

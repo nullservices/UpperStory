@@ -1,5 +1,6 @@
 import { operatingDay } from './time';
 import { hotelCheckoutCents } from './hotelEconomy';
+import { recordCommercialVisit } from './commercialEconomy';
 import { CONFIG, TENANT_DATA, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { rngInt, rngNext } from './core/rng';
@@ -317,6 +318,7 @@ function scheduleCheck(state: GameState, p: Person): ScheduleAction | null {
 function chargePatron(state: GameState, p: Person): void {
   const tenant = state.tenants.get(p.activityTenantId);
   if (!tenant) return;
+  if (recordCommercialVisit(tenant, p.kind === 'officeWorker', state.calendar.day)) return;
   const pricing = CONFIG.PRICING_LEVELS[tenant.pricing]!;
   const base =
     tenant.type === 'cinema' ? 25 : tenant.type === 'partyHall' ? 75 : tenant.type === 'fastfood'

@@ -36,6 +36,8 @@ export interface Tenant {
   sold?: boolean;
   movieAge?: number;
   visitsToday?: number;
+  paidExternalVisits?: number;
+  paidOfficeVisits?: number;
   reportedPopulation?: number;
   populationUpdatedDay?: number;
 }

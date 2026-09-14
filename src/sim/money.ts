@@ -71,6 +71,8 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
     // Meals, shop sales and hotel nights accumulate here during the day.
     income += tenant.dailyRevenue;
     tenant.dailyRevenue = 0;
+    tenant.paidExternalVisits = 0;
+    tenant.paidOfficeVisits = 0;
   }
 
   upkeep += state.escalators.size * quarterlyShare(5000_00, settledDay);

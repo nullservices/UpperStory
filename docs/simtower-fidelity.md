@@ -45,7 +45,11 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   proportional to guest count; pricing multipliers remain our own model.
   Fast-food population updates at 10:00. Shop (09:00) and restaurant (12:00)
   update times retain our visitor windows pending original-game verification.
-  Commercial income and the visitor demand ramp remain approximate.
+  Commercial income uses calibrated, capped patron curves: fast food $3k base
+  plus up to $2k from 15 weekday office lunches, restaurants $6k and shops $5k
+  per trading day at average pricing. These curves and the visitor demand ramp
+  remain approximations, not recovered original formulas. Existing saves retain
+  accrued revenue; their new receipt counters begin from zero for the first day.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy

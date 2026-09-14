@@ -144,8 +144,6 @@ export const CONFIG = {
   RESTAURANT_MEAL_DOLLARS: 15,
   FASTFOOD_MEAL_DOLLARS: 8,
   SHOP_SALE_DOLLARS: 8,
-  GUARD_WAGE_DAILY_DOLLARS: 200,
-  HOUSEKEEPER_WAGE_DAILY_DOLLARS: 200,
   QUARTER_DAYS: 3,
   /** Pricing levels: visitor volume multiplier vs revenue multiplier. */
   PRICING_LEVELS: [
@@ -197,7 +195,7 @@ export interface TenantTypeData {
   heightFloors?: number;
   basementOnly?: boolean;
   limit?: number;
-  upkeepDaily?: number;
+  upkeepQuarter?: number;
 }
 
 /**
@@ -236,6 +234,7 @@ export const TENANT_DATA = {
     capacity: 35, // seats
   },
   security: {
+    upkeepQuarter: 20_000,
     sizeCells: 16,
     costDollars: 100_000,
     constructionTicks: 900,
@@ -243,11 +242,12 @@ export const TENANT_DATA = {
     capacity: 1, // 1 guard
   },
   housekeeping: {
+    upkeepQuarter: 10_000,
     sizeCells: 15,
     costDollars: 50_000,
     constructionTicks: 900,
     unlockedAtStar: 2,
-    capacity: 6, // 1 housekeeper
+    capacity: 6, // six housekeepers
   },
   hotel: {
     sizeCells: 4,
@@ -282,10 +282,10 @@ export const TENANT_DATA = {
   partyHall: { sizeCells: 24, heightFloors: 2, costDollars: 100_000, constructionTicks: 2200, unlockedAtStar: 3, capacity: 50, limit: 16 },
   cinema: { sizeCells: 31, heightFloors: 2, costDollars: 500_000, constructionTicks: 2600, unlockedAtStar: 3, capacity: 120, limit: 16 },
   medical: { sizeCells: 26, costDollars: 500_000, constructionTicks: 1800, unlockedAtStar: 3, capacity: 0, limit: 10 },
-  parkingRamp: { sizeCells: 16, costDollars: 50_000, constructionTicks: 600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepDaily: 3333 },
+  parkingRamp: { sizeCells: 16, costDollars: 50_000, constructionTicks: 600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepQuarter: 10_000 },
   parkingSpace: { sizeCells: 4, costDollars: 3_000, constructionTicks: 100, unlockedAtStar: 3, capacity: 0, basementOnly: true, limit: 512 },
-  recycling: { sizeCells: 25, heightFloors: 2, costDollars: 500_000, constructionTicks: 2600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepDaily: 16667 },
-  metro: { sizeCells: 30, heightFloors: 3, costDollars: 1_000_000, constructionTicks: 3900, unlockedAtStar: 4, capacity: 0, basementOnly: true, floorRestriction: -8, limit: 1, upkeepDaily: 33333 },
+  recycling: { sizeCells: 25, heightFloors: 2, costDollars: 500_000, constructionTicks: 2600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepQuarter: 50_000 },
+  metro: { sizeCells: 30, heightFloors: 3, costDollars: 1_000_000, constructionTicks: 3900, unlockedAtStar: 4, capacity: 0, basementOnly: true, floorRestriction: -8, limit: 1, upkeepQuarter: 100_000 },
   cathedral: { sizeCells: 28, heightFloors: 4, costDollars: 3_000_000, constructionTicks: 5200, unlockedAtStar: 5, capacity: 0, floorRestriction: 97, limit: 1 },
 
 } as const satisfies Record<string, TenantTypeData>;

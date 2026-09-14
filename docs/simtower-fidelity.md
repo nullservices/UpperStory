@@ -12,6 +12,7 @@ economic comparisons have not been completed.
 | Construction | Offices, condos, three hotel types, food, shops, cinema, party hall, medical, security, housekeeping, parking ramps and spaces, recycling, metro, cathedral and sky lobbies |
 | Transport | Standard, service and express elevators; stairs and directional escalators; 21/10/42 passenger capacities; eight cars per shaft and 24 shafts; operating shaft extension |
 | Population | Individual workers, residents, guests, visitors and staff; walking, queues, boarding, rides, activities and departures |
+| Service upkeep | Exact quarterly totals for housekeeping, security, parking ramps, recycling, metro and escalators; collected in daily shares with final-day rounding |
 | Economy | One-time condo sales, office rent, guest and visitor revenue, service upkeep, parking fees and film replacement |
 | Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |

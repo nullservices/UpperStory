@@ -44,7 +44,7 @@ export function rentMultiplier(grade: number): number {
   return 0.4 + 0.15 * grade;
 }
 
-/** End-of-day settlement: rent, commercial revenue, wages and upkeep. */
+/** End-of-day settlement: rent, commercial revenue and facility upkeep. */
 export function stepDailySettlement(state: GameState, settledDay = state.calendar.day): void {
   let income = 0;
   let upkeep = 0;
@@ -61,7 +61,7 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
       );
     }
     const data = TENANT_DATA[tenant.type] as TenantTypeData;
-    upkeep += (data.upkeepDaily ?? 0) * 100;
+    upkeep += quarterlyShare((data.upkeepQuarter ?? 0) * 100, settledDay);
     if (['shop', 'restaurant', 'fastfood', 'cinema', 'partyHall'].includes(tenant.type)) {
       tenant.reportedPopulation = Math.min(tenant.capacity, tenant.visitsToday ?? 0);
       tenant.visitsToday = 0;
@@ -73,14 +73,11 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
     tenant.dailyRevenue = 0;
   }
 
-  for (const p of state.people.values()) {
-    if (p.kind === 'guard') upkeep += CONFIG.GUARD_WAGE_DAILY_DOLLARS * 100;
-    if (p.kind === 'housekeeper') upkeep += CONFIG.HOUSEKEEPER_WAGE_DAILY_DOLLARS * 100;
-  }
+  upkeep += state.escalators.size * quarterlyShare(5000_00, settledDay);
   for (const group of state.elevatorGroups.values()) {
     const prices = CONFIG.ELEVATOR_PRICES[group.kind];
     const quarterCents = (prices.shaftUpkeepQuarter + group.cars.length * prices.carUpkeepQuarter) * 100;
-    upkeep += Math.floor(quarterCents / CONFIG.QUARTER_DAYS) + (settledDay % CONFIG.QUARTER_DAYS === 0 ? quarterCents % CONFIG.QUARTER_DAYS : 0);
+    upkeep += quarterlyShare(quarterCents, settledDay);
   }
 
   state.money.balanceCents += income - upkeep;
@@ -118,4 +115,8 @@ export function formatDollars(cents: number): string {
   const rem = abs % 100;
   const grouped = String(dollars).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${sign}$${grouped}.${String(rem).padStart(2, '0')}`;
+}
+
+function quarterlyShare(cents: number, day: number): number {
+  return Math.floor(cents / CONFIG.QUARTER_DAYS) + (day % CONFIG.QUARTER_DAYS === 0 ? cents % CONFIG.QUARTER_DAYS : 0);
 }

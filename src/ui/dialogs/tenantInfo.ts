@@ -171,6 +171,8 @@ export class TenantInfo {
     if (isPricable(tenant.type)) {
       rows.push(this.line('Pricing', CONFIG.PRICING_LEVELS[tenant.pricing]!.label));
     }
+    const operatingCost = (TENANT_DATA[tenant.type] as { upkeepQuarter?: number }).upkeepQuarter;
+    if (operatingCost) rows.push(this.line('Operating cost', `$${operatingCost.toLocaleString()} / quarter`));
     if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
     }

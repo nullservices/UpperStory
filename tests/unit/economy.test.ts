@@ -39,7 +39,7 @@ describe('daily settlement', () => {
     expect(office.dailyRevenue).toBe(0); // reset
   });
 
-  it('pays guard/housekeeper wages and elevator upkeep', () => {
+  it('pays facility operating costs and elevator upkeep', () => {
     const state = newTestGame();
     state.starLevel = 5; // M3: unlocks by hand (M4 makes progression real)
     for (let i = 2; i <= 5; i++) buildFloor(state, i);
@@ -52,7 +52,7 @@ describe('daily settlement', () => {
     stepDailySettlement(state);
 
     const expectedUpkeep =
-      CONFIG.GUARD_WAGE_DAILY_DOLLARS * 100 + Math.floor(20_000_00 / 3);
+      Math.floor(20_000_00 / 3) + Math.floor(20_000_00 / 3);
     expect(state.money.dailyUpkeepCents).toBe(expectedUpkeep);
     expect(state.money.balanceCents).toBe(before - expectedUpkeep);
   });

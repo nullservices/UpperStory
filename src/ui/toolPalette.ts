@@ -38,15 +38,15 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   stairs: { label: 'Stairs', hint: '8 cells. Click the lobby to connect floor 2, or an upper floor to connect the floor below.', icon: 'stairs' },
 
-  escalatorUp: { label: 'Escalator ↑', hint: '8 cells. Place on a floor to carry people to the next floor up.', icon: 'up' },
+  escalatorUp: { label: 'Escalator ↑', hint: '8 cells. Place on a floor to carry people to the next floor up. Operating cost: $5,000 per quarter.', icon: 'up' },
 
-  escalatorDown: { label: 'Escalator ↓', hint: '8 cells. Place on a floor to carry people down from the next floor.', icon: 'down' },
+  escalatorDown: { label: 'Escalator ↓', hint: '8 cells. Place on a floor to carry people down from the next floor. Operating cost: $5,000 per quarter.', icon: 'down' },
 
   skyLobby: { label: 'Sky lobby', hint: '6 cells. A transfer point for express elevators.', icon: 'lobby' },
 
-  security: { label: 'Security', hint: '16 cells. Security staff patrol your building.', icon: 'security' },
+  security: { label: 'Security', hint: '16 cells. Security staff patrol your building. Operating cost: $20,000 per quarter.', icon: 'security' },
 
-  housekeeping: { label: 'Housekeeping', hint: '15 cells. Six staff clean hotel rooms using service elevators.', icon: 'housekeeping' },
+  housekeeping: { label: 'Housekeeping', hint: '15 cells. Six staff clean hotel rooms using service elevators. Operating cost: $10,000 per quarter.', icon: 'housekeeping' },
 
   buildBasement: { label: 'Basement', hint: 'Excavate the next basement, down to B9. Use the wheel and right-drag to look below ground.', icon: 'floor' },
 
@@ -60,13 +60,13 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   medical: { label: 'Medical', hint: 'A medical center supports tenant welfare and the four-star rating.', icon: 'medical' },
 
-  parkingRamp: { label: 'Parking ramp', hint: 'Build in B1, then align ramps on deeper basements. Required for parking on each level.', icon: 'ramp' },
+  parkingRamp: { label: 'Parking ramp', hint: 'Build in B1, then align ramps on deeper basements. Required for parking on each level. Operating cost: $10,000 per quarter.', icon: 'ramp' },
 
   parkingSpace: { label: 'Parking', hint: 'Basement parking. Requires a ramp on the same level and earns daily fees.', icon: 'parking' },
 
-  recycling: { label: 'Recycling', hint: 'Two basement floors tall. Handles tower waste and is required for four stars.', icon: 'recycling' },
+  recycling: { label: 'Recycling', hint: 'Two basement floors tall. Handles tower waste and is required for four stars. Operating cost: $50,000 per quarter.', icon: 'recycling' },
 
-  metro: { label: 'Metro', hint: 'Three floors tall, starting in B9. Connect a passenger elevator to the entrance for five stars.', icon: 'metro' },
+  metro: { label: 'Metro', hint: 'Three floors tall, starting in B9. Connect a passenger elevator to the entrance for five stars. Operating cost: $100,000 per quarter.', icon: 'metro' },
 
   cathedral: { label: 'Cathedral', hint: 'Four floors tall: build floors 97–100 and place on floor 97. Connect its entrance for the final wedding.', icon: 'cathedral' },
 

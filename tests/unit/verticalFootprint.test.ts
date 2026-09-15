@@ -71,3 +71,27 @@ it('removes only the lobby escalator when its upper landing is shared', () => {
   expect(getFloor(state.tower, 1)!.cells[27]).toEqual(lobby);
   expect(getFloor(state.tower, 2)!.cells[27]!.content).toBe('escalator');
 });
+
+it('extends legacy escalators and clears mixed-width landings on demolition', () => {
+  const state = newTestGame(); for (let f = 2; f <= 4; f++) buildFloor(state, f);
+  for (const f of [2, 3]) getFloor(state.tower, f)!.cells[20] = { content: 'escalator', tenantId: -1 };
+  state.escalators.set('2:20', 'up');
+  placeEscalator(state, 3, 20, 'up');
+  expect(getFloor(state.tower, 2)!.cells[20]!.transportWidth).toBeUndefined();
+  expect(getFloor(state.tower, 3)!.cells[27]!.transportWidth).toBe(8);
+  demolishAt(state, 4, 27);
+  demolishAt(state, 2, 20);
+  expect(state.escalators.size).toBe(0);
+  expect(getFloor(state.tower, 3)!.cells.slice(20, 28).every(c => c.content === 'empty')).toBe(true);
+});
+
+it('does not widen a legacy escalator into occupied neighboring space', () => {
+  const state = newTestGame(); for (let f = 2; f <= 4; f++) buildFloor(state, f);
+  getFloor(state.tower, 3)!.cells[20] = { content: 'escalator', tenantId: -1 };
+  getFloor(state.tower, 3)!.cells[21] = { content: 'stair', tenantId: -1 };
+  state.escalators.set('2:20', 'up');
+  const balance = state.money.balanceCents;
+  expect(() => placeEscalator(state, 3, 20, 'up')).toThrow('occupied');
+  expect(state.money.balanceCents).toBe(balance);
+  expect(getFloor(state.tower, 3)!.cells[21]!.content).toBe('stair');
+});

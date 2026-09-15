@@ -436,7 +436,11 @@ export function escalatorPlacementError(
     }
     for (let cx = x; cx < x + 8; cx++) {
       const cell = floor.cells[cx];
-      if (!cell || (cell.content !== 'empty' && !(cell.content === 'escalator' && cell.transportX === x && cell.transportWidth === 8))) return 'Space is occupied';
+      const shared = cell?.content === 'escalator' && (
+        (cell.transportX === x && cell.transportWidth === 8) ||
+        (cx === x && cell.transportX === undefined && cell.transportWidth === undefined)
+      );
+      if (!cell || (cell.content !== 'empty' && !shared)) return 'Space is occupied';
     }
   }
   if (CONFIG.ESCALATOR_COST_DOLLARS * 100 > state.money.balanceCents) return 'Not enough funds';

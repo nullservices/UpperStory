@@ -14,7 +14,7 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   buildFloor: { label: 'Floor', hint: 'Click above the tower to add its next floor. Shortcut: F.', icon: 'floor' },
 
-  lobby: { label: 'Lobby', hint: 'The entrance connects your tower to the street.', icon: 'lobby' },
+  lobby: { label: 'Lobby', hint: 'Snaps to ground level. Choose any horizontal starting position, then drag. Extend an existing lobby from either edge.', icon: 'lobby' },
 
   demolish: { label: 'Bulldoze', hint: 'Click a room to remove it. Construction costs are not refunded.', icon: 'bulldoze' },
 

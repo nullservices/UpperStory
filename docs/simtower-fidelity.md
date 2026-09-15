@@ -73,8 +73,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   lobby at $5,000 per cell, extendable from either edge. Existing saves and demo
   lobbies retain their width. Lobby maintenance is free at 1–2 stars, $300 per built cell per quarter
   at 3 stars, and $1,000 at 4 stars and above, collected in daily shares
-  at the rating and width in effect at settlement. Upper-floor widths, transport
-  coverage of partially built lobbies, and segment demolition remain pending.
+  at the rating and width in effect at settlement. The lobby tool snaps to
+  ground level, and new transport entrances require full lobby coverage.
+  Upper-floor widths and segment demolition remain pending.
 - Compare remaining original lobby construction rules. New stairs and escalators occupy
   eight cells; legacy single-cell installations remain usable.
   New standard/service shafts occupy four cells and express shafts six;

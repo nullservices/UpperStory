@@ -141,6 +141,11 @@ export function stairEscalatorCount(state: GameState): number {
   return count;
 }
 
+/** Whether the full transport footprint fits within an open lobby. */
+export function lobbyCovers(state: GameState, x: number, width: number): boolean {
+  return [...state.tenants.values()].some(t => t.type === 'lobby' && t.state === 'open' && x >= t.x && x + width <= t.x + t.sizeCells);
+}
+
 /** Human-readable reason a stair placement would fail, or null. */
 export function stairPlacementError(state: GameState, floorIndex: number, x: number): string | null {
   if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX) floorIndex++;
@@ -148,6 +153,7 @@ export function stairPlacementError(state: GameState, floorIndex: number, x: num
   if (!floor) return 'Build this floor first';
   if (floorIndex <= CONFIG.LOBBY_FLOOR_INDEX) return 'Stairs start above the lobby';
   if (!Number.isInteger(x) || x < 0 || x + 8 > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
+  if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX + 1 && !lobbyCovers(state, x, 8)) return 'Extend the lobby beneath all 8 stair cells';
   if (floor.cells.slice(x, x + 8).some(cell => cell.content !== 'empty')) return 'Space is occupied';
   if (stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   // Stairwell continuity: stair below (or the lobby floor beneath).

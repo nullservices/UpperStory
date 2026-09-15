@@ -62,6 +62,11 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   subject to available capacity. The nonparticipating worker is chosen by stable
   roster order; destination selection remains random, not a recovered original
   algorithm. Workers without an eligible destination take a break at the office.
+  Noise evaluation now covers same-floor office/fast-food spacing (11 cells)
+  and all hotel types near offices (21 cells), measured between room edges.
+  Active sources inside those distances impose a nonstacking 20-point daily
+  evaluation penalty, shown in the inspector. The penalty strength and other
+  noise pairs remain unverified; existing placement restrictions still apply.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
 - Compare original lobby construction rules. New stairs and escalators occupy

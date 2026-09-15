@@ -31,6 +31,7 @@ export interface Tenant {
   /** 0..5 evaluation grade, refreshed daily (JudgeT equivalent). */
   grade: number;
   evalScore: number;
+  noisePenalty?: number;
   daysVacant: number;
   daysGood: number;
   sold?: boolean;

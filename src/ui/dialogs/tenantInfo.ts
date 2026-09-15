@@ -169,6 +169,7 @@ export class TenantInfo {
     if (tenant.state !== 'constructing') {
       rows.push(
         this.line('Grade', `${stars(tenant.grade)} (score ${Math.round(tenant.evalScore)})`),
+        this.line('Noise at last evaluation', `${tenant.noisePenalty ?? 0} point penalty`),
       );
     }
     if (isPricable(tenant.type)) {

@@ -1,13 +1,14 @@
 import { expect, it } from 'vitest';
 import { newTestGame } from '../helpers/simHarness';
 import { buildFloor, placeTenant, stepEvaluation } from '../../src/sim';
-import { noisePenalty } from '../../src/sim/noise';
+import { noisePenalty, noiseSources } from '../../src/sim/noise';
 
 it('uses edge spacing and clears office noise at eleven cells', () => {
   const state = newTestGame(); buildFloor(state, 2);
   const office = placeTenant(state, 'office', 2, 20); office.state = 'open';
   const food = placeTenant(state, 'fastfood', 2, 39); food.state = 'open';
   expect(noisePenalty(state, office)).toBe(20);
+  expect(noiseSources(state, office)).toEqual([{ tenantId: food.id, gap: 10, clearance: 11 }]);
   office.occupancy = office.capacity; stepEvaluation(state);
   expect(office.noisePenalty).toBe(20);
   expect(office.evalScore).toBe(80);

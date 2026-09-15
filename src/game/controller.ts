@@ -356,6 +356,10 @@ export class Controller {
       tenant,
       {
         avgStress: occupancy > 0 ? stressSum / occupancy : 0,
+        noiseSources: noiseSources(this.state, tenant).map(source => {
+          const room = this.state.tenants.get(source.tenantId)!;
+          return { type: room.type, x: room.x, gap: source.gap, clearance: source.clearance };
+        }),
         occupancy,
         housekeepingFloors: tenant.type === 'housekeeping' ? [...new Set(
           [...this.state.people.values()].filter(p => p.tenantId === tenant.id && p.kind === 'housekeeper' && p.activityTenantId >= 0 && p.state !== 'offscreen')
@@ -470,3 +474,4 @@ function kindFor(
   if (tool === 'expressElevator') return 'express';
   return 'standard';
 }
+import { noiseSources } from '../sim/noise';

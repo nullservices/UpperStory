@@ -12,6 +12,7 @@ export interface TenantInfoData {
   /** People currently attached to the tenant. */
   occupancy: number;
   housekeepingFloors?: number[];
+  noiseSources?: { type: TenantType; x: number; gap: number; clearance: number }[];
 }
 
 /**
@@ -169,7 +170,7 @@ export class TenantInfo {
     if (tenant.state !== 'constructing') {
       rows.push(
         this.line('Grade', `${stars(tenant.grade)} (score ${Math.round(tenant.evalScore)})`),
-        this.line('Noise at last evaluation', `${tenant.noisePenalty ?? 0} point penalty`),
+        this.line('Noise at last evaluation', tenant.noisePenalty === undefined ? 'Not yet evaluated' : `${tenant.noisePenalty} point penalty`),
       );
     }
     if (isPricable(tenant.type)) {
@@ -181,6 +182,10 @@ export class TenantInfo {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
       rows.push(this.line('Checkout per guest', `$${(hotelCheckoutCents(tenant) / 100).toLocaleString()}`));
       rows.push(this.line('Full room / night', `$${(hotelCheckoutCents(tenant) * TENANT_DATA[tenant.type].capacity / 100).toLocaleString()}`));
+    }
+    for (const source of data.noiseSources ?? []) {
+      rows.push(this.line(`${tenantTypeName(source.type)} at cell ${source.x + 1}`,
+        `${source.gap}/${source.clearance} cells clearance — needs ${source.clearance - source.gap} more`));
     }
     if (tenant.type === 'housekeeping') {
       rows.push(this.line('Assigned floors', data.housekeepingFloors?.length ? data.housekeepingFloors.map(floorLabel).join(', ') : 'None'));

@@ -36,3 +36,22 @@ it('loads legacy single-cell stairs without expanding into neighboring cells', (
   demolishAt(loaded, 2, 20);
   expect(getFloor(loaded.tower, 2)!.cells[21]!.content).toBe('stair');
 });
+
+it('demolishes stairs from their lobby landing without removing the lobby', () => {
+  const state = newTestGame(); buildFloor(state, 2); placeStair(state, 2, 20);
+  const lobby = getFloor(state.tower, 1)!.cells[27];
+  demolishAt(state, 1, 27);
+  expect(getFloor(state.tower, 1)!.cells[27]).toEqual(lobby);
+  expect(stairEscalatorCount(state)).toBe(0);
+});
+
+it('removes only the lobby escalator when its upper landing is shared', () => {
+  const state = newTestGame(); buildFloor(state, 2); buildFloor(state, 3);
+  placeEscalator(state, 1, 20, 'up'); placeEscalator(state, 2, 20, 'up');
+  const lobby = getFloor(state.tower, 1)!.cells[27];
+  demolishAt(state, 1, 27);
+  expect(state.escalators.has('1:20')).toBe(false);
+  expect(state.escalators.has('2:20')).toBe(true);
+  expect(getFloor(state.tower, 1)!.cells[27]).toEqual(lobby);
+  expect(getFloor(state.tower, 2)!.cells[27]!.content).toBe('escalator');
+});

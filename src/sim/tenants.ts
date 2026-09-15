@@ -210,8 +210,17 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
 export function demolishAt(state: GameState, floorIndex: number, x: number): void {
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) throw new Error('Nothing to demolish here');
-  const cell = floor.cells[x];
+  let cell = floor.cells[x];
   if (!cell) throw new Error('Nothing to demolish here');
+  // Lobby landings retain lobby tiles; inspect the transport above them.
+  if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX && cell.content !== 'elevatorLobby' && cell.content !== 'elevatorShaft') {
+    const landing = getFloor(state.tower, floorIndex + 1)?.cells[x];
+    if (landing?.content === 'stair') {
+      demolishAt(state, floorIndex + 1, x);
+      return;
+    }
+    if (landing?.content === 'escalator' && state.escalators.has(`${floorIndex}:${landing.transportX ?? x}`)) cell = landing;
+  }
   if (cell.content === 'tenant' || cell.content === 'scaffold') {
     demolishTenant(state, floorIndex, x);
     return;

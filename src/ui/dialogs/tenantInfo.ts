@@ -12,6 +12,7 @@ export interface TenantInfoData {
   /** People currently attached to the tenant. */
   occupancy: number;
   housekeepingFloors?: number[];
+  lobbyUpkeepQuarter?: number;
   noiseSources?: { type: TenantType; x: number; gap: number; clearance: number }[];
 }
 
@@ -177,6 +178,11 @@ export class TenantInfo {
       rows.push(this.line('Pricing', CONFIG.PRICING_LEVELS[tenant.pricing]!.label));
     }
     const operatingCost = (TENANT_DATA[tenant.type] as { upkeepQuarter?: number }).upkeepQuarter;
+    if (tenant.type === 'lobby') {
+      rows.push(this.line('Built width', `${tenant.sizeCells} cells`));
+      rows.push(this.line('Lobby upkeep', `$${(data.lobbyUpkeepQuarter ?? 0).toLocaleString()} / quarter`));
+      rows.push(this.line('Upkeep per cell', '1–2★: free · 3★: $300 · 4★+: $1,000'));
+    }
     if (operatingCost) rows.push(this.line('Operating cost', `$${operatingCost.toLocaleString()} / quarter`));
     if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));

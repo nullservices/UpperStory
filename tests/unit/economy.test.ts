@@ -52,7 +52,7 @@ describe('daily settlement', () => {
     stepDailySettlement(state);
 
     const expectedUpkeep =
-      Math.floor(20_000_00 / 3) + Math.floor(20_000_00 / 3);
+      Math.floor(20_000_00 / 3) + Math.floor(20_000_00 / 3) + 125_000_00;
     expect(state.money.dailyUpkeepCents).toBe(expectedUpkeep);
     expect(state.money.balanceCents).toBe(before - expectedUpkeep);
   });

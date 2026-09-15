@@ -16,7 +16,7 @@ it.each([
   expect(state.money.balanceCents).toBe(before - (shaft + car) * 100);
   const operatingBalance = state.money.balanceCents;
   for (let day = 1; day <= 3; day++) { state.calendar.day = day; stepDailySettlement(state); }
-  expect(state.money.balanceCents).toBe(operatingBalance - upkeep * 100);
+  expect(state.money.balanceCents).toBe(operatingBalance - (upkeep + 375_000) * 100);
 });
 
 it('rejects an unaffordable shaft or extra car without spending or partial construction', () => {

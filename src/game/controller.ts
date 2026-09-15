@@ -356,6 +356,7 @@ export class Controller {
       tenant,
       {
         avgStress: occupancy > 0 ? stressSum / occupancy : 0,
+        lobbyUpkeepQuarter: lobbyUpkeepQuarter(this.state.starLevel, tenant.sizeCells),
         noiseSources: noiseSources(this.state, tenant).map(source => {
           const room = this.state.tenants.get(source.tenantId)!;
           return { type: room.type, x: room.x, gap: source.gap, clearance: source.clearance };
@@ -475,3 +476,4 @@ function kindFor(
   return 'standard';
 }
 import { noiseSources } from '../sim/noise';
+import { lobbyUpkeepQuarter } from '../sim/money';

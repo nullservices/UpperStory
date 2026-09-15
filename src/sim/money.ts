@@ -44,6 +44,11 @@ export function rentMultiplier(grade: number): number {
   return 0.4 + 0.15 * grade;
 }
 
+/** Dollars per quarter for built lobby cells at the current rating. */
+export function lobbyUpkeepQuarter(stars: number, cells: number): number {
+  return cells * (stars >= 4 ? 1000 : stars === 3 ? 300 : 0);
+}
+
 /** End-of-day settlement: rent, commercial revenue and facility upkeep. */
 export function stepDailySettlement(state: GameState, settledDay = state.calendar.day): void {
   let income = 0;
@@ -61,7 +66,8 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
       );
     }
     const data = TENANT_DATA[tenant.type] as TenantTypeData;
-    upkeep += quarterlyShare((data.upkeepQuarter ?? 0) * 100, settledDay);
+    const quarterCost = tenant.type === 'lobby' ? lobbyUpkeepQuarter(state.starLevel, tenant.sizeCells) : data.upkeepQuarter ?? 0;
+    upkeep += quarterlyShare(quarterCost * 100, settledDay);
     if (['cinema', 'partyHall'].includes(tenant.type)) {
       tenant.reportedPopulation = Math.min(tenant.capacity, tenant.visitsToday ?? 0);
       tenant.visitsToday = 0;

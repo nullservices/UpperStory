@@ -9,15 +9,15 @@ it.each([['housekeeping', 10000], ['security', 20000], ['parkingRamp', 10000], [
     buildFloor(state, 2);
     const floor = type === 'metro' ? -8 : type === 'recycling' ? -1 : type === 'parkingRamp' ? 0 : 2;
     const facility = placeTenant(state, type, floor, 30);
-    stepDailySettlement(state, 1); expect(state.money.dailyUpkeepCents).toBe(0);
+    stepDailySettlement(state, 1); expect(state.money.dailyUpkeepCents).toBe(125_000_00);
     facility.state = 'open';
     const before = state.money.balanceCents;
     stepDailySettlement(state, 1);
     state = deserializeGame(serializeGame(state));
     stepDailySettlement(state, 2); stepDailySettlement(state, 3);
-    expect(before - state.money.balanceCents).toBe(cost * 100);
+    expect(before - state.money.balanceCents).toBe((cost + 375_000) * 100);
     state.tenants.get(facility.id)!.state = 'damaged';
-    stepDailySettlement(state, 4); expect(state.money.dailyUpkeepCents).toBe(0);
+    stepDailySettlement(state, 4); expect(state.money.dailyUpkeepCents).toBe(125_000_00);
   },
 );
 

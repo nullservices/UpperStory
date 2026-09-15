@@ -69,7 +69,11 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   noise pairs remain unverified; existing placement restrictions still apply.
   Housekeeping floor assignments follow the PC reference; daily room quotas,
   work timing and cleaning rates still need original-game comparison.
-- Compare original lobby construction rules. New stairs and escalators occupy
+- Normal games now start without a lobby. Drag construction builds a continuous
+  lobby at $5,000 per cell, extendable from either edge. Existing saves and demo
+  lobbies retain their width. Upper-floor widths, lobby maintenance, transport
+  coverage of partially built lobbies, and segment demolition remain pending.
+- Compare remaining original lobby construction rules. New stairs and escalators occupy
   eight cells; legacy single-cell installations remain usable.
   New standard/service shafts occupy four cells and express shafts six;
   saved two-cell shafts retain their dimensions, including extensions. New sky

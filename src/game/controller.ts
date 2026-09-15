@@ -329,7 +329,7 @@ export class Controller {
     const stroke = this.buildStroke;
     this.buildStroke = null;
     if (!stroke) return;
-    if (stroke.placed > 1) this.hud.toast(`Built ${stroke.placed} facilities${stroke.error ? ` — ${stroke.error}` : ''}`);
+    if (stroke.placed > 1) this.hud.toast(`Built ${stroke.placed} ${stroke.tool === 'lobby' ? 'lobby cells' : 'facilities'}${stroke.error ? ` — ${stroke.error}` : ''}`);
     else if (stroke.error) this.hud.toast(stroke.error);
   }
 

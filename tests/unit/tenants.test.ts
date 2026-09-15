@@ -71,12 +71,12 @@ describe('tenant lifecycle', () => {
 
   it('lobby rules: floor 1 only, full width, one at a time', () => {
     const state = newTestGame();
-    expect(placementError(state, 'lobby', 1, 0)).toBe('A lobby already exists');
+    expect(placementError(state, 'lobby', 1, 0)).toBe('Extend the lobby from either edge');
     buildFloor(state, 2);
     expect(placementError(state, 'lobby', 2, 0)).toBe('Must be placed on floor 1');
     // remove the lobby so the full-width rule is what we're testing
     demolishTenant(state, 1, 0);
-    expect(placementError(state, 'lobby', 1, 5)).toBe('The lobby spans the whole floor');
+    expect(placementError(state, 'lobby', 1, 5)).toBeNull();
     expect(placementError(state, 'lobby', 1, 0)).toBeNull();
   });
 

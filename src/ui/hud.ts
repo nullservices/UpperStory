@@ -93,7 +93,7 @@ export class Hud {
     const firstConstruction = [...state.tenants.values()].find(t => t.state === 'constructing');
     const hasOffice = [...state.tenants.values()].some(t => t.type === 'office');
     this.brief.innerHTML = state.tower.floors.length <= 2
-      ? '<b>Your first floor</b><span>Select Floor, then click the sky above your lobby.</span>'
+      ? ([...state.tenants.values()].some(t => t.type === 'lobby') ? '<b>Your first floor</b><span>Select Floor, then click the sky above your lobby.</span>' : '<b>Build your lobby</b><span>Select Lobby and drag along the ground. Each cell costs $5,000.</span>')
       : !state.elevatorGroups.size ? '<b>Going up?</b><span>Drag an elevator from the lobby to the upper floors.</span>'
       : !hasOffice ? '<b>Open for business</b><span>Place offices upstairs. Keep the elevator column clear.</span>'
       : firstConstruction && pop === 0 ? `<b>Your first tenants are on their way.</b><span>Construction: ${Math.ceil(firstConstruction.constructionTicksLeft / 10)}s at 1×. Use the time controls to speed things up.</span>`
@@ -123,7 +123,7 @@ export class Hud {
   private showHelp(): void {
     const dialog = document.createElement('dialog'); dialog.className = 'help-window';
     dialog.setAttribute('aria-label', 'How to play');
-    dialog.innerHTML = '<div class="panel-title">Welcome to Upper Story</div><h2>Build a world above the street.</h2><p>Your lobby is ready. Add floors, connect them with elevators, and give people places to work, live, and visit.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; each needs two clear cells.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><dl><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space</dt><dd>Pause or resume</dd><dt>Right-drag / scroll</dt><dd>Pan / zoom</dd><dt>Home / Escape</dt><dd>Center / cancel tool</dd></dl>';
+    dialog.innerHTML = '<div class="panel-title">Welcome to Upper Story</div><h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><dl><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space</dt><dd>Pause or resume</dd><dt>Right-drag / scroll</dt><dd>Pan / zoom</dd><dt>Home / Escape</dt><dd>Center / cancel tool</dd></dl>';
     dialog.append(this.button('Back to my tower', () => dialog.close()));
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog); dialog.showModal();

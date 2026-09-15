@@ -16,7 +16,10 @@ export class TowerView {
     this.tower = state.tower; this.revision = state.tower.structureRevision;
     const floors = state.tower.floors;
     if (!floors.length) return;
-    const width = CONFIG.FLOOR_WIDTH_CELLS * CONFIG.CELL_WIDTH_PX;
+    const lobby = [...state.tenants.values()].find(t => t.type === 'lobby');
+    const baseOnly = floors.every(f => f.index <= 1);
+    const left = baseOnly ? (lobby?.x ?? 0) * CONFIG.CELL_WIDTH_PX : 0;
+    const width = (baseOnly ? (lobby?.sizeCells ?? 0) : CONFIG.FLOOR_WIDTH_CELLS) * CONFIG.CELL_WIDTH_PX;
     const b = this.backdrop; b.clear();
     // Ground level is the lobby's foot, not the basement floor.
     const ground = 0;
@@ -41,10 +44,10 @@ export class TowerView {
       b.circle(x + 4, ground - 29, 10).fill(0x90a97a);
     }
     const g = this.structure; g.clear();
-    for (const floor of floors) {
+    for (const floor of width ? floors : []) {
       const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
-      g.rect(0, y, width, h).fill(floor.index <= 0 ? 0x979d8c : 0xdce0d3);
-      for (let x = 0; x < width; x += 12) {
+      g.rect(left, y, width, h).fill(floor.index <= 0 ? 0x979d8c : 0xdce0d3);
+      for (let x = left; x < left + width; x += 12) {
         if (floor.cells[x / 12]?.content === 'empty') {
           g.rect(x, y + 2, 1, h - 4).fill({ color: 0xb5c1b4, alpha: 0.5 });
           g.rect(x + 4, y + h - 6, 2, 1).fill(0xc1cbbd);
@@ -53,7 +56,7 @@ export class TowerView {
     }
     // Draw a whole room at once; cells are placement units, not dividing walls.
     for (const tenant of state.tenants.values()) this.room(g, tenant, state);
-    for (const floor of floors) {
+    for (const floor of width ? floors : []) {
       const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
       floor.cells.forEach((cell, index) => {
         const x = index * CONFIG.CELL_WIDTH_PX;
@@ -68,11 +71,11 @@ export class TowerView {
           for (let i = 0; i < 8; i++) g.rect(x + i * width / 8, y + h - 4 - i * (h - 6) / 8, width / 8 + 1, 2).fill(0x6c8276);
         }
       });
-      let segmentStart = 0;
-      for (let column = 0; column <= floor.cells.length; column++) {
+      let segmentStart = left / CONFIG.CELL_WIDTH_PX;
+      for (let column = segmentStart; column <= (left + width) / CONFIG.CELL_WIDTH_PX; column++) {
         const tenant = state.tenants.get(floor.cells[column]?.tenantId ?? -1);
         const interior = tenant && floor.index < tenant.floor + facilityHeight(tenant.type) - 1;
-        if (interior || column === floor.cells.length) {
+        if (interior || column === (left + width) / CONFIG.CELL_WIDTH_PX) {
           if (column > segmentStart) {
             g.rect(segmentStart * CONFIG.CELL_WIDTH_PX, y, (column - segmentStart) * CONFIG.CELL_WIDTH_PX, 2).fill(0x83958b);
             g.rect(segmentStart * CONFIG.CELL_WIDTH_PX, y + 2, (column - segmentStart) * CONFIG.CELL_WIDTH_PX, 1).fill(0xf1f0df);
@@ -80,15 +83,15 @@ export class TowerView {
           segmentStart = column + 1;
         }
       }
-      g.rect(-2, y, 2, h).fill(0x7e9183);
-      g.rect(width, y, 2, h).fill(0x7e9183);
+      g.rect(left - 2, y, 2, h).fill(0x7e9183);
+      g.rect(left + width, y, 2, h).fill(0x7e9183);
     }
     const roof = floorTopY(floors[floors.length - 1]!.index, state.tower.lobbyHeight);
-    g.rect(-5, roof - 4, width + 10, 4).fill(0x6e847d);
-    g.rect(-5, roof - 5, width + 10, 1).fill(0xe6e9da);
+    if (width) g.rect(left - 5, roof - 4, width + 10, 4).fill(0x6e847d);
+    if (width) g.rect(left - 5, roof - 5, width + 10, 1).fill(0xe6e9da);
     for (const label of this.labels) label.destroy();
     this.labels = [];
-    for (const floor of floors) {
+    for (const floor of width ? floors : []) {
       const text = new Text({ text: floor.index <= 0 ? `B${1 - floor.index}` : floor.index === 1 ? 'L' : String(floor.index), style: { fontSize: 9, fill: 0x496253, fontFamily: 'Tahoma', fontWeight: 'bold' } });
       text.position.set(-22, floorTopY(floor.index, state.tower.lobbyHeight) + 5); this.labels.push(text); this.container.addChild(text);
     }

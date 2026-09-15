@@ -4,7 +4,7 @@ import { Motion } from '../../src/render/motion';
 import { placeElevatorGroup, stepElevators } from '../../src/sim/elevators';
 
 it.each([1, 2, 3] as const)('keeps geometry, picking and elevator interpolation aligned for a %i-story lobby', height => {
-  const state = createInitialState(1); state.tower.lobbyHeight = height; setupNewGame(state);
+  const state = createInitialState(1); state.tower.lobbyHeight = height; setupNewGame(state, true);
   for (let floor = 2; floor <= 5; floor++) buildFloor(state, floor);
   for (const floor of state.tower.floors) {
     const top = floorTopY(floor.index, height);
@@ -23,7 +23,7 @@ it.each([1, 2, 3] as const)('keeps geometry, picking and elevator interpolation 
 });
 
 it.each([1, 2])('preserves the two-story geometry of version %i saves', version => {
-  const state = createInitialState(1); setupNewGame(state);
+  const state = createInitialState(1); setupNewGame(state, true);
   const saved = JSON.parse(serializeGame(state)); saved.version = version; delete saved.state.tower.lobbyHeight;
   const restored = deserializeGame(JSON.stringify(saved));
   expect(restored.tower.lobbyHeight).toBe(2);
@@ -31,7 +31,7 @@ it.each([1, 2])('preserves the two-story geometry of version %i saves', version 
 });
 
 it.each([1, 2, 3] as const)('maintains elevator travel speed through a %i-story lobby in both directions', height => {
-  const state = createInitialState(1); state.tower.lobbyHeight = height; setupNewGame(state);
+  const state = createInitialState(1); state.tower.lobbyHeight = height; setupNewGame(state, true);
   buildFloor(state, 2);
   const car = placeElevatorGroup(state, 1, 2, 10).cars[0]!;
   for (const [from, to] of [[1, 2], [2, 1]] as const) {
@@ -46,7 +46,7 @@ it.each([1, 2, 3] as const)('maintains elevator travel speed through a %i-story 
 });
 
 it('rejects an invalid lobby height in a current save', () => {
-  const state = createInitialState(1); setupNewGame(state);
+  const state = createInitialState(1); setupNewGame(state, true);
   const saved = JSON.parse(serializeGame(state)); saved.state.tower.lobbyHeight = 8;
   expect(() => deserializeGame(JSON.stringify(saved))).toThrow('Invalid lobby height');
 });

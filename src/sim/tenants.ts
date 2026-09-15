@@ -109,7 +109,8 @@ export function placementError(
   if (data.floorRestriction !== undefined && floorIndex !== data.floorRestriction) {
     return `Must be placed on floor ${data.floorRestriction}`;
   }
-  if (type === 'lobby' && hasLobby(state)) return 'A lobby already exists';
+  const existingLobby = type === 'lobby' ? [...state.tenants.values()].find(t => t.type === 'lobby') : undefined;
+  if (existingLobby && x !== existingLobby.x - 1 && x !== existingLobby.x + existingLobby.sizeCells) return 'Extend the lobby from either edge';
   if (data.requiresFullFloor && x !== 0) return 'The lobby spans the whole floor';
   if (data.basementOnly && floorIndex + facilityHeight(type) - 1 > 0) return 'Build this facility entirely below ground';
   if (!data.basementOnly && type !== 'lobby' && floorIndex <= 0) return 'No tenants in the basement';
@@ -149,6 +150,13 @@ export function placeTenant(
   const cost = data.costDollars * 100;
   if (cost > 0 && !spend(state, cost)) throw new Error('Not enough funds');
 
+  const lobby = type === 'lobby' ? [...state.tenants.values()].find(t => t.type === 'lobby') : undefined;
+  if (lobby) {
+    lobby.x = Math.min(lobby.x, x); lobby.sizeCells++;
+    getFloor(state.tower, floorIndex)!.cells[x] = { content: 'tenant', tenantId: lobby.id };
+    state.tower.structureRevision++;
+    return lobby;
+  }
   const id = nextId(state);
   const constructing = data.constructionTicks > 0;
   const tenant: Tenant = {
@@ -179,13 +187,6 @@ export function placeTenant(
   if (constructing) state.constructionQueue.push(id);
   state.tower.structureRevision++;
   return tenant;
-}
-
-function hasLobby(state: GameState): boolean {
-  for (const tenant of state.tenants.values()) {
-    if (tenant.type === 'lobby') return true;
-  }
-  return false;
 }
 
 /** Demolish the tenant occupying a cell. No refund (matches the original). */

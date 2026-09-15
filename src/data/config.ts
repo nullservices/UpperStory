@@ -205,12 +205,11 @@ export interface TenantTypeData {
  */
 export const TENANT_DATA = {
   lobby: {
-    sizeCells: CONFIG.FLOOR_WIDTH_CELLS,
-    costDollars: 0,
+    sizeCells: 1,
+    costDollars: 5_000,
     constructionTicks: 0,
     unlockedAtStar: 1,
     capacity: 0,
-    requiresFullFloor: true,
     floorRestriction: CONFIG.LOBBY_FLOOR_INDEX,
   },
   office: {

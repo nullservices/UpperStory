@@ -7,7 +7,7 @@ import { buildFloor, placeStair } from './tower';
 
 /** Repeatable transport scenario, independent of the showcase demo. */
 export function setupReferenceTower(state: GameState): void {
-  setupNewGame(state);
+  setupNewGame(state, true);
   for (let floor = 2; floor <= 10; floor++) buildFloor(state, floor);
   placeElevatorGroup(state, 1, 10, 10);
   placeStair(state, 2, 0);

@@ -15,7 +15,7 @@ import {
 /** Fresh game: B1 + lobby floor + full-width lobby + $2M starting funds. */
 export function newTestGame(seed = 1): GameState {
   const state = createInitialState(seed);
-  setupNewGame(state);
+  setupNewGame(state, true);
   return state;
 }
 

@@ -4,7 +4,7 @@ import { BuildStroke } from '../../src/game/buildStroke';
 import { buildFloor, createInitialState, setupNewGame, placeTenant, placeStair } from '../../src/sim';
 
 function fixture() {
-  const state = createInitialState(1); setupNewGame(state);
+  const state = createInitialState(1); setupNewGame(state, true);
   buildFloor(state, 2); buildFloor(state, 3);
   return state;
 }

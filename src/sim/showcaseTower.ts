@@ -8,7 +8,7 @@ import { buildFloor, placeStair } from './tower';
 
 /** A playable facilities tour. The normal new game retains its starting budget and rating. */
 export function setupShowcaseTower(state: GameState): void {
-  setupNewGame(state);
+  setupNewGame(state, true);
   state.starLevel = 5;
   state.money.balanceCents = 20_000_000_00;
   for (let f = 2; f <= 15; f++) buildFloor(state, f);

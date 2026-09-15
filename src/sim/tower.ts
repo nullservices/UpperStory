@@ -89,6 +89,7 @@ export function buildFloorError(state: GameState, index: number): string | null 
   }
   if (getFloor(state.tower, index)) return 'Floor already exists';
   if (index < 0 && !getFloor(state.tower, index + 1)) return 'Build the basement above first';
+  if (index > CONFIG.LOBBY_FLOOR_INDEX && ![...state.tenants.values()].some(t => t.type === 'lobby')) return 'Build a lobby first';
   if (index > CONFIG.LOBBY_FLOOR_INDEX && !getFloor(state.tower, index - 1)) {
     return 'Build lower floors first';
   }

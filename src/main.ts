@@ -43,7 +43,7 @@ async function main(): Promise<void> {
   if (!host) throw new Error('missing #app host element');
   host.appendChild(app.canvas);
 
-  // --- Sim: fresh M1 game (B1 + lobby floor + full-width lobby), or the
+  // --- Sim: fresh game (empty plot with ground and basement building bands), or the
   // demo tower (?demo=1) so people/vertical transport are visible quickly.
   // The demo runs at 5★ so the palette shows every M3/M4 tool unlocked.
   // `state` is reassigned by New game / Load, so the ticker closure below

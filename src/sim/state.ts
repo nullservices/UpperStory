@@ -75,13 +75,19 @@ export function createInitialState(seed = 1): GameState {
 }
 
 /**
- * A fresh game: B1, the lobby floor with a full-width lobby, and starting
- * funds. Runs through the same public commands the player uses.
+ * A fresh plot with ground and basement building bands. Fixtures can opt into
+ * a prebuilt full-width lobby; player games build their own.
  */
-export function setupNewGame(state: GameState): void {
+export function setupNewGame(state: GameState, prebuiltLobby = false): void {
   buildFloor(state, CONFIG.BASEMENT_FLOOR_INDEX);
   buildFloor(state, CONFIG.LOBBY_FLOOR_INDEX);
-  placeTenant(state, 'lobby', CONFIG.LOBBY_FLOOR_INDEX, 0);
+  if (prebuiltLobby) {
+    const balance = state.money.balanceCents;
+    const lobby = placeTenant(state, 'lobby', CONFIG.LOBBY_FLOOR_INDEX, 0);
+    lobby.sizeCells = CONFIG.FLOOR_WIDTH_CELLS;
+    state.tower.floors.find(f => f.index === CONFIG.LOBBY_FLOOR_INDEX)!.cells.forEach((_, x, cells) => { cells[x] = { content: 'tenant', tenantId: lobby.id }; });
+    state.money.balanceCents = balance;
+  }
 }
 
 /**
@@ -91,7 +97,7 @@ export function setupNewGame(state: GameState): void {
  * M3 loop.
  */
 export function setupDemoTower(state: GameState): void {
-  setupNewGame(state);
+  setupNewGame(state, true);
   for (let i = 2; i <= 7; i++) buildFloor(state, i);
   for (let i = 2; i <= 7; i++) placeStair(state, i, 0);
   placeElevatorGroup(state, 1, 7, 10);

@@ -151,7 +151,7 @@ export function stairPlacementError(state: GameState, floorIndex: number, x: num
   if (stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   // Stairwell continuity: stair below (or the lobby floor beneath).
   const below = getFloor(state.tower, floorIndex - 1);
-  if (below && below.index !== CONFIG.LOBBY_FLOOR_INDEX && (below.cells[x]?.content !== 'stair' || (below.cells[x]?.transportX ?? x) !== x || (below.cells[x]?.transportWidth ?? 1) !== 8)) {
+  if (below && below.index !== CONFIG.LOBBY_FLOOR_INDEX && (below.cells[x]?.content !== 'stair' || (below.cells[x]?.transportX ?? x) !== x)) {
     return 'Needs a stair directly below';
   }
   if (CONFIG.STAIR_COST_DOLLARS * 100 > state.money.balanceCents) return 'Not enough funds';

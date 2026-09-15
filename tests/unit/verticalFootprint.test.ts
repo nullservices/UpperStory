@@ -45,6 +45,22 @@ it('demolishes stairs from their lobby landing without removing the lobby', () =
   expect(stairEscalatorCount(state)).toBe(0);
 });
 
+it('extends a legacy stair anchor with a modern flight without widening the old floor', () => {
+  const state = newTestGame(); buildFloor(state, 2); buildFloor(state, 3);
+  const lower = getFloor(state.tower, 2)!;
+  lower.cells[20] = { content: 'stair', tenantId: -1 };
+  lower.cells[21] = { content: 'stair', tenantId: -1 };
+  const loaded = deserializeGame(serializeGame(state));
+  placeStair(loaded, 3, 20);
+  expect(getFloor(loaded.tower, 2)!.cells[20]!.transportWidth).toBeUndefined();
+  expect(getFloor(loaded.tower, 2)!.cells[21]!.content).toBe('stair');
+  expect(getFloor(loaded.tower, 3)!.cells.slice(20, 28).every(c => c.transportWidth === 8)).toBe(true);
+  rebuildRouting(loaded);
+  expect(pickupRoute(loaded, 1, 3, 'resident')).not.toBeNull();
+  demolishAt(loaded, 3, 27);
+  expect(stairEscalatorCount(loaded)).toBe(2);
+});
+
 it('removes only the lobby escalator when its upper landing is shared', () => {
   const state = newTestGame(); buildFloor(state, 2); buildFloor(state, 3);
   placeEscalator(state, 1, 20, 'up'); placeEscalator(state, 2, 20, 'up');

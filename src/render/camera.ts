@@ -1,5 +1,6 @@
 import { Application, Container, type FederatedPointerEvent } from 'pixi.js';
 import { CONFIG } from '../data/config';
+import { cameraAnchor, initialCameraZoom } from './cameraLayout';
 
 /**
  * Camera over the tower world. World coordinates are pixels at zoom 1
@@ -24,6 +25,17 @@ export class Camera {
     app.stage.addChild(this.view);
     this.bindInput();
     this.center();
+    let previousWidth = app.screen.width;
+    let previousHeight = app.screen.height;
+    app.renderer.on('resize', (width, height) => {
+      const before = cameraAnchor(previousWidth, previousHeight);
+      const after = cameraAnchor(width, height);
+      this.x += after.x - before.x;
+      this.y += after.y - before.y;
+      previousWidth = width; previousHeight = height;
+      app.stage.hitArea = app.screen;
+      this.apply();
+    });
   }
 
   /**
@@ -32,15 +44,14 @@ export class Camera {
    */
   center(): void {
     const width = this.app.screen.width;
-    this.zoom = Math.min(1.8, Math.max(CONFIG.MIN_ZOOM, (width - 270) / (60 * CONFIG.CELL_WIDTH_PX)));
-    this.x = width < 620 ? 184 : 230;
+    this.zoom = Math.max(CONFIG.MIN_ZOOM, initialCameraZoom(width));
+    this.x = width <= 620 ? 184 : 230;
     this.y = this.app.screen.height * 0.79;
     this.apply();
   }
 
   zoomBy(factor: number): void {
-    const cx = (this.app.screen.width + 200) / 2;
-    const cy = this.app.screen.height / 2;
+    const { x: cx, y: cy } = cameraAnchor(this.app.screen.width, this.app.screen.height);
     const world = this.screenToWorld(cx, cy);
     this.zoom = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.MIN_ZOOM, this.zoom * factor));
     this.x = cx - world.x * this.zoom;

@@ -75,7 +75,7 @@ describe('tenant lifecycle', () => {
     buildFloor(state, 2);
     expect(placementError(state, 'lobby', 2, 0)).toBe('Must be placed on floor 1');
     // Remove the empty upper floor before trimming its support.
-    demolishAt(state, 2, 0);
+    demolishAt(state, 2, 1);
     demolishTenant(state, 1, 0);
     expect(placementError(state, 'lobby', 1, 5)).toBe('Extend the lobby from either edge');
     expect(placementError(state, 'lobby', 1, 0)).toBeNull();
@@ -120,7 +120,7 @@ describe('tenant lifecycle', () => {
     placeStair(state, 3, 5);
     demolishAt(state, 3, 5);
     expect(state.tower.floors[3]!.cells[5]!.content).toBe('empty');
-    demolishAt(state, 3, 0); // empty top floor
+    demolishAt(state, 3, 1); // interior click removes the empty top floor
     expect(state.tower.floors.map((f) => f.index)).toEqual([0, 1, 2]);
   });
 

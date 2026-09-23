@@ -159,6 +159,20 @@ export function buildFloor(state: GameState, index: number): Floor {
   return floor;
 }
 
+/** Trim a single empty edge cell without removing support beneath another floor. */
+export function trimFloor(state: GameState, index: number, x: number): void {
+  const floor = getFloor(state.tower, index);
+  if (!floor || index <= CONFIG.LOBBY_FLOOR_INDEX) throw new Error('Select an upper floor');
+  const bounds = floorBounds(state, index);
+  if (x !== bounds.lo && x !== bounds.hi - 1) throw new Error('Trim the floor from either edge');
+  if (floor.cells[x]?.content !== 'empty') throw new Error('Remove the room or transport before trimming this edge');
+  if (floorContains(state, index + 1, x, 1)) throw new Error('Trim the floor above before removing its support');
+  if (bounds.hi - bounds.lo === 1) { demolishFloor(state, index); return; }
+  floor.builtLo = bounds.lo + (x === bounds.lo ? 1 : 0);
+  floor.builtHi = bounds.hi - (x === bounds.hi - 1 ? 1 : 0);
+  state.tower.structureRevision++;
+}
+
 /** Only the top floor may be demolished, and only when completely empty. */
 export function demolishFloor(state: GameState, index: number): void {
   const tower = state.tower;

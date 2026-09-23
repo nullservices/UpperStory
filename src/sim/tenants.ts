@@ -5,7 +5,7 @@ import { demolishElevatorGroup, groupAt } from './elevators';
 import { spend } from './money';
 import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
-import { demolishFloor, getFloor, topFloorIndex, floorContains } from './tower';
+import { demolishFloor, getFloor, topFloorIndex, floorContains, floorBounds, trimFloor } from './tower';
 
 export type TenantType = keyof typeof TENANT_DATA;
 export type TenantState = 'constructing' | 'open' | 'vacant' | 'damaged';
@@ -227,11 +227,13 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
 
 /**
  * Composite demolish command used by the UI tool: tenants first, then stair
- * cells, then (empty top) floors. Throws Error(reason) when nothing applies.
+ * cells, then empty upper-floor edges or whole empty outermost floors.
+ * Throws Error(reason) when nothing applies.
  */
 export function demolishAt(state: GameState, floorIndex: number, x: number): void {
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) throw new Error('Nothing to demolish here');
+  if (floorIndex > 1 && !floorContains(state, floorIndex, x, 1)) throw new Error('Nothing to demolish here');
   let cell = floor.cells[x];
   if (!cell) throw new Error('Nothing to demolish here');
   // Lobby landings retain lobby tiles; inspect the transport above them.
@@ -275,6 +277,11 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
       if (!stillUsed) for (let cx = x; cx < x + landingWidth; cx++) escFloor.cells[cx] = { content: 'empty', tenantId: -1 };
     }
     state.tower.structureRevision++;
+    return;
+  }
+  const bounds = floorBounds(state, floorIndex);
+  if (floorIndex > 1 && (x === bounds.lo || x === bounds.hi - 1)) {
+    trimFloor(state, floorIndex, x);
     return;
   }
   if (

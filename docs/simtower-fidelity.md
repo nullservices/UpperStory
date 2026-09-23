@@ -40,8 +40,11 @@ New upper floors inherit the built bounds below them. The Floor tool extends
 either edge within the support below; upper floors retain their own widths
 when lower floors expand. Rooms and transport require built floor coverage.
 Version 9 saves preserve these bounds; older floors retain their full width.
-Extension pricing ($500 per cell) is provisional. Basement sizing and upper-floor
-edge trimming remain pending. Lobby edge demolition is implemented,
+Extension pricing ($500 per cell) is provisional. Empty upper-floor edges can
+be trimmed one cell at a time, working downward, without refunds. Occupied edges
+require removing the room or transport first. Clicking inside a completely empty
+top floor still removes the whole floor. These trimming rules remain unverified
+against the original. Basement sizing remains pending. Lobby edge demolition is implemented,
 with transport protection and a continuous-lobby restriction that remains
 unverified against the original. Existing saves retain their dimensions.
 

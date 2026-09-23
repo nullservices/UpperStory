@@ -2,11 +2,11 @@ import { Graphics, Text } from 'pixi.js';
 import { CONFIG, TENANT_DATA, facilityHeight } from '../data/config';
 import type { Tool } from '../game/controller';
 import { elevatorBuildPlan } from '../game/elevatorBuild';
+import { floorBuildPlan } from '../game/floorBuild';
 import {
   buildFloorError,
   escalatorPlacementError,
   floorTopY,
-  topFloorIndex,
   type GameState,
 } from '../sim';
 
@@ -58,7 +58,6 @@ export class PlacementPreview {
     if (!tool) return;
     const cell = CONFIG.CELL_WIDTH_PX;
     const towerWidth = CONFIG.FLOOR_WIDTH_CELLS * cell;
-    const nextIndex = topFloorIndex(state.tower) + 1;
     const valid = hoverError === null;
 
     switch (tool) {
@@ -71,11 +70,11 @@ export class PlacementPreview {
       }
       case 'buildFloor': {
         if (state.tower.floors.length === 0) break;
-        const canBuild = buildFloorError(state, nextIndex) === null;
-        g.rect(0, floorTopY(nextIndex, state.tower.lobbyHeight), towerWidth, bandHeightPx(nextIndex, state.tower.lobbyHeight)).fill(
-          canBuild ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
+        const plan = floorBuildPlan(state, hover);
+        g.rect(plan.lo * cell, floorTopY(plan.floor, state.tower.lobbyHeight), (plan.hi - plan.lo) * cell, bandHeightPx(plan.floor, state.tower.lobbyHeight)).fill(
+          !plan.error ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (hoverError) this.showError(hoverError, 0, floorTopY(nextIndex, state.tower.lobbyHeight), towerWidth);
+        if (plan.error) this.showError(plan.error, plan.lo * cell, floorTopY(plan.floor, state.tower.lobbyHeight), cell);
         break;
       }
       case 'select':

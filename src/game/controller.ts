@@ -1,5 +1,7 @@
 import { shaftWidth } from '../sim/elevators';
 import { CONFIG } from '../data/config';
+import { floorBuildPlan } from './floorBuild';
+import { extendFloor } from '../sim/tower';
 import type { Application, FederatedPointerEvent } from 'pixi.js';
 import type { Camera } from '../render/camera';
 import {
@@ -21,7 +23,6 @@ import {
   placementError,
   removeElevatorCar,
   stairPlacementError,
-  topFloorIndex,
   upgradeCarSpeed,
   type ElevatorGroup,
   type GameState,
@@ -256,9 +257,11 @@ export class Controller {
           break;
         }
         case 'buildFloor': {
-          const next = topFloorIndex(state.tower) + 1;
-          buildFloor(state, next);
-          this.hud.toast(`Built floor ${next}`);
+          const plan = floorBuildPlan(state, hover);
+          if (plan.error) throw new Error(plan.error);
+          if (plan.extending) extendFloor(state, plan.floor, hover!.cell);
+          else buildFloor(state, plan.floor);
+          this.hud.toast(`${plan.extending ? 'Extended' : 'Built'} floor ${plan.floor}`);
           break;
         }
         case 'elevator':
@@ -446,7 +449,7 @@ export class Controller {
       case 'buildBasement':
         return buildFloorError(state, state.tower.floors[0]!.index - 1);
       case 'buildFloor':
-        return buildFloorError(state, topFloorIndex(state.tower) + 1);
+        return floorBuildPlan(state, hover).error;
       case 'demolish':
       case 'select':
         return null;

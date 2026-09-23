@@ -1,3 +1,4 @@
+import { extendFloor } from '../../src/sim/tower';
 import { expect, it } from 'vitest';
 import { createInitialState, setupNewGame, placeTenant, buildFloor, placeStair, placeEscalator, placeElevatorGroup } from '../../src/sim';
 
@@ -12,5 +13,6 @@ it.each(['stairs', 'escalator', 'standard', 'service', 'express'] as const)('req
   expect(build).toThrow('Extend the lobby');
   expect(state.money.balanceCents).toBe(balance);
   placeTenant(state, 'lobby', 1, 20 + width - 1);
+  extendFloor(state, 2, 20 + width - 1);
   expect(build).not.toThrow();
 });

@@ -12,7 +12,7 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   select: { label: 'Inspect', hint: 'Click a room or elevator to inspect it. Shortcut: I.', icon: 'inspect' },
 
-  buildFloor: { label: 'Floor', hint: 'Click above the tower to add its next floor. Shortcut: F.', icon: 'floor' },
+  buildFloor: { label: 'Floor', hint: 'Click above the tower to add a floor matching the one below. Click beside an existing floor to extend it ($500 per cell); extend its support first. Shortcut: F.', icon: 'floor' },
 
   lobby: { label: 'Lobby', hint: 'Snaps to ground level. Choose any horizontal starting position, then drag. Extend an existing lobby from either edge.', icon: 'lobby' },
 

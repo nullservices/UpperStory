@@ -5,7 +5,7 @@ import { demolishElevatorGroup, groupAt } from './elevators';
 import { spend } from './money';
 import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
-import { demolishFloor, getFloor, topFloorIndex } from './tower';
+import { demolishFloor, getFloor, topFloorIndex, floorContains } from './tower';
 
 export type TenantType = keyof typeof TENANT_DATA;
 export type TenantState = 'constructing' | 'open' | 'vacant' | 'damaged';
@@ -129,6 +129,7 @@ export function placementError(
   for (let f = floorIndex; f < floorIndex + facilityHeight(type); f++) {
     const band = getFloor(state.tower, f);
     if (!band) return `Build all ${facilityHeight(type)} floors first`;
+    if (type !== 'lobby' && !floorContains(state, f, x, data.sizeCells)) return 'Extend this floor first';
     if (band.cells.slice(x, x + data.sizeCells).some(c => c.content !== 'empty')) return 'Space is occupied';
   }
   const kinship = kinsokuViolation(state, type, floorIndex, x);
@@ -204,6 +205,8 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
       const landing = getFloor(state.tower, lower === floorIndex ? lower + 1 : lower)?.cells[anchor];
       if (x >= anchor && x < anchor + (landing?.transportWidth ?? 1)) throw new Error('Remove the escalator before trimming its lobby');
     }
+    const upperFloor = getFloor(state.tower, floorIndex + 1);
+    if (upperFloor?.builtLo !== undefined && floorContains(state, floorIndex + 1, x, 1)) throw new Error('Remove the floor above before trimming its support');
     if (tenant.sizeCells === 1 && (topFloorIndex(state.tower) > floorIndex || state.tenants.size > 1)) throw new Error('Remove the rest of the tower before its last lobby cell');
     getFloor(state.tower, floorIndex)!.cells[x] = { content: 'empty', tenantId: -1 };
     if (tenant.sizeCells === 1) state.tenants.delete(tenant.id);

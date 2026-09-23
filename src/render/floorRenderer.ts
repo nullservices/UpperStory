@@ -1,3 +1,4 @@
+import { floorBounds } from '../sim/tower';
 import { Container, Graphics, Text } from 'pixi.js';
 import { facilityHeight, isHotel, CONFIG } from '../data/config';
 import { floorHeightPx, floorTopY, type GameState, type Tenant } from '../sim';
@@ -16,10 +17,11 @@ export class TowerView {
     this.tower = state.tower; this.revision = state.tower.structureRevision;
     const floors = state.tower.floors;
     if (!floors.length) return;
+    // Keep the unused starter basement from appearing as a full-width foundation.
+    const visibleBounds = (index: number) => floorBounds(state,
+      index === 0 && floors[0]?.index === 0 && floors[0].cells.every(cell => cell.content === 'empty') ? 1 : index);
     const lobby = [...state.tenants.values()].find(t => t.type === 'lobby');
-    const baseOnly = floors.every(f => f.index <= 1);
-    const left = baseOnly ? (lobby?.x ?? 0) * CONFIG.CELL_WIDTH_PX : 0;
-    const width = (baseOnly ? (lobby?.sizeCells ?? 0) : CONFIG.FLOOR_WIDTH_CELLS) * CONFIG.CELL_WIDTH_PX;
+    const width = ((lobby?.x ?? 0) + (lobby?.sizeCells ?? 0)) * CONFIG.CELL_WIDTH_PX;
     const b = this.backdrop; b.clear();
     // Ground level is the lobby's foot, not the basement floor.
     const ground = 0;
@@ -44,7 +46,11 @@ export class TowerView {
       b.circle(x + 4, ground - 29, 10).fill(0x90a97a);
     }
     const g = this.structure; g.clear();
-    for (const floor of width ? floors : []) {
+    for (const floor of floors) {
+      const bounds = visibleBounds(floor.index);
+      const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
+      const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
+      if (!width) continue;
       const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
       g.rect(left, y, width, h).fill(floor.index <= 0 ? 0x979d8c : 0xdce0d3);
       for (let x = left; x < left + width; x += 12) {
@@ -56,7 +62,11 @@ export class TowerView {
     }
     // Draw a whole room at once; cells are placement units, not dividing walls.
     for (const tenant of state.tenants.values()) this.room(g, tenant, state);
-    for (const floor of width ? floors : []) {
+    for (const floor of floors) {
+      const bounds = visibleBounds(floor.index);
+      const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
+      const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
+      if (!width) continue;
       const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
       floor.cells.forEach((cell, index) => {
         const x = index * CONFIG.CELL_WIDTH_PX;
@@ -87,13 +97,20 @@ export class TowerView {
       g.rect(left + width, y, 2, h).fill(0x7e9183);
     }
     const roof = floorTopY(floors[floors.length - 1]!.index, state.tower.lobbyHeight);
-    if (width) g.rect(left - 5, roof - 4, width + 10, 4).fill(0x6e847d);
-    if (width) g.rect(left - 5, roof - 5, width + 10, 1).fill(0xe6e9da);
+    const roofBounds = floorBounds(state, floors[floors.length - 1]!.index);
+    const roofLeft = roofBounds.lo * CONFIG.CELL_WIDTH_PX;
+    const roofWidth = (roofBounds.hi - roofBounds.lo) * CONFIG.CELL_WIDTH_PX;
+    if (roofWidth) g.rect(roofLeft - 5, roof - 4, roofWidth + 10, 4).fill(0x6e847d);
+    if (roofWidth) g.rect(roofLeft - 5, roof - 5, roofWidth + 10, 1).fill(0xe6e9da);
     for (const label of this.labels) label.destroy();
     this.labels = [];
-    for (const floor of width ? floors : []) {
+    for (const floor of floors) {
+      const bounds = visibleBounds(floor.index);
+      const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
+      const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
+      if (!width) continue;
       const text = new Text({ text: floor.index <= 0 ? `B${1 - floor.index}` : floor.index === 1 ? 'L' : String(floor.index), style: { fontSize: 9, fill: 0x496253, fontFamily: 'Tahoma', fontWeight: 'bold' } });
-      text.position.set(-22, floorTopY(floor.index, state.tower.lobbyHeight) + 5); this.labels.push(text); this.container.addChild(text);
+      text.position.set(left - 22, floorTopY(floor.index, state.tower.lobbyHeight) + 5); this.labels.push(text); this.container.addChild(text);
     }
   }
   private room(g: Graphics, tenant: Tenant, state: GameState): void {

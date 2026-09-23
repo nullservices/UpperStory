@@ -9,7 +9,7 @@ import {
   type QueueDir,
 } from './queues';
 import type { GameState } from './state';
-import { getFloor, stairEscalatorCount, lobbyCovers } from './tower';
+import { getFloor, stairEscalatorCount, lobbyCovers, floorContains } from './tower';
 
 /**
  * Elevator groups, cars, calls and dispatch (ElevatorsT equivalent).
@@ -144,6 +144,7 @@ export function elevatorPlacementError(
     const floor = getFloor(state.tower, f);
     if (!floor) return 'Build the floors first';
     if (existing && f >= existing.serviceLo && f <= existing.serviceHi) continue;
+    if (f !== CONFIG.LOBBY_FLOOR_INDEX && !floorContains(state, f, x, width)) return 'Extend this floor first';
     if (f === CONFIG.LOBBY_FLOOR_INDEX) {
       if (!lobbyCovers(state, x, width)) return `Extend the lobby beneath all ${width} shaft cells`;
       const upper = getFloor(state.tower, f + 1);
@@ -431,6 +432,7 @@ export function escalatorPlacementError(
   if (!lower || !upper) return 'Build both floors first';
   if (!state.escalators.has(`${floorIndex}:${x}`) && stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   for (const floor of [lower, upper]) {
+    if (floor.index !== CONFIG.LOBBY_FLOOR_INDEX && !floorContains(state, floor.index, x, 8)) return 'Extend this floor first';
     if (floor.index === CONFIG.LOBBY_FLOOR_INDEX) {
       if (!lobbyCovers(state, x, 8)) return 'Extend the lobby beneath all 8 escalator cells';
       for (const group of state.elevatorGroups.values()) if (group.serviceLo <= floor.index && group.serviceHi >= floor.index && x < group.x + shaftWidth(group) && x + 8 > group.x) return 'Space is occupied';

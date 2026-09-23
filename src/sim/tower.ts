@@ -26,6 +26,9 @@ export interface Floor {
   /** 0 = B1, 1 = ground/lobby floor, 2..MAX_FLOORS above ground. */
   index: number;
   cells: GridCell[];
+  /** Missing bounds are full-width legacy floors. */
+  builtLo?: number;
+  builtHi?: number;
 }
 
 export interface Tower {
@@ -46,6 +49,44 @@ export function emptyCell(): GridCell {
 
 export function getFloor(tower: Tower, index: number): Floor | undefined {
   return tower.floors.find((f) => f.index === index);
+}
+
+/** Half-open horizontal bounds of usable floor space. */
+export function floorBounds(state: GameState, index: number): { lo: number; hi: number } {
+  if (index === CONFIG.LOBBY_FLOOR_INDEX) {
+    const lobby = [...state.tenants.values()].find(t => t.type === 'lobby');
+    return { lo: lobby?.x ?? 0, hi: lobby ? lobby.x + lobby.sizeCells : 0 };
+  }
+  const floor = getFloor(state.tower, index);
+  return floor ? { lo: floor.builtLo ?? 0, hi: floor.builtHi ?? CONFIG.FLOOR_WIDTH_CELLS } : { lo: 0, hi: 0 };
+}
+
+export function floorContains(state: GameState, index: number, x: number, width: number): boolean {
+  const bounds = floorBounds(state, index);
+  return x >= bounds.lo && x + width <= bounds.hi;
+}
+
+/** Expand a floor within the support beneath it. Extension pricing is custom. */
+export function floorExtensionError(state: GameState, index: number, x: number): string | null {
+  if (index <= CONFIG.LOBBY_FLOOR_INDEX || !getFloor(state.tower, index)) return 'Select an existing upper floor';
+  if (!Number.isInteger(x) || x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
+  const bounds = floorBounds(state, index);
+  if (x >= bounds.lo && x < bounds.hi) return 'Floor already built here';
+  const lo = Math.min(x, bounds.lo); const hi = Math.max(x + 1, bounds.hi);
+  if (!floorContains(state, index - 1, lo, hi - lo)) return 'Extend the floor or lobby below first';
+  if ((hi - lo - (bounds.hi - bounds.lo)) * 500_00 > state.money.balanceCents) return 'Not enough funds';
+  return null;
+}
+
+export function extendFloor(state: GameState, index: number, x: number): void {
+  const error = floorExtensionError(state, index, x);
+  if (error) throw new Error(error);
+  const bounds = floorBounds(state, index);
+  const lo = Math.min(x, bounds.lo); const hi = Math.max(x + 1, bounds.hi);
+  spend(state, (hi - lo - (bounds.hi - bounds.lo)) * 500_00);
+  const floor = getFloor(state.tower, index)!;
+  floor.builtLo = lo; floor.builtHi = hi;
+  state.tower.structureRevision++;
 }
 
 /** Highest built floor index, or -1 for an empty tower. */
@@ -106,6 +147,10 @@ export function buildFloor(state: GameState, index: number): Floor {
   const cost = floorCostDollars(index) * 100;
   if (cost > 0 && !spend(state, cost)) throw new Error('Not enough funds');
   const floor = addFloor(state.tower, index);
+  if (index > CONFIG.LOBBY_FLOOR_INDEX) {
+    const support = floorBounds(state, index - 1);
+    floor.builtLo = support.lo; floor.builtHi = support.hi;
+  }
   if (index < 0 && !state.campaign.treasureFound && rngInt(state, 0, 7) === 0) {
     state.campaign.treasureFound = true;
     state.money.balanceCents += 1_000_000 * 100;
@@ -154,6 +199,7 @@ export function stairPlacementError(state: GameState, floorIndex: number, x: num
   if (floorIndex <= CONFIG.LOBBY_FLOOR_INDEX) return 'Stairs start above the lobby';
   if (!Number.isInteger(x) || x < 0 || x + 8 > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX + 1 && !lobbyCovers(state, x, 8)) return 'Extend the lobby beneath all 8 stair cells';
+  if (!floorContains(state, floorIndex, x, 8)) return 'Extend this floor first';
   if (floor.cells.slice(x, x + 8).some(cell => cell.content !== 'empty')) return 'Space is occupied';
   if (stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
   // Stairwell continuity: stair below (or the lobby floor beneath).

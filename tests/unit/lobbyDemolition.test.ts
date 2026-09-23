@@ -29,7 +29,7 @@ it('refuses to trim an elevator entrance without changing the save', () => {
 it('removes the final cell only when no upper tower or other facilities remain', () => {
   const state = createInitialState(); setupNewGame(state); placeTenant(state, 'lobby', 1, 20);
   buildFloor(state, 2);
-  expect(() => demolishAt(state, 1, 20)).toThrow('last lobby cell');
+  expect(() => demolishAt(state, 1, 20)).toThrow('floor above');
   demolishAt(state, 2, 0); demolishAt(state, 1, 20);
   expect(state.tenants.size).toBe(0);
 });

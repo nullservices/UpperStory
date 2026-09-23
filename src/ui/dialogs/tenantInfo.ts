@@ -257,7 +257,7 @@ export class TenantInfo {
   }
 
   private paintDemolish(): void {
-    this.demolishBtn.textContent = this.armed ? 'Are you sure?' : 'Demolish';
+    this.demolishBtn.textContent = this.armed ? 'Are you sure?' : this.tenant?.type === 'lobby' ? 'Trim leftmost cell' : 'Demolish';
   }
 
   private button(text: string): HTMLButtonElement {

@@ -9,6 +9,7 @@ import {
   cellIndexAtWorldX,
   cyclePricing,
   demolishAt,
+  demolishTenant,
   escalatorPlacementError,
   floorIndexAtWorldY,
   getFloor,
@@ -372,7 +373,8 @@ export class Controller {
       {
         demolish: () => {
           try {
-            demolishAt(this.state, tenant.floor, tenant.x);
+            if (tenant.type === 'lobby') demolishTenant(this.state, tenant.floor, tenant.x);
+            else demolishAt(this.state, tenant.floor, tenant.x);
             this.tenantInfo.close();
           } catch (err) {
             this.tenantInfo.setError(err instanceof Error ? err.message : String(err));

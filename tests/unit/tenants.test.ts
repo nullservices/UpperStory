@@ -74,9 +74,9 @@ describe('tenant lifecycle', () => {
     expect(placementError(state, 'lobby', 1, 0)).toBe('Extend the lobby from either edge');
     buildFloor(state, 2);
     expect(placementError(state, 'lobby', 2, 0)).toBe('Must be placed on floor 1');
-    // remove the lobby so the full-width rule is what we're testing
+    // Trimming leaves the remainder intact and permits rebuilding the edge.
     demolishTenant(state, 1, 0);
-    expect(placementError(state, 'lobby', 1, 5)).toBeNull();
+    expect(placementError(state, 'lobby', 1, 5)).toBe('Extend the lobby from either edge');
     expect(placementError(state, 'lobby', 1, 0)).toBeNull();
   });
 

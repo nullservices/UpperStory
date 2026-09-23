@@ -193,6 +193,24 @@ export function placeTenant(
 export function demolishTenant(state: GameState, floorIndex: number, x: number): void {
   const tenant = getTenantAt(state, floorIndex, x);
   if (!tenant) throw new Error('Nothing to demolish here');
+  if (tenant.type === 'lobby') {
+    if (x !== tenant.x && x !== tenant.x + tenant.sizeCells - 1) throw new Error('Trim the lobby from either edge');
+    if (groupAt(state, floorIndex, x)) throw new Error('Remove the elevator before trimming its lobby');
+    const above = getFloor(state.tower, floorIndex + 1)?.cells[x];
+    if (above?.content === 'stair') throw new Error('Remove the stairs before trimming their lobby');
+    for (const key of state.escalators.keys()) {
+      const [lower, anchor] = key.split(':').map(Number) as [number, number];
+      if (lower !== floorIndex && lower + 1 !== floorIndex) continue;
+      const landing = getFloor(state.tower, lower === floorIndex ? lower + 1 : lower)?.cells[anchor];
+      if (x >= anchor && x < anchor + (landing?.transportWidth ?? 1)) throw new Error('Remove the escalator before trimming its lobby');
+    }
+    if (tenant.sizeCells === 1 && (topFloorIndex(state.tower) > floorIndex || state.tenants.size > 1)) throw new Error('Remove the rest of the tower before its last lobby cell');
+    getFloor(state.tower, floorIndex)!.cells[x] = { content: 'empty', tenantId: -1 };
+    if (tenant.sizeCells === 1) state.tenants.delete(tenant.id);
+    else { if (x === tenant.x) tenant.x++; tenant.sizeCells--; }
+    state.tower.structureRevision++;
+    return;
+  }
   removeTenantPeople(state, tenant.id);
   for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
     const floor = getFloor(state.tower, f)!;

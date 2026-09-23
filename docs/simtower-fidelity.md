@@ -36,8 +36,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
 
 Construction is still the first unfinished parity pass. Player-built lobby
 width, drag extension, maintenance and transport coverage are implemented.
-Upper floors still use full-width building bands; floor-by-floor sizing and
-lobby segment demolition are next. Existing saves retain their dimensions.
+Upper floors still use full-width building bands; floor-by-floor sizing is next. Lobby edge demolition is implemented,
+with transport protection and a continuous-lobby restriction that remains
+unverified against the original. Existing saves retain their dimensions.
 
 Desktop camera scale now starts at 140% from 1366px-wide windows through
 ultrawide, and resizing preserves the world point at the viewport center.
@@ -93,7 +94,9 @@ comparison scenarios before it can be considered equivalent.
   at 3 stars, and $1,000 at 4 stars and above, collected in daily shares
   at the rating and width in effect at settlement. The lobby tool snaps to
   ground level, and new transport entrances require full lobby coverage.
-  Upper-floor widths and segment demolition remain pending.
+  Upper-floor widths remain pending. Lobby edges can be trimmed one cell at
+  a time without refunds; interior cuts and removal beneath transport are
+  blocked. The inspector trims the left edge; the bulldozer selects either edge.
 - Compare remaining original lobby construction rules. New stairs and escalators occupy
   eight cells; legacy single-cell installations remain usable.
   New standard/service shafts occupy four cells and express shafts six;

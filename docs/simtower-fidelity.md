@@ -83,7 +83,12 @@ comparison scenarios before it can be considered equivalent.
   opposite-direction cars and cars turning before the call are excluded.
   The 0–100 input range, exact eligibility and tie behavior need gameplay
   comparison. Existing saves without this setting use five floors.
-  Standard-floor departure delay remains pending (manual default: zero seconds).
+  Standard-floor departure delay is configurable for each weekday/weekend
+  period, defaulting to zero game seconds. Stops sample the delay on arrival,
+  retain normal boarding time, and accept later passengers while held. The saved
+  deadline follows the game clock through midnight and 07:00 rollover. The
+  0–300-second input range, arrival-based timing and tick rounding are our
+  implementation choices pending original-game comparison.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
   Hotel nightly baselines are derived from reference quarterly income, not a

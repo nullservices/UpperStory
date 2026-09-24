@@ -14,6 +14,7 @@ export interface ElevatorEditorActions {
   home(carId: number, floor: number | null): void;
   priority(day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void;
   response(day: 'weekday' | 'weekend', period: number, floors: number): void;
+  departure(day: 'weekday' | 'weekend', period: number, seconds: number): void;
   stop(floor: number, enabled: boolean): void;
   close(): void;
 }
@@ -178,7 +179,7 @@ export class ElevatorEditor {
       row.label.title = `${car.passengers.length} passengers aboard; capacity ${elevatorCapacity(group.kind)}`;
       row.status.textContent = car.state === 'moving' && car.targetFloor !== null
         ? `${car.dir > 0 ? 'Going up' : 'Going down'} to ${floorLabel(car.targetFloor)}`
-        : `${car.state === 'doors' ? 'Doors open' : 'Idle'} at ${floorLabel(Math.round(car.y))}`;
+        : `${car.state === 'doors' ? (car.departureAt !== undefined && car.doorsTicksLeft <= 0 ? 'Waiting to depart' : 'Doors open') : 'Idle'} at ${floorLabel(Math.round(car.y))}`;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
       row.removeBtn.hidden = group.cars.length <= 1;
       if (row.home.dataset.stops !== group.stops.join(',')) {
@@ -234,7 +235,9 @@ export class ElevatorEditor {
     const help = document.createElement('p'); help.textContent = 'Priority chooses which waiting calls empty cars serve first. Passengers already aboard keep their destinations. Idle cars return to their home floors when no calls remain.';
     const responseHelp = document.createElement('p');
     responseHelp.textContent = 'Waiting-car response: how many floors closer an idle car must be to take a call from an approaching moving car. Lower values use idle cars sooner. Default: 5 floors.';
-    this.schedules.append(help, responseHelp);
+    const departureHelp = document.createElement('p');
+    departureHelp.textContent = 'Departure delay is the minimum stop time in game seconds. Doors stay open for later arrivals. Default: 0; normal boarding time still applies. Changes apply at the next stop.';
+    this.schedules.append(help, responseHelp, departureHelp);
     const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center';
     for (const title of ['Period', 'Weekday', 'Weekend']) { const strong = document.createElement('strong'); strong.textContent = title; grid.append(strong); }
     for (const [period, data] of SERVICE_PERIODS.entries()) {
@@ -254,7 +257,17 @@ export class ElevatorEditor {
           this.actions?.response(day, period, response.value === '' ? NaN : Number(response.value));
           response.value = String(this.group?.waitingResponse?.[day][period] ?? 5);
         };
-        label.append(response); cell.append(select, label); grid.append(cell);
+        const departureLabel = document.createElement('label'); departureLabel.textContent = 'Departure (seconds)';
+        const departure = document.createElement('input'); departure.type = 'number'; departure.min = '0'; departure.max = '300'; departure.step = '1';
+        departure.style.cssText = 'width:100%;box-sizing:border-box';
+        departure.setAttribute('aria-label', `${day} ${data.label} departure delay`);
+        departure.value = String(this.group?.departureDelay?.[day][period] ?? 0);
+        departure.onchange = () => {
+          this.actions?.departure(day, period, departure.value === '' ? NaN : Number(departure.value));
+          departure.value = String(this.group?.departureDelay?.[day][period] ?? 0);
+        };
+        departureLabel.append(departure);
+        label.append(response); cell.append(select, label, departureLabel); grid.append(cell);
       }
     }
     this.schedules.append(grid);

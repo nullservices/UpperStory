@@ -43,6 +43,22 @@ export function activeWaitingResponse(state: GameState, group: ElevatorGroup): n
   return group.waitingResponse?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 5;
 }
 
+export function activeDepartureDelay(state: GameState, group: ElevatorGroup): number {
+  return group.departureDelay?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 0;
+}
+
+export function setDepartureDelay(state: GameState, groupId: number, day: 'weekday' | 'weekend', period: number, seconds: number): void {
+  const group = state.elevatorGroups.get(groupId);
+  if (!group) throw new Error('Elevator not found');
+  if (!['weekday', 'weekend'].includes(day) || !Number.isInteger(period) || period < 0 || period >= 6 || !Number.isInteger(seconds) || seconds < 0 || seconds > 300) throw new Error('Departure delay must be 0–300 game seconds');
+  group.departureDelay ??= { weekday: Array<number>(6).fill(0), weekend: Array<number>(6).fill(0) };
+  group.departureDelay[day][period] = seconds;
+}
+
+function gameSeconds(state: GameState): number {
+  return (state.calendar.day - 1) * 86400 + (state.calendar.minuteOfDay % 1440) * 60;
+}
+
 export function setWaitingResponse(state: GameState, groupId: number, day: 'weekday' | 'weekend', period: number, floors: number): void {
   const group = state.elevatorGroups.get(groupId);
   if (!group) throw new Error('Elevator not found');
@@ -88,6 +104,7 @@ export interface ElevatorGroup {
   cars: ElevatorCar[];
   schedule?: { weekday: ElevatorPriority[]; weekend: ElevatorPriority[] };
   waitingResponse?: { weekday: number[]; weekend: number[] };
+  departureDelay?: { weekday: number[]; weekend: number[] };
   disabledStops?: number[];
 }
 
@@ -105,6 +122,8 @@ export interface ElevatorCar {
   lastFloor: number;
   /** Null/absent retains the current idle position. */
   homeFloor?: number | null;
+  /** Absolute game-clock deadline, sampled when the car opens its doors. */
+  departureAt?: number;
 }
 
 export function carSpeed(car: ElevatorCar): number {
@@ -633,6 +652,9 @@ function hasCommittedPickup(state: GameState, group: ElevatorGroup, floor: numbe
 function arrive(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
   car.state = 'doors';
   car.doorsTicksLeft = CONFIG.ELEVATOR_DOOR_TICKS;
+  const delay = activeDepartureDelay(state, group);
+  if (delay > 0) car.departureAt = gameSeconds(state) + delay;
+  else delete car.departureAt;
   car.targetFloor = null;
   const floor = Math.round(car.y);
   car.lastFloor = floor;
@@ -701,6 +723,11 @@ function completeDoors(state: GameState, group: ElevatorGroup, car: ElevatorCar)
     if (queue.length > 0) pressCall(state, floor, dir);
   }
 
+  if (car.departureAt !== undefined && gameSeconds(state) + 1e-7 < car.departureAt) {
+    car.doorsTicksLeft = 0;
+    return;
+  }
+  delete car.departureAt;
   if (boarded === 0 && car.passengers.length === 0) car.dir = 0;
   car.state = 'idle';
 }

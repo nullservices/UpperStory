@@ -44,7 +44,12 @@ Extension pricing ($500 per cell) is provisional. Empty upper-floor edges can
 be trimmed one cell at a time, working downward, without refunds. Occupied edges
 require removing the room or transport first. Clicking inside a completely empty
 top floor still removes the whole floor. These trimming rules remain unverified
-against the original. Basement sizing remains pending. Lobby edge demolition is implemented,
+against the original. New towers receive B1 beneath built lobby cells; deeper
+basements inherit the width above. Side excavation uses the Basement tool,
+working downward at a provisional $500 per cell. Existing basements retain their
+widths. Basement edge backfilling remains pending; empty deepest levels can still
+be removed whole. These excavation rules need original-game verification.
+Lobby edge demolition is implemented,
 with transport protection and a continuous-lobby restriction that remains
 unverified against the original. Existing saves retain their dimensions.
 

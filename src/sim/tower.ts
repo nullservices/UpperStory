@@ -68,12 +68,12 @@ export function floorContains(state: GameState, index: number, x: number, width:
 
 /** Expand a floor within the support beneath it. Extension pricing is custom. */
 export function floorExtensionError(state: GameState, index: number, x: number): string | null {
-  if (index <= CONFIG.LOBBY_FLOOR_INDEX || !getFloor(state.tower, index)) return 'Select an existing upper floor';
+  if (index === CONFIG.LOBBY_FLOOR_INDEX || !getFloor(state.tower, index)) return 'Select an existing floor';
   if (!Number.isInteger(x) || x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const bounds = floorBounds(state, index);
   if (x >= bounds.lo && x < bounds.hi) return 'Floor already built here';
   const lo = Math.min(x, bounds.lo); const hi = Math.max(x + 1, bounds.hi);
-  if (!floorContains(state, index - 1, lo, hi - lo)) return 'Extend the floor or lobby below first';
+  if (!floorContains(state, index <= 0 ? index + 1 : index - 1, lo, hi - lo)) return index <= 0 ? 'Extend the basement or lobby above first' : 'Extend the floor or lobby below first';
   if ((hi - lo - (bounds.hi - bounds.lo)) * 500_00 > state.money.balanceCents) return 'Not enough funds';
   return null;
 }
@@ -130,6 +130,10 @@ export function buildFloorError(state: GameState, index: number): string | null 
   }
   if (getFloor(state.tower, index)) return 'Floor already exists';
   if (index < 0 && !getFloor(state.tower, index + 1)) return 'Build the basement above first';
+  if (index < 0) {
+    const bounds = floorBounds(state, index + 1);
+    if (bounds.hi === bounds.lo) return 'Build a lobby first';
+  }
   if (index > CONFIG.LOBBY_FLOOR_INDEX && ![...state.tenants.values()].some(t => t.type === 'lobby')) return 'Build a lobby first';
   if (index > CONFIG.LOBBY_FLOOR_INDEX && !getFloor(state.tower, index - 1)) {
     return 'Build lower floors first';
@@ -147,8 +151,8 @@ export function buildFloor(state: GameState, index: number): Floor {
   const cost = floorCostDollars(index) * 100;
   if (cost > 0 && !spend(state, cost)) throw new Error('Not enough funds');
   const floor = addFloor(state.tower, index);
-  if (index > CONFIG.LOBBY_FLOOR_INDEX) {
-    const support = floorBounds(state, index - 1);
+  if (index > CONFIG.LOBBY_FLOOR_INDEX || index < 0) {
+    const support = floorBounds(state, index < 0 ? index + 1 : index - 1);
     floor.builtLo = support.lo; floor.builtHi = support.hi;
   }
   if (index < 0 && !state.campaign.treasureFound && rngInt(state, 0, 7) === 0) {

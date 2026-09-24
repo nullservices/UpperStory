@@ -4,7 +4,6 @@ import type { Tool } from '../game/controller';
 import { elevatorBuildPlan } from '../game/elevatorBuild';
 import { floorBuildPlan } from '../game/floorBuild';
 import {
-  buildFloorError,
   escalatorPlacementError,
   floorTopY,
   type GameState,
@@ -57,20 +56,13 @@ export class PlacementPreview {
     this.errorText.visible = false;
     if (!tool) return;
     const cell = CONFIG.CELL_WIDTH_PX;
-    const towerWidth = CONFIG.FLOOR_WIDTH_CELLS * cell;
     const valid = hoverError === null;
 
     switch (tool) {
-      case 'buildBasement': {
-        const floor = state.tower.floors[0]!.index - 1;
-        const error = buildFloorError(state, floor);
-        g.rect(0, floorTopY(floor, state.tower.lobbyHeight), towerWidth, CONFIG.FLOOR_HEIGHT_PX).fill({ color: error ? RED : GREEN, alpha: GREEN_ALPHA });
-        if (error) this.showError(error, hover ? hover.cell * cell : 0, floorTopY(floor, state.tower.lobbyHeight), cell);
-        break;
-      }
+      case 'buildBasement':
       case 'buildFloor': {
         if (state.tower.floors.length === 0) break;
-        const plan = floorBuildPlan(state, hover);
+        const plan = floorBuildPlan(state, hover, tool === 'buildBasement');
         g.rect(plan.lo * cell, floorTopY(plan.floor, state.tower.lobbyHeight), (plan.hi - plan.lo) * cell, bandHeightPx(plan.floor, state.tower.lobbyHeight)).fill(
           !plan.error ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );

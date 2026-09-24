@@ -79,7 +79,8 @@ export function createInitialState(seed = 1): GameState {
  * a prebuilt full-width lobby; player games build their own.
  */
 export function setupNewGame(state: GameState, prebuiltLobby = false): void {
-  buildFloor(state, CONFIG.BASEMENT_FLOOR_INDEX);
+  const basement = buildFloor(state, CONFIG.BASEMENT_FLOOR_INDEX);
+  if (!prebuiltLobby) { basement.builtLo = 0; basement.builtHi = 0; }
   buildFloor(state, CONFIG.LOBBY_FLOOR_INDEX);
   if (prebuiltLobby) {
     const balance = state.money.balanceCents;

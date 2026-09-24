@@ -151,6 +151,14 @@ export function placeTenant(
   const cost = data.costDollars * 100;
   if (cost > 0 && !spend(state, cost)) throw new Error('Not enough funds');
 
+  // New towers receive their starter basement footprint with lobby construction.
+  const basement = getFloor(state.tower, 0);
+  if (type === 'lobby' && basement?.builtLo !== undefined) {
+    const bounds = floorBounds(state, 0);
+    basement.builtLo = bounds.lo === bounds.hi ? x : Math.min(bounds.lo, x);
+    basement.builtHi = Math.max(bounds.hi, x + 1);
+  }
+
   const lobby = type === 'lobby' ? [...state.tenants.values()].find(t => t.type === 'lobby') : undefined;
   if (lobby) {
     lobby.x = Math.min(lobby.x, x); lobby.sizeCells++;
@@ -233,7 +241,7 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
 export function demolishAt(state: GameState, floorIndex: number, x: number): void {
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) throw new Error('Nothing to demolish here');
-  if (floorIndex > 1 && !floorContains(state, floorIndex, x, 1)) throw new Error('Nothing to demolish here');
+  if (floorIndex !== 1 && !floorContains(state, floorIndex, x, 1)) throw new Error('Nothing to demolish here');
   let cell = floor.cells[x];
   if (!cell) throw new Error('Nothing to demolish here');
   // Lobby landings retain lobby tiles; inspect the transport above them.

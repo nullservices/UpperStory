@@ -48,7 +48,7 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   housekeeping: { label: 'Housekeeping', hint: '15 cells. Six staff clean hotel rooms using service elevators. Operating cost: $10,000 per quarter.', icon: 'housekeeping' },
 
-  buildBasement: { label: 'Basement', hint: 'Excavate the next basement, down to B9. Use the wheel and right-drag to look below ground.', icon: 'floor' },
+  buildBasement: { label: 'Basement', hint: 'Excavate the next basement matching the width above, down to B9. Click beside an existing basement to extend it ($500 per cell); expand the level above first.', icon: 'floor' },
 
   hotelTwin: { label: 'Twin hotel', hint: 'Two guests. Needs housekeeping and service elevator access.', icon: 'hotel' },
 

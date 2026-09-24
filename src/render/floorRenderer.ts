@@ -17,9 +17,6 @@ export class TowerView {
     this.tower = state.tower; this.revision = state.tower.structureRevision;
     const floors = state.tower.floors;
     if (!floors.length) return;
-    // Keep the unused starter basement from appearing as a full-width foundation.
-    const visibleBounds = (index: number) => floorBounds(state,
-      index === 0 && floors[0]?.index === 0 && floors[0].cells.every(cell => cell.content === 'empty') ? 1 : index);
     const lobby = [...state.tenants.values()].find(t => t.type === 'lobby');
     const width = ((lobby?.x ?? 0) + (lobby?.sizeCells ?? 0)) * CONFIG.CELL_WIDTH_PX;
     const b = this.backdrop; b.clear();
@@ -47,7 +44,7 @@ export class TowerView {
     }
     const g = this.structure; g.clear();
     for (const floor of floors) {
-      const bounds = visibleBounds(floor.index);
+      const bounds = floorBounds(state, floor.index);
       const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
       const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
       if (!width) continue;
@@ -63,7 +60,7 @@ export class TowerView {
     // Draw a whole room at once; cells are placement units, not dividing walls.
     for (const tenant of state.tenants.values()) this.room(g, tenant, state);
     for (const floor of floors) {
-      const bounds = visibleBounds(floor.index);
+      const bounds = floorBounds(state, floor.index);
       const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
       const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
       if (!width) continue;
@@ -105,7 +102,7 @@ export class TowerView {
     for (const label of this.labels) label.destroy();
     this.labels = [];
     for (const floor of floors) {
-      const bounds = visibleBounds(floor.index);
+      const bounds = floorBounds(state, floor.index);
       const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
       const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
       if (!width) continue;

@@ -7,7 +7,6 @@ import type { Camera } from '../render/camera';
 import {
   addElevatorCar,
   buildFloor,
-  buildFloorError,
   cellIndexAtWorldX,
   cyclePricing,
   demolishAt,
@@ -252,16 +251,14 @@ export class Controller {
     }
     try {
       switch (tool) {
-        case 'buildBasement': {
-          buildFloor(state, state.tower.floors[0]!.index - 1);
-          break;
-        }
+        case 'buildBasement':
         case 'buildFloor': {
-          const plan = floorBuildPlan(state, hover);
+          const plan = floorBuildPlan(state, hover, tool === 'buildBasement');
           if (plan.error) throw new Error(plan.error);
           if (plan.extending) extendFloor(state, plan.floor, hover!.cell);
           else buildFloor(state, plan.floor);
-          this.hud.toast(`${plan.extending ? 'Extended' : 'Built'} floor ${plan.floor}`);
+          const label = plan.floor <= 0 ? `basement B${1 - plan.floor}` : `floor ${plan.floor}`;
+          this.hud.toast(`${plan.extending ? 'Extended' : 'Built'} ${label}`);
           break;
         }
         case 'elevator':
@@ -447,7 +444,7 @@ export class Controller {
     const state = this.state;
     switch (tool) {
       case 'buildBasement':
-        return buildFloorError(state, state.tower.floors[0]!.index - 1);
+        return floorBuildPlan(state, hover, true).error;
       case 'buildFloor':
         return floorBuildPlan(state, hover).error;
       case 'demolish':

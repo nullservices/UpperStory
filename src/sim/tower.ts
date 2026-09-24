@@ -72,7 +72,7 @@ export function floorExtensionError(state: GameState, index: number, x: number):
   if (!Number.isInteger(x) || x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const bounds = floorBounds(state, index);
   if (x >= bounds.lo && x < bounds.hi) return 'Floor already built here';
-  const lo = Math.min(x, bounds.lo); const hi = Math.max(x + 1, bounds.hi);
+  const lo = bounds.lo === bounds.hi ? x : Math.min(x, bounds.lo); const hi = bounds.lo === bounds.hi ? x + 1 : Math.max(x + 1, bounds.hi);
   if (!floorContains(state, index <= 0 ? index + 1 : index - 1, lo, hi - lo)) return index <= 0 ? 'Extend the basement or lobby above first' : 'Extend the floor or lobby below first';
   if ((hi - lo - (bounds.hi - bounds.lo)) * 500_00 > state.money.balanceCents) return 'Not enough funds';
   return null;
@@ -82,7 +82,7 @@ export function extendFloor(state: GameState, index: number, x: number): void {
   const error = floorExtensionError(state, index, x);
   if (error) throw new Error(error);
   const bounds = floorBounds(state, index);
-  const lo = Math.min(x, bounds.lo); const hi = Math.max(x + 1, bounds.hi);
+  const lo = bounds.lo === bounds.hi ? x : Math.min(x, bounds.lo); const hi = bounds.lo === bounds.hi ? x + 1 : Math.max(x + 1, bounds.hi);
   spend(state, (hi - lo - (bounds.hi - bounds.lo)) * 500_00);
   const floor = getFloor(state.tower, index)!;
   floor.builtLo = lo; floor.builtHi = hi;
@@ -163,15 +163,21 @@ export function buildFloor(state: GameState, index: number): Floor {
   return floor;
 }
 
-/** Trim a single empty edge cell without removing support beneath another floor. */
+/** Trim an empty edge, preserving the footprint of more distant levels. */
 export function trimFloor(state: GameState, index: number, x: number): void {
   const floor = getFloor(state.tower, index);
-  if (!floor || index <= CONFIG.LOBBY_FLOOR_INDEX) throw new Error('Select an upper floor');
+  if (!floor || index === CONFIG.LOBBY_FLOOR_INDEX) throw new Error('Select a floor or basement');
   const bounds = floorBounds(state, index);
   if (x !== bounds.lo && x !== bounds.hi - 1) throw new Error('Trim the floor from either edge');
   if (floor.cells[x]?.content !== 'empty') throw new Error('Remove the room or transport before trimming this edge');
-  if (floorContains(state, index + 1, x, 1)) throw new Error('Trim the floor above before removing its support');
-  if (bounds.hi - bounds.lo === 1) { demolishFloor(state, index); return; }
+  if (floorContains(state, index <= 0 ? index - 1 : index + 1, x, 1)) throw new Error(index <= 0 ? 'Backfill the basement below first' : 'Trim the floor above before removing its support');
+  if (bounds.hi - bounds.lo === 1) {
+    if (index !== 0) { demolishFloor(state, index); return; }
+    if (getFloor(state.tower, -1)) throw new Error('Remove deeper basements first');
+    floor.builtLo = 0; floor.builtHi = 0;
+    state.tower.structureRevision++;
+    return;
+  }
   floor.builtLo = bounds.lo + (x === bounds.lo ? 1 : 0);
   floor.builtHi = bounds.hi - (x === bounds.hi - 1 ? 1 : 0);
   state.tower.structureRevision++;

@@ -288,7 +288,7 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
     return;
   }
   const bounds = floorBounds(state, floorIndex);
-  if (floorIndex > 1 && (x === bounds.lo || x === bounds.hi - 1)) {
+  if (floorIndex !== 1 && (x === bounds.lo || x === bounds.hi - 1)) {
     trimFloor(state, floorIndex, x);
     return;
   }

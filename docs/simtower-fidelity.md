@@ -47,8 +47,11 @@ top floor still removes the whole floor. These trimming rules remain unverified
 against the original. New towers receive B1 beneath built lobby cells; deeper
 basements inherit the width above. Side excavation uses the Basement tool,
 working downward at a provisional $500 per cell. Existing basements retain their
-widths. Basement edge backfilling remains pending; empty deepest levels can still
-be removed whole. These excavation rules need original-game verification.
+widths. Empty basement edges can be backfilled one cell at a time, working from
+the deepest level upward, without refunds. Empty deepest B2–B9 levels can still
+be removed whole from an interior cell. B1 can be backfilled completely and
+re-excavated with the Basement tool; its level record remains in the save.
+These excavation and backfilling rules need original-game verification.
 Lobby edge demolition is implemented,
 with transport protection and a continuous-lobby restriction that remains
 unverified against the original. Existing saves retain their dimensions.

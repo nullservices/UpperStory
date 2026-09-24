@@ -16,7 +16,7 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
 
   lobby: { label: 'Lobby', hint: 'Snaps to ground level. Choose any horizontal starting position, then drag. Extend an existing lobby from either edge.', icon: 'lobby' },
 
-  demolish: { label: 'Bulldoze', hint: 'Click a room or transport to remove it. Click an empty upper-floor edge to trim one cell, working downward. Click inside a completely empty top floor to remove it. No refunds.', icon: 'bulldoze' },
+  demolish: { label: 'Bulldoze', hint: 'Click a room or transport to remove it. Trim empty floor edges from the top down; backfill basement edges from the bottom up. An interior click removes a completely empty top floor or deepest basement (B2–B9). No refunds.', icon: 'bulldoze' },
 
   office: { label: 'Office', hint: '9 cells · 6 workers. Connect to the lobby before the morning commute. Shortcut: O.', icon: 'office' },
 

@@ -6,8 +6,8 @@ export function floorBuildPlan(state: GameState, hover: { floor: number; cell: n
     const bounds = floorBounds(state, hover.floor);
     if (hover.cell < bounds.lo || hover.cell >= bounds.hi) {
       return { floor: hover.floor, extending: true,
-        lo: hover.cell < bounds.lo ? hover.cell : bounds.hi,
-        hi: hover.cell < bounds.lo ? bounds.lo : hover.cell + 1,
+        lo: bounds.lo === bounds.hi ? hover.cell : hover.cell < bounds.lo ? hover.cell : bounds.hi,
+        hi: bounds.lo === bounds.hi ? hover.cell + 1 : hover.cell < bounds.lo ? bounds.lo : hover.cell + 1,
         error: floorExtensionError(state, hover.floor, hover.cell) };
     }
   }

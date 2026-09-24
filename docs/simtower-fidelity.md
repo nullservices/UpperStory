@@ -69,6 +69,11 @@ comparison scenarios before it can be considered equivalent.
 
 - Compare original PC gameplay against repeatable morning, lunch and evening
   traffic scenarios. Calibrate dispatch, journey times, patience and stress.
+  Dispatch now filters occupied hall queues by the passenger's assigned shaft
+  and direction, including calls collected while moving. A different shaft
+  clearing the shared hall signal no longer hides waiting passengers. This fixes
+  an internal routing inconsistency; it does not establish original dispatch
+  equivalence. Car management displays current movement, destination and door state.
 - Compare weekday/weekend schedules, priorities and home-floor dispatch against
   the original. Six configurable periods, direction priority and per-car homes
   are implemented; period boundaries and priority weighting are our own model.

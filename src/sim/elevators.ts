@@ -1,7 +1,6 @@
 import { CONFIG } from '../data/config';
 import { giveUp } from './people';
 import {
-  anyCallPending,
   callPending,
   clearCall,
   pressCall,
@@ -499,8 +498,8 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
     if (Math.abs(delta) <= 1e-9) {
       // Already at the call floor: face the pending call's direction so the
       // right queue boards (delta alone would default to -1 and stall).
-      car.dir = callPending(state, target, 'up') ? 1 : car.dir;
-      car.dir = callPending(state, target, 'down') ? -1 : car.dir;
+      car.dir = groupCallPending(state, group, target, 'up') ? 1 : car.dir;
+      car.dir = groupCallPending(state, group, target, 'down') ? -1 : car.dir;
       arrive(state, group, car);
     } else {
       car.dir = delta > 0 ? 1 : -1;
@@ -541,7 +540,7 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
       const dir: QueueDir = car.dir > 0 ? 'up' : 'down';
       if (
         (group.stops.includes(crossed) || hasCommittedPickup(state, group, crossed)) &&
-        callPending(state, crossed, dir)
+        groupCallPending(state, group, crossed, dir)
       ) {
         car.y = crossed;
         arrive(state, group, car);
@@ -571,14 +570,27 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
     return best;
   }
   for (let f = group.serviceLo; f <= group.serviceHi; f++) {
-    if (!anyCallPending(state, f) || (!group.stops.includes(f) && !hasCommittedPickup(state, group, f))) continue;
+    if ((!groupCallPending(state, group, f, 'up') && !groupCallPending(state, group, f, 'down')) || (!group.stops.includes(f) && !hasCommittedPickup(state, group, f))) continue;
     const priority = activePriority(state, group);
-    const penalty = priority !== 'normal' && !callPending(state, f, priority) ? group.serviceHi - group.serviceLo + 1 : 0;
+    const penalty = priority !== 'normal' && !groupCallPending(state, group, f, priority) ? group.serviceHi - group.serviceLo + 1 : 0;
     const distance = Math.abs(car.y - f) + penalty;
     if (distance < bestDist) { best = f; bestDist = distance; }
   }
   if (best !== null) return best;
   return car.homeFloor != null && group.stops.includes(car.homeFloor) && Math.abs(car.y - car.homeFloor) > 1e-9 ? car.homeFloor : null;
+}
+
+/** Shared hall signals must not send a shaft to another shaft's passengers. */
+function groupCallPending(state: GameState, group: ElevatorGroup, floor: number, dir: QueueDir): boolean {
+  const queue = queueHead(state, floor, dir);
+  // Retain explicit empty-queue button calls used by scripted scenarios.
+  if (queue.length === 0) return callPending(state, floor, dir);
+  return queue.some(id => {
+    const person = state.people.get(id);
+    const leg = person?.route?.[person.legIndex];
+    return person?.state === 'waiting' && leg?.mode === 'elevator' &&
+      leg.groupId === group.id && leg.from === floor && leg.dir === (dir === 'up' ? 1 : -1);
+  });
 }
 
 function hasCommittedPickup(state: GameState, group: ElevatorGroup, floor: number): boolean {
@@ -603,10 +615,10 @@ function arrive(state: GameState, group: ElevatorGroup, car: ElevatorCar): void 
   // An empty car travels toward a call, then serves the requested direction.
   if (car.passengers.length === 0) {
     const priority = activePriority(state, group);
-    if (priority !== 'normal' && callPending(state, floor, priority)) car.dir = priority === 'up' ? 1 : -1;
-    else if (car.dir >= 0 && callPending(state, floor, 'up')) car.dir = 1;
-    else if (callPending(state, floor, 'down')) car.dir = -1;
-    else if (callPending(state, floor, 'up')) car.dir = 1;
+    if (priority !== 'normal' && groupCallPending(state, group, floor, priority)) car.dir = priority === 'up' ? 1 : -1;
+    else if (car.dir >= 0 && groupCallPending(state, group, floor, 'up')) car.dir = 1;
+    else if (groupCallPending(state, group, floor, 'down')) car.dir = -1;
+    else if (groupCallPending(state, group, floor, 'up')) car.dir = 1;
   }
   const dir: QueueDir | null = car.dir > 0 ? 'up' : car.dir < 0 ? 'down' : null;
   if (dir) clearCall(state, floor, dir);

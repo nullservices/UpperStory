@@ -53,6 +53,7 @@ export class ElevatorEditor {
     {
       row: HTMLDivElement;
       label: HTMLSpanElement;
+      status: HTMLSpanElement;
       speedBtn: HTMLButtonElement;
       removeBtn: HTMLButtonElement;
       home: HTMLSelectElement;
@@ -174,6 +175,9 @@ export class ElevatorEditor {
       }
       row.label.textContent = `Car ${car.id} · Lv${car.speedLevel} · ${car.passengers.length}/${elevatorCapacity(group.kind)}`;
       row.label.title = `${car.passengers.length} passengers aboard; capacity ${elevatorCapacity(group.kind)}`;
+      row.status.textContent = car.state === 'moving' && car.targetFloor !== null
+        ? `${car.dir > 0 ? 'Going up' : 'Going down'} to ${floorLabel(car.targetFloor)}`
+        : `${car.state === 'doors' ? 'Doors open' : 'Idle'} at ${floorLabel(Math.round(car.y))}`;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
       row.removeBtn.hidden = group.cars.length <= 1;
       if (row.home.dataset.stops !== group.stops.join(',')) {
@@ -195,6 +199,7 @@ export class ElevatorEditor {
   ): {
     row: HTMLDivElement;
     label: HTMLSpanElement;
+    status: HTMLSpanElement;
     speedBtn: HTMLButtonElement;
     removeBtn: HTMLButtonElement;
     home: HTMLSelectElement;
@@ -215,9 +220,11 @@ export class ElevatorEditor {
 
     const home = document.createElement('select'); home.setAttribute('aria-label', `Car ${carId} home floor`);
     home.onchange = () => this.actions?.home(carId, home.value === '' ? null : Number(home.value));
-    row.append(label, speedBtn, removeBtn, home);
+    const status = document.createElement('span');
+    status.style.cssText = `flex-basis:100%;color:${C.dim};font-size:11px;`;
+    row.append(label, speedBtn, removeBtn, home, status);
     this.rows.appendChild(row);
-    return { row, label, speedBtn, removeBtn, home };
+    return { row, label, status, speedBtn, removeBtn, home };
   }
 
   private renderSchedules(): void {

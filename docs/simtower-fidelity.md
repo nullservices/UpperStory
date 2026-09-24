@@ -77,7 +77,13 @@ comparison scenarios before it can be considered equivalent.
 - Compare weekday/weekend schedules, priorities and home-floor dispatch against
   the original. Six configurable periods, direction priority and per-car homes
   are implemented; period boundaries and priority weighting are our own model.
-  Original waiting-car response and standard-floor departure settings remain.
+  Waiting-car response is configurable per period, defaulting to the manual's
+  five-floor advantage: an idle car waits for an approaching eligible moving car
+  unless it is at least the configured number of floors closer. Full cars,
+  opposite-direction cars and cars turning before the call are excluded.
+  The 0–100 input range, exact eligibility and tie behavior need gameplay
+  comparison. Existing saves without this setting use five floors.
+  Standard-floor departure delay remains pending (manual default: zero seconds).
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
   Hotel nightly baselines are derived from reference quarterly income, not a
@@ -152,3 +158,4 @@ arrival times, queue lengths, occupancy, stress and finances when comparing.
 
 No original game assets are bundled. No external implementation code was copied
 to implement these systems.
+- [Original manual, pp. 39–40](https://ru.scribd.com/document/619283680/SimTower-the-Vertical-Empire-Manual-Win-3x-En): waiting-car response compares distance against moving cars; default five floors. Departure delay defaults to zero game seconds.

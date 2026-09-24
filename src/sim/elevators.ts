@@ -28,11 +28,27 @@ export const SERVICE_PERIODS = [
   { start: 1020, label: '17:00–21:00' }, { start: 1260, label: '21:00–07:00' },
 ] as const;
 
-export function activePriority(state: GameState, group: ElevatorGroup): ElevatorPriority {
+function activePeriod(state: GameState): number {
   const minute = ((state.calendar.minuteOfDay - 420) % 1440 + 1440) % 1440 + 420;
   let period = 0;
   for (let i = 1; i < SERVICE_PERIODS.length; i++) if (minute >= SERVICE_PERIODS[i]!.start) period = i;
-  return group.schedule?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][period] ?? 'normal';
+  return period;
+}
+
+export function activePriority(state: GameState, group: ElevatorGroup): ElevatorPriority {
+  return group.schedule?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 'normal';
+}
+
+export function activeWaitingResponse(state: GameState, group: ElevatorGroup): number {
+  return group.waitingResponse?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 5;
+}
+
+export function setWaitingResponse(state: GameState, groupId: number, day: 'weekday' | 'weekend', period: number, floors: number): void {
+  const group = state.elevatorGroups.get(groupId);
+  if (!group) throw new Error('Elevator not found');
+  if (!['weekday', 'weekend'].includes(day) || !Number.isInteger(period) || period < 0 || period >= 6 || !Number.isInteger(floors) || floors < 0 || floors > 100) throw new Error('Invalid waiting-car response');
+  group.waitingResponse ??= { weekday: Array<number>(6).fill(5), weekend: Array<number>(6).fill(5) };
+  group.waitingResponse[day][period] = floors;
 }
 
 export function setElevatorPriority(state: GameState, groupId: number, day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void {
@@ -71,6 +87,7 @@ export interface ElevatorGroup {
   stops: number[];
   cars: ElevatorCar[];
   schedule?: { weekday: ElevatorPriority[]; weekend: ElevatorPriority[] };
+  waitingResponse?: { weekday: number[]; weekend: number[] };
   disabledStops?: number[];
 }
 
@@ -571,13 +588,24 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
   }
   for (let f = group.serviceLo; f <= group.serviceHi; f++) {
     if ((!groupCallPending(state, group, f, 'up') && !groupCallPending(state, group, f, 'down')) || (!group.stops.includes(f) && !hasCommittedPickup(state, group, f))) continue;
+    if (!(['up', 'down'] as const).some(dir => groupCallPending(state, group, f, dir) && !movingCarPreferred(state, group, car, f, dir))) continue;
     const priority = activePriority(state, group);
     const penalty = priority !== 'normal' && !groupCallPending(state, group, f, priority) ? group.serviceHi - group.serviceLo + 1 : 0;
     const distance = Math.abs(car.y - f) + penalty;
     if (distance < bestDist) { best = f; bestDist = distance; }
   }
   if (best !== null) return best;
+  // Keep a waiting car parked while a moving car handles an outstanding call.
+  if (group.stops.some(f => groupCallPending(state, group, f, 'up') || groupCallPending(state, group, f, 'down'))) return null;
   return car.homeFloor != null && group.stops.includes(car.homeFloor) && Math.abs(car.y - car.homeFloor) > 1e-9 ? car.homeFloor : null;
+}
+
+function movingCarPreferred(state: GameState, group: ElevatorGroup, idle: ElevatorCar, floor: number, dir: QueueDir): boolean {
+  const direction = dir === 'up' ? 1 : -1;
+  return group.cars.some(car => car.id !== idle.id && car.state === 'moving' && car.dir === direction &&
+    car.passengers.length < elevatorCapacity(group.kind) && car.targetFloor !== null &&
+    (floor - car.y) * direction >= 0 && (car.targetFloor - floor) * direction >= 0 &&
+    Math.abs(car.y - floor) - Math.abs(idle.y - floor) < activeWaitingResponse(state, group));
 }
 
 /** Shared hall signals must not send a shaft to another shaft's passengers. */

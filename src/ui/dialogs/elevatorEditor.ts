@@ -13,6 +13,7 @@ export interface ElevatorEditorActions {
   upgrade(carId: number): void;
   home(carId: number, floor: number | null): void;
   priority(day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void;
+  response(day: 'weekday' | 'weekend', period: number, floors: number): void;
   stop(floor: number, enabled: boolean): void;
   close(): void;
 }
@@ -231,7 +232,9 @@ export class ElevatorEditor {
     this.schedules.replaceChildren();
     const summary = document.createElement('summary'); summary.textContent = 'Weekday & weekend service'; this.schedules.append(summary);
     const help = document.createElement('p'); help.textContent = 'Priority chooses which waiting calls empty cars serve first. Passengers already aboard keep their destinations. Idle cars return to their home floors when no calls remain.';
-    this.schedules.append(help);
+    const responseHelp = document.createElement('p');
+    responseHelp.textContent = 'Waiting-car response: how many floors closer an idle car must be to take a call from an approaching moving car. Lower values use idle cars sooner. Default: 5 floors.';
+    this.schedules.append(help, responseHelp);
     const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center';
     for (const title of ['Period', 'Weekday', 'Weekend']) { const strong = document.createElement('strong'); strong.textContent = title; grid.append(strong); }
     for (const [period, data] of SERVICE_PERIODS.entries()) {
@@ -241,7 +244,17 @@ export class ElevatorEditor {
         for (const [value, label] of [['normal', 'Normal'], ['up', 'Up first'], ['down', 'Down first']]) select.add(new Option(label, value));
         select.value = this.group?.schedule?.[day][period] ?? 'normal';
         select.onchange = () => this.actions?.priority(day, period, select.value as ElevatorPriority);
-        grid.append(select);
+        const cell = document.createElement('div'); cell.style.cssText = 'display:grid;gap:4px;min-width:0';
+        const label = document.createElement('label'); label.textContent = 'Response (floors)';
+        const response = document.createElement('input'); response.type = 'number'; response.min = '0'; response.max = '100'; response.step = '1';
+        response.style.cssText = 'width:100%;box-sizing:border-box';
+        response.setAttribute('aria-label', `${day} ${data.label} waiting-car response`);
+        response.value = String(this.group?.waitingResponse?.[day][period] ?? 5);
+        response.onchange = () => {
+          this.actions?.response(day, period, response.value === '' ? NaN : Number(response.value));
+          response.value = String(this.group?.waitingResponse?.[day][period] ?? 5);
+        };
+        label.append(response); cell.append(select, label); grid.append(cell);
       }
     }
     this.schedules.append(grid);

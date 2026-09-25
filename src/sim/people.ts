@@ -670,12 +670,12 @@ export function stepPeople(state: GameState): void {
           p.pos.x = target.x;
           const leg = p.route?.[p.legIndex];
           if (leg?.mode === 'elevator') {
-            pressCall(state, leg.from, leg.dir > 0 ? 'up' : 'down');
             const joined = joinQueue(state, p.id, leg.from, leg.dir > 0 ? 'up' : 'down');
             if (!joined) {
               giveUp(state, p);
               break;
             }
+            pressCall(state, leg.from, leg.dir > 0 ? 'up' : 'down');
             p.state = 'waiting';
             p.waitTicks = 0;
             p.target = null;

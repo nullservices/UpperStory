@@ -37,6 +37,12 @@ export function leaveQueue(state: GameState, personId: number): void {
     const i = queue.indexOf(personId);
     if (i >= 0) {
       queue.splice(i, 1);
+      // A cancelled final trip must not leave an empty hall call behind.
+      // Other shafts share this bucket, so retain the call while anyone waits.
+      if (queue.length === 0) {
+        const [floor, dir] = key.split(':');
+        clearCall(state, Number(floor), dir as QueueDir);
+      }
       return;
     }
   }

@@ -34,7 +34,8 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
 
 ### Current checkpoint
 
-Construction is still the first unfinished parity pass. Player-built lobby
+Construction width controls are implemented but still need original-game
+comparison; the active pass is elevator management. Player-built lobby
 width, drag extension, maintenance and transport coverage are implemented.
 New upper floors inherit the built bounds below them. The Floor tool extends
 either edge within the support below; upper floors retain their own widths
@@ -77,6 +78,11 @@ comparison scenarios before it can be considered equivalent.
 - Compare weekday/weekend schedules, priorities and home-floor dispatch against
   the original. Six configurable periods, direction priority and per-car homes
   are implemented; period boundaries and priority weighting are our own model.
+  New cars receive a home at the lowest enabled stop. Home stops cannot be
+  disabled or excluded by shaft resizing until all assigned cars are moved to
+  another home. Legacy unassigned cars remain unchanged until assigned a home.
+  Default home selection and immediate relocation after reassignment still need
+  comparison; current cars finish their work before returning home when idle.
   Waiting-car response is configurable per period, defaulting to the manual's
   five-floor advantage: an idle car waits for an approaching eligible moving car
   unless it is at least the configured number of floors closer. Full cars,

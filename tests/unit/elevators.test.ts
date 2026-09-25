@@ -109,8 +109,9 @@ describe('elevator dispatch', () => {
     for (let i = 0; i < 100 && car.state !== 'doors'; i++) tick(state);
     expect(car.y).toBeCloseTo(5);
     expect(car.state).toBe('doors');
-    for (let i = 0; i < 10; i++) tick(state);
+    for (let i = 0; i < 100; i++) tick(state);
     expect(car.state).toBe('idle');
+    expect(car.y).toBe(car.homeFloor);
     expect(car.passengers).toHaveLength(0);
   });
 

@@ -182,10 +182,12 @@ export class ElevatorEditor {
         : `${car.state === 'doors' ? (car.departureAt !== undefined && car.doorsTicksLeft <= 0 ? 'Waiting to depart' : 'Doors open') : 'Idle'} at ${floorLabel(Math.round(car.y))}`;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
       row.removeBtn.hidden = group.cars.length <= 1;
-      if (row.home.dataset.stops !== group.stops.join(',')) {
-        row.home.replaceChildren(new Option('Stay where idle', ''));
+      const homeOptions = `${group.stops.join(',')}:${car.homeFloor == null}`;
+      if (row.home.dataset.stops !== homeOptions) {
+        row.home.replaceChildren();
+        if (car.homeFloor == null) row.home.add(new Option('Unassigned (legacy save)', ''));
         for (const floor of group.stops) row.home.add(new Option(`Home: ${floorLabel(floor)}`, String(floor)));
-        row.home.dataset.stops = group.stops.join(',');
+        row.home.dataset.stops = homeOptions;
       }
       row.home.value = car.homeFloor == null ? '' : String(car.homeFloor);
     }
@@ -276,7 +278,7 @@ export class ElevatorEditor {
   private renderStops(): void {
     this.stops.replaceChildren();
     const summary = document.createElement('summary'); summary.textContent = 'Floors served';
-    const help = document.createElement('p'); help.textContent = 'Uncheck a floor to exclude it from new trips. People already on their way finish their trips. Disabling a car’s home floor clears its home assignment.';
+    const help = document.createElement('p'); help.textContent = 'Uncheck a floor to exclude it from new trips. People already on their way finish their trips. Move every car assigned to this home floor before disabling its stop.';
     const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:180px;overflow:auto';
     const group = this.group!;
     for (const floor of [...group.stops, ...(group.disabledStops ?? [])].sort((a, b) => a - b)) {

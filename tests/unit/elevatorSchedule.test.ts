@@ -28,7 +28,7 @@ it('serves preferred calls first and serves the other direction when none remain
   pressCall(state, 2, 'down'); pressCall(state, 5, 'up');
   stepElevators(state); expect(car.targetFloor).toBe(5);
   for (let i = 0; i < 100; i++) stepElevators(state);
-  expect(car.y).toBe(2);
+  expect(car.y).toBe(1); // Returns to its waiting floor once calls are served.
 });
 
 it('keeps passenger destinations ahead of priority calls and home floors', () => {
@@ -53,12 +53,14 @@ it('parks at home without cycling its doors and responds to new calls', () => {
   pressCall(state, 1, 'up'); stepElevators(state); expect(car.targetFloor).toBe(1);
 });
 
-it('rejects invalid home stops and clears a home removed by shaft resizing', () => {
+it('rejects invalid home stops and protects homes during shaft resizing', () => {
   const { state, group, car } = fixture();
   expect(() => setCarHome(state, group.id, car.id, 8)).toThrow('serviced stop');
   setCarHome(state, group.id, car.id, 5);
+  expect(() => setElevatorServiceRange(state, group.id, 1, 3)).toThrow('car homes');
+  setCarHome(state, group.id, car.id, 2);
   setElevatorServiceRange(state, group.id, 1, 3);
-  expect(car.homeFloor).toBeNull();
+  expect(car.homeFloor).toBe(2);
   expect(() => setElevatorPriority(state, group.id, 'weekday', 6, 'up')).toThrow('Invalid');
 });
 
@@ -93,13 +95,16 @@ it.each([1, 5])('finishes a trip from floor %i after its stop is disabled', from
 it('retains disabled stops on extension and save, without disabling new floors', () => {
   const { state, group, car } = fixture();
   setCarHome(state, group.id, car.id, 5);
+  expect(() => setElevatorStop(state, group.id, 5, false)).toThrow('car home');
+  setCarHome(state, group.id, car.id, 4);
   setElevatorStop(state, group.id, 5, false);
-  expect(car.homeFloor).toBeNull();
+  expect(car.homeFloor).toBe(4);
   buildFloor(state, 6); setElevatorServiceRange(state, group.id, 1, 6);
   expect(group.stops).toEqual([1, 2, 3, 4, 6]);
   const restored = deserializeGame(serializeGame(state));
   expect(restored.elevatorGroups.get(group.id)!.disabledStops).toEqual([5]);
   for (const floor of [1, 2, 3]) setElevatorStop(state, group.id, floor, false);
+  setCarHome(state, group.id, car.id, 6);
   const before = serializeGame(state);
   expect(() => setElevatorStop(state, group.id, 4, false)).toThrow('two stops');
   expect(() => setElevatorServiceRange(state, group.id, 1, 3)).toThrow('two stops');

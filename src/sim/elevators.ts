@@ -79,7 +79,7 @@ export function setCarHome(state: GameState, groupId: number, carId: number, flo
   const group = state.elevatorGroups.get(groupId);
   const car = group?.cars.find(c => c.id === carId);
   if (!group || !car) throw new Error('Elevator car not found');
-  if (floor !== null && !group.stops.includes(floor)) throw new Error('Home floor must be a serviced stop');
+  if (floor === null || !group.stops.includes(floor)) throw new Error('Home floor must be a serviced stop');
   car.homeFloor = floor;
 }
 
@@ -255,10 +255,10 @@ export function setElevatorStop(state: GameState, groupId: number, floor: number
   if (!group) throw new Error('Elevator not found');
   if (!stopsFor(state, group.kind, group.serviceLo, group.serviceHi).includes(floor)) throw new Error('This shaft cannot stop on that floor');
   if (group.stops.includes(floor) === enabled) return;
+  if (!enabled && group.cars.some(car => car.homeFloor === floor)) throw new Error('Move every car home from this floor before disabling its stop');
   if (!enabled && group.stops.length <= 2) throw new Error('Keep at least two stops in service');
   group.disabledStops = enabled ? (group.disabledStops ?? []).filter(f => f !== floor) : [...(group.disabledStops ?? []), floor];
   group.stops = stopsFor(state, group.kind, group.serviceLo, group.serviceHi).filter(f => !group.disabledStops!.includes(f));
-  for (const car of group.cars) if (car.homeFloor === floor && !enabled) car.homeFloor = null;
   state.tower.structureRevision++;
 }
 
@@ -295,6 +295,7 @@ function makeGroup(
     passengers: [],
     speedLevel: 1,
     lastFloor: floorLo,
+    homeFloor: stopsFor(state, kind, floorLo, floorHi)[0]!,
   };
   const group: ElevatorGroup = {
     id,
@@ -358,6 +359,7 @@ export function addElevatorCar(state: GameState, groupId: number): void {
     passengers: [],
     speedLevel: 1,
     lastFloor: group.serviceLo,
+    homeFloor: group.stops[0]!,
   });
   state.tower.structureRevision++;
 }
@@ -394,6 +396,7 @@ export function elevatorServiceRangeError(state: GameState, groupId: number, lo:
   const error = elevatorPlacementError(state, lo, hi, group.x, group.kind, groupId);
   if (error) return error;
   if (group.disabledStops?.length && stopsFor(state, group.kind, lo, hi).filter(f => !group.disabledStops!.includes(f)).length < 2) return 'Keep at least two stops in service';
+  if (group.cars.some(car => car.homeFloor != null && (car.homeFloor < lo || car.homeFloor > hi))) return 'Move car homes inside the new service range first';
   // Extensions preserve every active route and car. Shrinks must not strand riders.
   if (lo > group.serviceLo || hi < group.serviceHi) {
     if (group.cars.some(car => car.state !== 'idle' || car.passengers.length > 0)) {
@@ -422,7 +425,6 @@ export function setElevatorServiceRange(state: GameState, groupId: number, lo: n
   const available = stopsFor(state, group.kind, lo, hi);
   if (group.disabledStops) group.disabledStops = group.disabledStops.filter(f => available.includes(f));
   group.stops = available.filter(f => !group.disabledStops?.includes(f));
-  for (const car of group.cars) if (car.homeFloor != null && !group.stops.includes(car.homeFloor)) car.homeFloor = null;
   for (const car of group.cars) {
     if (car.y < lo || car.y > hi) {
       car.y = Math.max(lo, Math.min(hi, car.y));

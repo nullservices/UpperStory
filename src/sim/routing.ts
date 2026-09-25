@@ -186,7 +186,7 @@ function groupScore(state: GameState, group: ElevatorGroup, from: number, to: nu
   let score =
     nearestCarDistance(group, from) / speed +
     group.cars.length * 0.3 +
-    queueLength(state, from, dir) * 0.15;
+    queueLength(state, from, dir, group.id) * 0.15;
   // Staff prefer service shafts when both exist.
   if (group.kind === 'service') score -= 2;
   return score;

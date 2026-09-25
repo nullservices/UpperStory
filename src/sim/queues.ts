@@ -4,6 +4,8 @@ import type { GameState } from './state';
 /**
  * Per-floor per-direction waiting queues for elevators (uniElv equivalent).
  * Keyed by `${floor}:${dir}`; arrays keep arrival order (deterministic).
+ * Capacity and shaft-specific counts follow each person's active route, keeping
+ * existing save data compatible without combining separate shaft capacities.
  */
 
 export type QueueDir = 'up' | 'down';
@@ -21,7 +23,9 @@ export function joinQueue(
 ): boolean {
   const key = queueKey(floor, dir);
   const queue = (state.queues[key] ??= []);
-  if (queue.length >= CONFIG.QUEUE_MAX_PER_SIDE) return false;
+  if (queue.includes(personId)) return true;
+  const groupId = queuedGroup(state, personId);
+  if (queue.filter(id => queuedGroup(state, id) === groupId).length >= CONFIG.QUEUE_MAX_PER_SIDE) return false;
   queue.push(personId);
   return true;
 }
@@ -38,8 +42,15 @@ export function leaveQueue(state: GameState, personId: number): void {
   }
 }
 
-export function queueLength(state: GameState, floor: number, dir: QueueDir): number {
-  return state.queues[queueKey(floor, dir)]?.length ?? 0;
+function queuedGroup(state: GameState, personId: number): number | undefined {
+  const person = state.people.get(personId);
+  const leg = person?.route?.[person.legIndex];
+  return leg?.mode === 'elevator' ? leg.groupId : undefined;
+}
+
+export function queueLength(state: GameState, floor: number, dir: QueueDir, groupId?: number): number {
+  const queue = state.queues[queueKey(floor, dir)] ?? [];
+  return groupId === undefined ? queue.length : queue.filter(id => queuedGroup(state, id) === groupId).length;
 }
 
 /** Queue in arrival order (person ids). */

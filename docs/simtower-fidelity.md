@@ -75,6 +75,10 @@ comparison scenarios before it can be considered equivalent.
   clearing the shared hall signal no longer hides waiting passengers. This fixes
   an internal routing inconsistency; it does not establish original dispatch
   equivalence. Car management displays current movement, destination and door state.
+  Hall queue capacity is now 40 people per shaft, floor and direction, rather
+  than shared by every shaft on a floor. Routing congestion scores count only
+  the candidate shaft's waiters. Arrival order and existing queue saves are
+  preserved; the congestion weighting remains an approximation.
 - Compare weekday/weekend schedules, priorities and home-floor dispatch against
   the original. Six configurable periods, direction priority and per-car homes
   are implemented; period boundaries and priority weighting are our own model.

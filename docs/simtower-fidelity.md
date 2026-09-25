@@ -81,8 +81,11 @@ comparison scenarios before it can be considered equivalent.
   New cars receive a home at the lowest enabled stop. Home stops cannot be
   disabled or excluded by shaft resizing until all assigned cars are moved to
   another home. Legacy unassigned cars remain unchanged until assigned a home.
-  Default home selection and immediate relocation after reassignment still need
-  comparison; current cars finish their work before returning home when idle.
+  Reassigning a home schedules a visit before new pickups. Cars finish their
+  current movement and deliver riders already aboard first; they skip new
+  pickups until reaching that home. Pending visits survive saves. Default home
+  selection and the exact treatment of an occupied or moving car still need
+  original-game comparison.
   Waiting-car response is configurable per period, defaulting to the manual's
   five-floor advantage: an idle car waits for an approaching eligible moving car
   unless it is at least the configured number of floors closer. Full cars,

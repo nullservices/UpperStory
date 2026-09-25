@@ -80,7 +80,9 @@ export function setCarHome(state: GameState, groupId: number, carId: number, flo
   const car = group?.cars.find(c => c.id === carId);
   if (!group || !car) throw new Error('Elevator car not found');
   if (floor === null || !group.stops.includes(floor)) throw new Error('Home floor must be a serviced stop');
+  if (car.homeFloor === floor) return;
   car.homeFloor = floor;
+  car.homeReassignmentPending = Math.abs(car.y - floor) > 1e-9;
 }
 
 export function elevatorCapacity(kind: ElevatorKind): number {
@@ -122,6 +124,7 @@ export interface ElevatorCar {
   lastFloor: number;
   /** Null/absent retains the current idle position. */
   homeFloor?: number | null;
+  homeReassignmentPending?: boolean;
   /** Absolute game-clock deadline, sampled when the car opens its doors. */
   departureAt?: number;
 }
@@ -571,7 +574,7 @@ function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void
   }
   // Opportunistic collect: a car with spare capacity stops for a pending
   // same-direction call on a floor it crosses.
-  if (car.passengers.length < elevatorCapacity(group.kind)) {
+  if (car.passengers.length < elevatorCapacity(group.kind) && !car.homeReassignmentPending) {
     const crossed = car.dir > 0 ? Math.floor(car.y) : Math.ceil(car.y);
     if (crossed !== car.lastFloor) {
       car.lastFloor = crossed;
@@ -607,6 +610,10 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
     }
     return best;
   }
+  if (car.homeReassignmentPending && car.homeFloor != null) {
+    if (Math.abs(car.y - car.homeFloor) > 1e-9) return car.homeFloor;
+    delete car.homeReassignmentPending;
+  }
   for (let f = group.serviceLo; f <= group.serviceHi; f++) {
     if ((!groupCallPending(state, group, f, 'up') && !groupCallPending(state, group, f, 'down')) || (!group.stops.includes(f) && !hasCommittedPickup(state, group, f))) continue;
     if (!(['up', 'down'] as const).some(dir => groupCallPending(state, group, f, dir) && !movingCarPreferred(state, group, car, f, dir))) continue;
@@ -623,7 +630,7 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
 
 function movingCarPreferred(state: GameState, group: ElevatorGroup, idle: ElevatorCar, floor: number, dir: QueueDir): boolean {
   const direction = dir === 'up' ? 1 : -1;
-  return group.cars.some(car => car.id !== idle.id && car.state === 'moving' && car.dir === direction &&
+  return group.cars.some(car => car.id !== idle.id && !car.homeReassignmentPending && car.state === 'moving' && car.dir === direction &&
     car.passengers.length < elevatorCapacity(group.kind) && car.targetFloor !== null &&
     (floor - car.y) * direction >= 0 && (car.targetFloor - floor) * direction >= 0 &&
     Math.abs(car.y - floor) - Math.abs(idle.y - floor) < activeWaitingResponse(state, group));
@@ -660,6 +667,7 @@ function arrive(state: GameState, group: ElevatorGroup, car: ElevatorCar): void 
   car.targetFloor = null;
   const floor = Math.round(car.y);
   car.lastFloor = floor;
+  if (car.homeReassignmentPending && floor === car.homeFloor) delete car.homeReassignmentPending;
   for (const pid of car.passengers) {
     const p = state.people.get(pid);
     if (p) p.pos = { floor, x: group.x + 0.5 };
@@ -701,7 +709,7 @@ function completeDoors(state: GameState, group: ElevatorGroup, car: ElevatorCar)
   // Board: people whose current leg matches this group and direction.
   const dir: QueueDir | null = car.dir > 0 ? 'up' : car.dir < 0 ? 'down' : null;
   let boarded = 0;
-  if (dir) {
+  if (dir && !car.homeReassignmentPending) {
     const queue = queueHead(state, floor, dir);
     for (const pid of [...queue]) {
       if (car.passengers.length >= elevatorCapacity(group.kind)) break;

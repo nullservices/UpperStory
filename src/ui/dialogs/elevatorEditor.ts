@@ -234,7 +234,7 @@ export class ElevatorEditor {
   private renderSchedules(): void {
     this.schedules.replaceChildren();
     const summary = document.createElement('summary'); summary.textContent = 'Weekday & weekend service'; this.schedules.append(summary);
-    const help = document.createElement('p'); help.textContent = 'Priority chooses which waiting calls empty cars serve first. Passengers already aboard keep their destinations. Idle cars return to their home floors when no calls remain.';
+    const help = document.createElement('p'); help.textContent = 'Priority chooses which waiting calls empty cars serve first. A changed home is visited before new pickups, after delivering riders already aboard. Cars then return home whenever no calls remain.';
     const responseHelp = document.createElement('p');
     responseHelp.textContent = 'Waiting-car response: how many floors closer an idle car must be to take a call from an approaching moving car. Lower values use idle cars sooner. Default: 5 floors.';
     const departureHelp = document.createElement('p');

@@ -1,4 +1,5 @@
 import { configureDialog } from './accessibility';
+import type { HousekeepingAccess } from '../../sim/housekeepingAccess';
 import { hotelCheckoutCents } from '../../sim/hotelEconomy';
 import { commercialOpeningMinute } from '../../sim/commercialPopulation';
 import { formatTimeOfDay } from '../../sim/time';
@@ -12,6 +13,7 @@ export interface TenantInfoData {
   /** People currently attached to the tenant. */
   occupancy: number;
   housekeepingFloors?: number[];
+  housekeepingAccess?: HousekeepingAccess;
   lobbyUpkeepQuarter?: number;
   noiseSources?: { type: TenantType; x: number; gap: number; clearance: number }[];
 }
@@ -186,6 +188,18 @@ export class TenantInfo {
     if (operatingCost) rows.push(this.line('Operating cost', `$${operatingCost.toLocaleString()} / quarter`));
     if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
+      const access = data.housekeepingAccess;
+      if (access) {
+        rows.push(this.line('Housekeeping access', access.openOffices === 0
+          ? 'No operating housekeeping office'
+          : access.reachableOffices === 0 ? 'No route from an operating office'
+          : `${access.reachableOffices} office${access.reachableOffices === 1 ? '' : 's'} can reach this floor`));
+        rows.push(this.line('Assigned cleaners', String(access.assignedCleaners)));
+        if (access.reachableOffices === 0) rows.push(this.line('To provide cleaning',
+          access.openOffices === 0 ? 'Build housekeeping here or on a connected floor'
+          : 'Add housekeeping on this floor or connect an office by service elevator'));
+        else rows.push(this.line('Cleaning capacity', 'Access does not guarantee an available cleaner'));
+      }
       rows.push(this.line('Checkout per guest', `$${(hotelCheckoutCents(tenant) / 100).toLocaleString()}`));
       rows.push(this.line('Full room / night', `$${(hotelCheckoutCents(tenant) * TENANT_DATA[tenant.type].capacity / 100).toLocaleString()}`));
     }

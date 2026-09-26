@@ -45,6 +45,12 @@ public passenger kind, and housekeeping access gained by adding a service shaft.
 Staff use of express cars and stairs remains unchanged and unverified, as do
 route-choice priorities. Those comparisons remain before closing this batch.
 
+Hotel inspectors now distinguish missing operating housekeeping offices from
+missing routes, report how many offices can reach the floor, and show active
+cleaner assignments. This is modernization feedback based on the current routing
+rules, not a claim about the original interface or guaranteed cleaning capacity.
+Access is checked when the paused inspector opens, including recent stop edits.
+
 ## Work beyond elevators
 
 The facility catalogue exists. The remaining scope is primarily behavioral

@@ -1,4 +1,5 @@
 import { shaftWidth } from '../sim/elevators';
+import { housekeepingAccess } from '../sim/housekeepingAccess';
 import { CONFIG } from '../data/config';
 import { floorBuildPlan } from './floorBuild';
 import { extendFloor } from '../sim/tower';
@@ -364,6 +365,7 @@ export class Controller {
           return { type: room.type, x: room.x, gap: source.gap, clearance: source.clearance };
         }),
         occupancy,
+        housekeepingAccess: housekeepingAccess(this.state, tenant),
         housekeepingFloors: tenant.type === 'housekeeping' ? [...new Set(
           [...this.state.people.values()].filter(p => p.tenantId === tenant.id && p.kind === 'housekeeper' && p.activityTenantId >= 0 && p.state !== 'offscreen')
             .map(p => this.state.tenants.get(p.activityTenantId))

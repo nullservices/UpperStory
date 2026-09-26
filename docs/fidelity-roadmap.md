@@ -66,6 +66,13 @@ verify that remaining riders finish, cancelled people are not moved by the car,
 empty calls clear and save/reload preserves the result. Patience and stress
 formulas are unchanged; their original-game thresholds remain unverified.
 
+Batch 5: shaft demolition now cancels unfinished routes for walkers and future
+transfer passengers as well as existing waiters. Completed legs do not trigger
+cancellation, and occupied shafts reject demolition before any mutation. Tests
+cover stale walk targets, release from an earlier car, and save/reload. This
+extends the existing give-up policy; original demolition consequences still need
+comparison.
+
 ## Work beyond elevators
 
 The facility catalogue exists. The remaining scope is primarily behavioral

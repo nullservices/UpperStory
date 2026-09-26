@@ -443,18 +443,17 @@ export function setElevatorServiceRange(state: GameState, groupId: number, lo: n
   state.tower.structureRevision++;
 }
 
-/** Demolish a whole shaft: cells cleared, waiting people give up. */
+/** Demolish a whole shaft and cancel unfinished journeys that require it. */
 export function demolishElevatorGroup(state: GameState, groupId: number): void {
   const group = state.elevatorGroups.get(groupId);
   if (!group) throw new Error('Elevator not found');
   for (const car of group.cars) {
     if (car.passengers.length > 0) throw new Error('Elevators are occupied');
   }
-  // Waiting people whose route used this shaft give up.
+  // Include walkers and future transfer legs, not just this shaft's queue.
+  // Otherwise someone already walking to a deleted shaft can join a dead queue.
   for (const p of [...state.people.values()]) {
-    if (p.state !== 'waiting') continue;
-    const leg = p.route?.[p.legIndex];
-    if (leg?.mode === 'elevator' && leg.groupId === groupId) giveUp(state, p);
+    if (p.route?.slice(p.legIndex).some(leg => leg.mode === 'elevator' && leg.groupId === groupId)) giveUp(state, p);
   }
   clearCells(state, group);
   state.elevatorGroups.delete(groupId);

@@ -4,7 +4,7 @@ Target: SimTower PC 1.0. Existing features and known approximations are recorded
 in [the fidelity inventory](simtower-fidelity.md). A passing automated test proves
 our implementation behaves consistently; it does not prove original-game parity.
 
-## Elevator work: five remaining batches
+## Elevator work: one internally validated batch, four remaining
 
 These are bounded work packages, not five remaining bugs. Close each only when
 its acceptance scenarios pass and unresolved original behavior is documented.
@@ -17,10 +17,17 @@ its acceptance scenarios pass and unresolved original behavior is documented.
 | 4. Passenger consequences | Waiting tolerance, accumulated stress, missed trips and overflow consequences | Original-game observations establish thresholds and resulting tenant behavior; regression tests reproduce them |
 | 5. Management and acceptance | Inspector controls, construction/editing feedback and full transport regression | Standard, service and express scenarios playable at common desktop sizes; save/reload and shaft edits preserve active journeys |
 
-Current work is batch 1. Per-shaft queue capacity and FIFO persistence are covered.
+Batch 1 is internally validated; original-game comparison remains in batches 3–5.
+Per-shaft queue capacity and FIFO persistence are covered.
 Cancellation now clears an empty hall call while preserving other shafts and
-directions. Rejected queue entry no longer presses a new call. Transfer journeys
-still need end-to-end coverage; this batch is not complete.
+directions. Rejected queue entry no longer presses a new call. Ground-lobby and
+sky-lobby transfers now have end-to-end coverage in both directions, including
+saves during walking, waiting, riding and the final approach. A full second-shaft
+queue rejects the new passenger without losing existing waiters. Passengers walk
+from the final stop to their destination, including same-floor journeys, instead
+of teleporting. This adds travel time; original walking speed and schedule timing
+remain unverified. Routes requiring two transfers are still unsupported and belong
+to batch 2's route-rule investigation.
 
 ## Work beyond elevators
 
@@ -40,7 +47,7 @@ accuracy and validation, with some missing features identified below.
 
 ## Order and completion policy
 
-Finish elevator batches 1–2, then build the comparison scenarios needed for 3–5.
+Continue with elevator batch 2, then build the comparison scenarios needed for 3–5.
 After transport, work through population/economy, services/incidents, progression,
 construction discrepancies and presentation. Original save compatibility is a
 separate milestone and must not silently become a prerequisite for gameplay work.

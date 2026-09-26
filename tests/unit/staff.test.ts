@@ -4,7 +4,7 @@ import { removeTenantPeople } from '../../src/sim/people';
 import { newTestGame, scenarioTower, setClock, tickN } from '../helpers/simHarness';
 
 describe('staff', () => {
-  it('a guard patrols: leaves the office during the workday and returns by night', () => {
+  it('a guard patrols and completes the walk back to the security office', () => {
     const state = newTestGame();
     state.starLevel = 5;
     scenarioTower(state);
@@ -18,9 +18,10 @@ describe('staff', () => {
     const g = [...state.people.values()].find((p) => p.kind === 'guard')!;
     expect(g.state === 'inTenant' ? g.pos.floor : 1).not.toBe(4);
     expect(g.state).not.toBe('offscreen');
-    // By 01:30 (ticking continuously through the evening) the guard is home.
+    // Let the patrol finish, including walking across the wide fixture floor.
     tickN(state, 2_500 - state.calendar.tickOfDay);
     const g2 = [...state.people.values()].find((p) => p.kind === 'guard')!;
+    for (let i = 0; i < 4000 && !(g2.state === 'inTenant' && g2.pos.floor === 4); i++) tickN(state, 1);
     expect(g2.state).toBe('inTenant');
     expect(g2.pos.floor).toBe(4);
   });

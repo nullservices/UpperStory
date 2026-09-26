@@ -381,6 +381,10 @@ function continueTrip(state: GameState, p: Person): void {
     }
     return;
   }
+  if (p.destination && p.pos.floor === p.destination.floor && p.pos.x !== p.destination.x) {
+    p.target = { ...p.destination };
+    return;
+  }
   arrive(state, p);
 }
 

@@ -22,6 +22,10 @@ it('returns workers to their office when lunch finishes', () => {
   worker.scheduleDone = true;
   stepPeople(state);
   expect(worker.endState).toBe('inTenant');
+  expect(worker.state).toBe('walking');
+  expect(worker.pos).toEqual({ floor: 2, x: 90 });
+  expect(worker.target).toEqual(tenantCenter(state, office.id));
+  for (let i = 0; i < 2000 && worker.state === 'walking'; i++) stepPeople(state);
   expect(worker.pos).toEqual(tenantCenter(state, office.id));
   expect(worker.state).toBe('inTenant');
 });

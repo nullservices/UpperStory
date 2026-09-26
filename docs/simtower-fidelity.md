@@ -32,8 +32,8 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
 
 ## Remaining fidelity work
 
-See the [bounded work roadmap](fidelity-roadmap.md) for the five remaining
-elevator batches, wider work tracks and their completion criteria.
+See the [bounded work roadmap](fidelity-roadmap.md) for elevator batch status,
+wider work tracks and their completion criteria.
 
 ### Current checkpoint
 

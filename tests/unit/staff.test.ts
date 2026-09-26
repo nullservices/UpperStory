@@ -8,6 +8,7 @@ describe('staff', () => {
     const state = newTestGame();
     state.starLevel = 5;
     scenarioTower(state);
+    placeElevatorGroup(state, 1, 5, 60, 'service');
     placeTenant(state, 'security', 4, 20);
     tickN(state, 2_600 + 160); // construction done, day 2 morning
     const guard = [...state.people.values()].find((p) => p.kind === 'guard');

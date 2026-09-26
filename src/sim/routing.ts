@@ -220,8 +220,9 @@ function servingGroups(
   for (const id of ids) {
     const group = state.elevatorGroups.get(id);
     if (!group) continue;
-    // Standard and express shafts serve everyone; service shafts serve staff only.
-    if (group.kind === 'standard' || group.kind === 'express' || isStaff(kind)) {
+    // The manual excludes security and housekeeping from standard cars.
+    // Express eligibility remains unchanged pending original-game comparison.
+    if (group.kind === 'express' || (group.kind === 'service' ? isStaff(kind) : !isStaff(kind))) {
       groups.push(group);
     }
   }

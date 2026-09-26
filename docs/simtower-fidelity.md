@@ -180,6 +180,11 @@ The manual also restricts elevator-to-stair/escalator transfers to lobby floors.
 Mixed routes now support one elevator ride plus a stair/escalator chain at those
 floors, with existing flight limits and direction rules. Route preference between
 two-elevator and mixed alternatives remains approximate.
+Page 51 excludes security and housekeeping from standard elevators. New staff
+routes now use service rather than standard cars; public passengers cannot use
+service cars. Already-planned trips in older saves still finish. Staff eligibility
+for express cars and stairs remains unverified and unchanged. Towers that relied
+on standard cars for staff may need a service shaft for subsequent trips.
 
 - [TDT specification](https://github.com/dfloer/tower-docs/blob/main/tdt_spec.md): partial save structure, geometry and elevator fields.
 - [SimTower reference](https://relentlessoptimizer.com/gaming/2021/03/13/simtower-reference/): PC 1.0 facility catalogue and progression reference, checked by its author against gameplay and help screens.

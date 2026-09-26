@@ -37,10 +37,13 @@ one elevator ride with a stair or escalator chain at a ground/sky lobby. They
 respect four-flight stair and seven-flight escalator limits and escalator
 direction. Tests cover full journeys and save/reload during a transfer.
 Two-elevator routes retain priority over mixed alternatives; this ordering is
-an implementation choice awaiting original-game comparison. Service passenger
-eligibility and route-choice priorities still need reference comparison before
-closing this batch. The manual describes service elevators for housekeeping
-carts, but the exact eligibility matrix has not yet been established here.
+an implementation choice awaiting original-game comparison. The manual's page 51
+excludes security and housekeeping staff from standard elevators and identifies
+service cars for infrastructure staff. New routes enforce that separation;
+existing saved journeys finish normally. Tests cover both staff roles, every
+public passenger kind, and housekeeping access gained by adding a service shaft.
+Staff use of express cars and stairs remains unchanged and unverified, as do
+route-choice priorities. Those comparisons remain before closing this batch.
 
 ## Work beyond elevators
 

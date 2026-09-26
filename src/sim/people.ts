@@ -160,12 +160,22 @@ export function spawnTenantPeople(state: GameState, tenant: Tenant): void {
   }
 }
 
+/** Cancel transport ownership before deleting or redirecting a passenger. */
+function detachFromTransport(state: GameState, personId: number): void {
+  leaveQueue(state, personId);
+  for (const group of state.elevatorGroups.values()) {
+    for (const car of group.cars) {
+      const index = car.passengers.indexOf(personId);
+      if (index >= 0) car.passengers.splice(index, 1);
+    }
+  }
+}
+
 /** Remove every person attached to a tenant (demolish or vacancy). */
 export function removeTenantPeople(state: GameState, tenantId: number): void {
   for (const [id, p] of state.people) {
     if (p.tenantId === tenantId) {
-      leaveQueue(state, id);
-      for (const group of state.elevatorGroups.values()) for (const car of group.cars) car.passengers = car.passengers.filter(pid => pid !== id);
+      detachFromTransport(state, id);
       state.people.delete(id);
     } else if (p.activityTenantId === tenantId) giveUp(state, p);
   }
@@ -432,7 +442,7 @@ function arrive(state: GameState, p: Person): void {
 
 /** Give up: leave the queue, complain, and retreat. */
 export function giveUp(state: GameState, p: Person): void {
-  leaveQueue(state, p.id);
+  detachFromTransport(state, p.id);
   p.stress = Math.min(Math.max(p.stress + CONFIG.STRESS_GIVEUP, 0), CONFIG.STRESS_MAX);
   p.dayStress += CONFIG.STRESS_GIVEUP;
   p.failedTripsToday++;

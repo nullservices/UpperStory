@@ -59,6 +59,13 @@ daily schedules and patience; they are consistency checks, not original-game
 timing benchmarks. Boarding late arrivals during a departure hold now clears the
 call when the final waiter boards. Original timing measurements remain pending.
 
+Batch 4: cancelling a trip now releases both queue membership and car occupancy.
+Removing an activity destination while a worker, visitor or cleaner was riding
+previously left a stale car occupant with no destination. Regression scenarios
+verify that remaining riders finish, cancelled people are not moved by the car,
+empty calls clear and save/reload preserves the result. Patience and stress
+formulas are unchanged; their original-game thresholds remain unverified.
+
 ## Work beyond elevators
 
 The facility catalogue exists. The remaining scope is primarily behavioral

@@ -51,6 +51,14 @@ cleaner assignments. This is modernization feedback based on the current routing
 rules, not a claim about the original interface or guaranteed cleaning capacity.
 Access is checked when the paused inspector opens, including recent stop edits.
 
+Batch 3 now has deterministic two-car scenarios for morning arrivals (40 riders),
+lunch cross-traffic (60 riders) and evening departures (60 riders). They check
+capacity, exclusive queue/car ownership, delivery to each destination, both cars
+being used and save/reload during dispatch. These isolate elevator operation from
+daily schedules and patience; they are consistency checks, not original-game
+timing benchmarks. Boarding late arrivals during a departure hold now clears the
+call when the final waiter boards. Original timing measurements remain pending.
+
 ## Work beyond elevators
 
 The facility catalogue exists. The remaining scope is primarily behavioral
@@ -69,7 +77,8 @@ accuracy and validation, with some missing features identified below.
 
 ## Order and completion policy
 
-Continue with elevator batch 2, then build the comparison scenarios needed for 3–5.
+Resolve batch 2 where reference evidence permits, while building the comparison
+scenarios needed for 3–5. Do not hold independent work behind unresolved rules.
 After transport, work through population/economy, services/incidents, progression,
 construction discrepancies and presentation. Original save compatibility is a
 separate milestone and must not silently become a prerequisite for gameplay work.

@@ -734,6 +734,7 @@ function completeDoors(state: GameState, group: ElevatorGroup, car: ElevatorCar)
     }
     // Leftover waiters re-press the call so another car comes.
     if (queue.length > 0) pressCall(state, floor, dir);
+    else clearCall(state, floor, dir); // Late arrivals may press during a door hold.
   }
 
   if (car.departureAt !== undefined && gameSeconds(state) + 1e-7 < car.departureAt) {

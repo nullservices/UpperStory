@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { activeDepartureDelay, setDepartureDelay, stepElevators } from '../../src/sim/elevators';
 import { spawnTenantPeople } from '../../src/sim/people';
-import { joinQueue, pressCall } from '../../src/sim/queues';
+import { callPending, joinQueue, pressCall } from '../../src/sim/queues';
 import { serializeGame, deserializeGame, stepTime, tickToMinute } from '../../src/sim';
 import { newTestGame, scenarioTower, setClock } from '../helpers/simHarness';
 
@@ -27,6 +27,7 @@ it('boards late arrivals during a delay and departs when game time reaches the d
   expect(first.state).toBe('riding'); expect(car.state).toBe('doors');
   const later = wait(1); stepTime(state); stepElevators(state);
   expect(later.state).toBe('riding');
+  expect(callPending(state, 1, 'up')).toBe(false);
   setDepartureDelay(state, group.id, 'weekday', 2, 0); // Does not cancel this stop.
   const restored = deserializeGame(serializeGame(state));
   for (let i = 0; i < 4; i++) { stepTime(state); stepElevators(state); stepTime(restored); stepElevators(restored); }

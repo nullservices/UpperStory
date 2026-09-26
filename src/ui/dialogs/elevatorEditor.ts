@@ -281,11 +281,17 @@ export class ElevatorEditor {
     const help = document.createElement('p'); help.textContent = 'Uncheck a floor to exclude it from new trips. People already on their way finish their trips. Move every car assigned to this home floor before disabling its stop.';
     const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-height:180px;overflow:auto';
     const group = this.group!;
+    if (group.kind === 'express') help.textContent = 'Express stops are fixed at the lobby, basement levels and sky lobbies. Unchecked stops from older saves can be restored.';
     for (const floor of [...group.stops, ...(group.disabledStops ?? [])].sort((a, b) => a - b)) {
       const label = document.createElement('label');
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = group.stops.includes(floor);
+      checkbox.disabled = group.kind === 'express' && checkbox.checked;
       checkbox.setAttribute('aria-label', `Serve floor ${floorLabel(floor)}`);
-      checkbox.onchange = () => { this.actions?.stop(floor, checkbox.checked); checkbox.checked = group.stops.includes(floor); };
+      checkbox.onchange = () => {
+        this.actions?.stop(floor, checkbox.checked);
+        checkbox.checked = group.stops.includes(floor);
+        checkbox.disabled = group.kind === 'express' && checkbox.checked;
+      };
       label.append(checkbox, ` ${floorLabel(floor)}`); grid.append(label);
     }
     this.stops.append(summary, help, grid);

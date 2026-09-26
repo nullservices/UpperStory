@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFloor,
+  checkRouting,
+  deserializeGame,
   elevatorPlacementError,
   placeElevatorGroup,
   placeTenant,
   pickupRoute,
   pressCall,
   rebuildRouting,
+  serializeGame,
   tick,
 } from '../../src/sim';
 import { newTestGame } from '../helpers/simHarness';
+import { setElevatorStop } from '../../src/sim/elevators';
 
 /**
  * A tall tower: floors 1..40, sky lobbies on 15 and 30, standard shafts
@@ -112,9 +116,37 @@ describe('express elevators', () => {
     expect(route?.[1]).toMatchObject({ mode: 'elevator', from: 30, to: 35, dir: 1 });
   });
 
-  it('more than one transfer is out of scope (single-transfer design)', () => {
+  it('rejects more than one elevator change, as specified in the original manual', () => {
     const state = tallTower();
-    // 10 → 35 needs transfers at both 15 and 30 — must be null by design.
+    // 10 → 35 needs changes at both 15 and 30, exceeding the original limit.
     expect(pickupRoute(state, 10, 35, 'officeWorker')).toBeNull();
+    expect(pickupRoute(state, 35, 10, 'officeWorker')).toBeNull();
+  });
+
+  it('keeps express stops fixed without mutating routes or saves on rejection', () => {
+    const state = tallTower();
+    const express = [...state.elevatorGroups.values()].find(g => g.kind === 'express')!;
+    const before = serializeGame(state);
+    expect(() => setElevatorStop(state, express.id, 15, false)).toThrow('Express elevator stops cannot be disabled');
+    expect(serializeGame(state)).toBe(before);
+    expect(() => setElevatorStop(state, express.id, 5, true)).toThrow('cannot stop');
+    setElevatorStop(state, express.id, 15, true); // Already enabled is a no-op.
+    expect(serializeGame(state)).toBe(before);
+  });
+
+  it('preserves legacy disabled express stops on load and permits restoring them', () => {
+    let state = tallTower();
+    const id = [...state.elevatorGroups.values()].find(g => g.kind === 'express')!.id;
+    const legacy = state.elevatorGroups.get(id)!;
+    legacy.disabledStops = [30]; legacy.stops = [1, 15];
+    rebuildRouting(state);
+    state = deserializeGame(serializeGame(state));
+    expect(state.elevatorGroups.get(id)!.stops).toEqual([1, 15]);
+    expect(pickupRoute(state, 1, 35, 'officeWorker')).toBeNull();
+    setElevatorStop(state, id, 30, true);
+    checkRouting(state);
+    expect(pickupRoute(state, 1, 35, 'officeWorker')).toHaveLength(2);
+    expect(() => setElevatorStop(state, id, 30, false)).toThrow('cannot be disabled');
+    expect(deserializeGame(serializeGame(state)).elevatorGroups.get(id)!.stops).toEqual([1, 15, 30]);
   });
 });

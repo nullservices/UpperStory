@@ -26,8 +26,15 @@ saves during walking, waiting, riding and the final approach. A full second-shaf
 queue rejects the new passenger without losing existing waiters. Passengers walk
 from the final stop to their destination, including same-floor journeys, instead
 of teleporting. This adds travel time; original walking speed and schedule timing
-remain unverified. Routes requiring two transfers are still unsupported and belong
-to batch 2's route-rule investigation.
+remain unverified. The original manual specifies only one elevator change per
+trip, so rejecting journeys that require two changes is intentional fidelity.
+
+Batch 2: the manual's fixed express-stop rule is enforced in the simulation and
+editor. Previously disabled express stops remain unchanged in old saves and can
+be restored, but cannot be disabled again. Regression coverage includes restored
+connectivity and both directions of the one-change limit. Service passenger
+eligibility, mixed stair/elevator routes and route-choice priorities still need
+reference comparison before closing this batch.
 
 ## Work beyond elevators
 

@@ -258,6 +258,9 @@ export function setElevatorStop(state: GameState, groupId: number, floor: number
   if (!group) throw new Error('Elevator not found');
   if (!stopsFor(state, group.kind, group.serviceLo, group.serviceHi).includes(floor)) throw new Error('This shaft cannot stop on that floor');
   if (group.stops.includes(floor) === enabled) return;
+  // Original express stops are fixed. Permit restoring a stop disabled by an
+  // older Upper Story version without silently changing an existing save.
+  if (group.kind === 'express' && !enabled) throw new Error('Express elevator stops cannot be disabled');
   if (!enabled && group.cars.some(car => car.homeFloor === floor)) throw new Error('Move every car home from this floor before disabling its stop');
   if (!enabled && group.stops.length <= 2) throw new Error('Keep at least two stops in service');
   group.disabledStops = enabled ? (group.disabledStops ?? []).filter(f => f !== floor) : [...(group.disabledStops ?? []), floor];

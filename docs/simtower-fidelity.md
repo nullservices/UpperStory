@@ -172,6 +172,11 @@ arrival times, queue lengths, occupancy, stress and finances when comparing.
 
 ## Sources
 
+The original manual limits each trip to one elevator change and disallows
+individual express-stop deactivation. Both rules are enforced. Older Upper Story
+saves retain disabled express stops until the player restores them in the editor.
+This compatibility exception avoids silently altering an existing tower's routes.
+
 - [TDT specification](https://github.com/dfloer/tower-docs/blob/main/tdt_spec.md): partial save structure, geometry and elevator fields.
 - [SimTower reference](https://relentlessoptimizer.com/gaming/2021/03/13/simtower-reference/): PC 1.0 facility catalogue and progression reference, checked by its author against gameplay and help screens.
 - [Asset loader](https://github.com/fabianschuiki/OpenSkyscraper/blob/master/source/SimTowerLoader.cpp): bitmap, palette and sound extraction from the original executable.
@@ -179,4 +184,4 @@ arrival times, queue lengths, occupancy, stress and finances when comparing.
 
 No original game assets are bundled. No external implementation code was copied
 to implement these systems.
-- [Original manual, pp. 39–40](https://ru.scribd.com/document/619283680/SimTower-the-Vertical-Empire-Manual-Win-3x-En): waiting-car response compares distance against moving cars; default five floors. Departure delay defaults to zero game seconds.
+- [Original manual](https://ru.scribd.com/document/619283680/SimTower-the-Vertical-Empire-Manual-Win-3x-En): one elevator change per trip; fixed express stops; waiting-car response compares distance against moving cars (default five floors); departure delay defaults to zero game seconds.

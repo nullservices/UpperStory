@@ -176,6 +176,10 @@ The original manual limits each trip to one elevator change and disallows
 individual express-stop deactivation. Both rules are enforced. Older Upper Story
 saves retain disabled express stops until the player restores them in the editor.
 This compatibility exception avoids silently altering an existing tower's routes.
+The manual also restricts elevator-to-stair/escalator transfers to lobby floors.
+Mixed routes now support one elevator ride plus a stair/escalator chain at those
+floors, with existing flight limits and direction rules. Route preference between
+two-elevator and mixed alternatives remains approximate.
 
 - [TDT specification](https://github.com/dfloer/tower-docs/blob/main/tdt_spec.md): partial save structure, geometry and elevator fields.
 - [SimTower reference](https://relentlessoptimizer.com/gaming/2021/03/13/simtower-reference/): PC 1.0 facility catalogue and progression reference, checked by its author against gameplay and help screens.

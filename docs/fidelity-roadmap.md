@@ -32,9 +32,15 @@ trip, so rejecting journeys that require two changes is intentional fidelity.
 Batch 2: the manual's fixed express-stop rule is enforced in the simulation and
 editor. Previously disabled express stops remain unchanged in old saves and can
 be restored, but cannot be disabled again. Regression coverage includes restored
-connectivity and both directions of the one-change limit. Service passenger
-eligibility, mixed stair/elevator routes and route-choice priorities still need
-reference comparison before closing this batch.
+connectivity and both directions of the one-change limit. Mixed routes now join
+one elevator ride with a stair or escalator chain at a ground/sky lobby. They
+respect four-flight stair and seven-flight escalator limits and escalator
+direction. Tests cover full journeys and save/reload during a transfer.
+Two-elevator routes retain priority over mixed alternatives; this ordering is
+an implementation choice awaiting original-game comparison. Service passenger
+eligibility and route-choice priorities still need reference comparison before
+closing this batch. The manual describes service elevators for housekeeping
+carts, but the exact eligibility matrix has not yet been established here.
 
 ## Work beyond elevators
 

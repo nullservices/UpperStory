@@ -275,6 +275,31 @@ export function pickupRoute(
     }
   }
 
+  // One elevator plus a stair/escalator chain, changing modes at a lobby.
+  // Do not recursively route either half: that would bypass the one-change
+  // limit by hiding additional elevator rides inside a transfer leg.
+  for (const s of transferFloors) {
+    if (s === from || s === to) continue;
+    const walkTo = stairRoute(state, from, s) ?? escalatorRoute(state, from, s);
+    const walkFrom = stairRoute(state, s, to) ?? escalatorRoute(state, s, to);
+    if (walkFrom) {
+      const group = bestGroup(state, from, s, servingGroups(state, from, kind)
+        .filter(g => servingGroups(state, s, kind).some(h => h.id === g.id)));
+      if (group) return [
+        { mode: 'elevator', from, to: s, dir: s > from ? 1 : -1, groupId: group.id },
+        ...walkFrom,
+      ];
+    }
+    if (walkTo) {
+      const group = bestGroup(state, s, to, servingGroups(state, s, kind)
+        .filter(g => servingGroups(state, to, kind).some(h => h.id === g.id)));
+      if (group) return [
+        ...walkTo,
+        { mode: 'elevator', from: s, to, dir: to > s ? 1 : -1, groupId: group.id },
+      ];
+    }
+  }
+
   return null;
 }
 

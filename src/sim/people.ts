@@ -67,6 +67,8 @@ export interface Person {
   failedTripsToday: number;
   jitterTicks: number;
   dayTracked: number;
+  /** Completed cleaning jobs this operating day; absent in older saves. */
+  roomsCleanedToday?: number;
   /** Activity timer while 'inTenant' (eating/shopping); 0 = none. */
   activityTicksLeft: number;
   /** The commercial tenant being patronized (-1 = none); pays on arrival. */
@@ -564,6 +566,11 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       return;
     }
     case 'goWork': {
+      if ((p.roomsCleanedToday ?? 0) >= CONFIG.HOUSEKEEPER_ROOMS_PER_DAY) {
+        p.activityTenantId = -1;
+        applyAction(state, p, 'goHome');
+        return;
+      }
       // A housekeeping office sends at most one cleaner to each floor.
       // Other offices may help on that floor, but never in the same room.
       let dirtiest: Tenant | null = null;
@@ -644,6 +651,7 @@ export function stepPeople(state: GameState): void {
     if (p.dayTracked !== day) {
       p.dayTracked = day;
       p.dayStress = 0;
+      p.roomsCleanedToday = 0;
       p.scheduleIndex = 0;
       p.scheduleDone = false;
       p.jitterTicks = rngInt(state, -CONFIG.ARRIVAL_JITTER_TICKS, CONFIG.ARRIVAL_JITTER_TICKS);
@@ -738,10 +746,12 @@ export function stepPeople(state: GameState): void {
         const hotel = state.tenants.get(p.activityTenantId);
         const canClean = hotel && isHotel(hotel.type) && hotel.state === 'open' && !hotelHasGuestInside(state, hotel.id);
         if (canClean) {
+          const wasDirty = hotel.cleanliness < 100;
           hotel.cleanliness = Math.min(
             100,
             hotel.cleanliness + CONFIG.HOUSEKEEPER_CLEAN_PER_TICK,
           );
+          if (wasDirty && hotel.cleanliness >= 100) p.roomsCleanedToday = (p.roomsCleanedToday ?? 0) + 1;
         }
         if (p.stairsTicksLeft <= 0 || !canClean || hotel.cleanliness >= 100) {
           p.state = 'inTenant';

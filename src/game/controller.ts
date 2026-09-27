@@ -366,6 +366,9 @@ export class Controller {
         }),
         occupancy,
         housekeepingAccess: housekeepingAccess(this.state, tenant),
+        cleaningRemaining: tenant.type === 'housekeeping' ? [...this.state.people.values()]
+          .filter(p => p.tenantId === tenant.id && p.kind === 'housekeeper')
+          .map(p => Math.max(0, CONFIG.HOUSEKEEPER_ROOMS_PER_DAY - (p.roomsCleanedToday ?? 0))) : undefined,
         housekeepingFloors: tenant.type === 'housekeeping' ? [...new Set(
           [...this.state.people.values()].filter(p => p.tenantId === tenant.id && p.kind === 'housekeeper' && p.activityTenantId >= 0 && p.state !== 'offscreen')
             .map(p => this.state.tenants.get(p.activityTenantId))

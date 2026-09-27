@@ -134,8 +134,10 @@ comparison scenarios before it can be considered equivalent.
   Active sources inside those distances impose a nonstacking 20-point daily
   evaluation penalty, shown in the inspector. The penalty strength and other
   noise pairs remain unverified; existing placement restrictions still apply.
-  Housekeeping floor assignments follow the PC reference; daily room quotas,
-  work timing and cleaning rates still need original-game comparison.
+  Housekeeping floor assignments follow the PC reference. Cleaners now have a
+  saved 19-completed-job allowance per operating day. Counting repeat cleanings
+  and all hotel types equally is provisional; quotas, work timing and cleaning
+  rates still need original-game comparison.
 - Normal games now start without a lobby. Drag construction builds a continuous
   lobby at $5,000 per cell, extendable from either edge. Existing saves and demo
   lobbies retain their width. Lobby maintenance is free at 1–2 stars, $300 per built cell per quarter

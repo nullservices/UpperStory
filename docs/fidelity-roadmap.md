@@ -84,8 +84,14 @@ still an explicit comparison gap.
 Housekeeping now skips hotels with guests inside and rechecks room occupancy and
 operating state before each cleaning step. A newly occupied or damaged room
 releases its assignment. This uses actual guest presence rather than cached
-occupancy and retains existing cleaning rates. The 19-room quota and shift-end
-rules are still pending reference verification.
+occupancy and retains existing cleaning rates. Each cleaner now has a saved
+19-completed-job allowance per operating day, shown in the housekeeping inspector.
+Only bringing a dirty room to 100% counts; cancelled, timed-out and already-clean
+jobs do not. Repeat cleanings consume additional jobs. Old saves start at zero;
+the next operating day resets the count. The value comes from the reported game
+help text and PC reference, but daily accounting and equal treatment of all hotel
+types are provisional interpretations, not recovered formulas. Shift-end rules
+still need verification.
 
 VIP incidents now retain cleanliness at first arrival, so later room turnover
 does not replace that observation in the cleanliness check. Stress, connectivity

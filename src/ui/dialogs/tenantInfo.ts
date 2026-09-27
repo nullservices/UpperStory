@@ -13,6 +13,7 @@ export interface TenantInfoData {
   /** People currently attached to the tenant. */
   occupancy: number;
   housekeepingFloors?: number[];
+  cleaningRemaining?: number[];
   housekeepingAccess?: HousekeepingAccess;
   lobbyUpkeepQuarter?: number;
   noiseSources?: { type: TenantType; x: number; gap: number; clearance: number }[];
@@ -208,6 +209,8 @@ export class TenantInfo {
         `${source.gap}/${source.clearance} cells clearance — needs ${source.clearance - source.gap} more`));
     }
     if (tenant.type === 'housekeeping') {
+      rows.push(this.line('Rooms remaining per cleaner', data.cleaningRemaining?.join(' · ') || 'Staff not yet available'));
+      rows.push(this.line('Daily limit', `${CONFIG.HOUSEKEEPER_ROOMS_PER_DAY} completed rooms per cleaner`));
       rows.push(this.line('Assigned floors', data.housekeepingFloors?.length ? data.housekeepingFloors.map(floorLabel).join(', ') : 'None'));
       rows.push(this.line('Assignments', 'One cleaner per floor from this office'));
       rows.push(this.line('Extra coverage', 'Build another office to share a floor'));

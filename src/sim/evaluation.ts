@@ -3,6 +3,7 @@ import { pushEvent } from './core/events';
 import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
 import { noisePenalty } from './noise';
+import { officeRentScoreAdjustment } from './money';
 
 /**
  * Daily tenant evaluation (JudgeT equivalent): grades from occupancy,
@@ -42,6 +43,10 @@ export function stepEvaluation(state: GameState): void {
     let score = 100 * ratio - avgStress * 0.6;
     tenant.noisePenalty = noisePenalty(state, tenant);
     score -= tenant.noisePenalty;
+    if (tenant.type === 'office') {
+      tenant.rentScoreAdjustment = officeRentScoreAdjustment(tenant);
+      score += tenant.rentScoreAdjustment;
+    }
     if (isHotel(tenant.type)) score -= (100 - tenant.cleanliness) * 0.5;
     if (hasSecurity) score += 5;
     if ([...state.tenants.values()].some(t => t.type === 'medical' && t.state === 'open' && Math.abs(t.floor - tenant.floor) <= 20)) score += 5;
@@ -71,8 +76,10 @@ export function stepEvaluation(state: GameState): void {
           tenant.daysGood++;
           tenant.daysVacant = 0;
         }
-        if (tenant.daysVacant >= CONFIG.EVAL_VACANCY_DAYS) {
+        const minimumTermComplete = tenant.type !== 'office' || state.tickCount >= (tenant.officeLeaseUntilTick ?? 0);
+        if (tenant.daysVacant >= CONFIG.EVAL_VACANCY_DAYS && minimumTermComplete) {
           tenant.state = 'vacant';
+          delete tenant.officeLeaseUntilTick;
           tenant.daysGood = 0;
           removeTenantPeople(state, tenant.id);
           pushEvent(state, {

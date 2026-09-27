@@ -360,6 +360,7 @@ export class Controller {
       {
         avgStress: occupancy > 0 ? stressSum / occupancy : 0,
         lobbyUpkeepQuarter: lobbyUpkeepQuarter(this.state.starLevel, tenant.sizeCells),
+        officeLeaseDaysRemaining: Math.max(0, (tenant.officeLeaseUntilTick ?? 0) - this.state.tickCount) / CONFIG.DAY_TICKS,
         noiseSources: noiseSources(this.state, tenant).map(source => {
           const room = this.state.tenants.get(source.tenantId)!;
           return { type: room.type, x: room.x, floor: room.floor, floorDistance: source.floorDistance, gap: source.gap, clearance: source.clearance };

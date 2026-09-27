@@ -110,8 +110,12 @@ comparison scenarios before it can be considered equivalent.
   Office rent is now player-selected in the inspector and collected in three
   exact daily installments per quarter, independent of grade. The documented
   average is $10,000; other tiers still use provisional pricing multipliers.
-  Rent-driven satisfaction and lease locking remain absent, so raising rent
-  currently adds income without an additional satisfaction penalty.
+  Workday evaluation now applies +20/+10/0/-20 points from very low through high
+  rent. These are provisional satisfaction adjustments. New office occupants
+  receive a saved three-day minimum term before dissatisfaction can evict them;
+  old saves without a timestamp receive no fresh grace period. The manual states
+  a one-quarter minimum, but elapsed-tick timing, renewal decisions and lease price
+  locking remain unverified. The inspector shows term remaining and rent effects.
   Hotel nightly baselines are derived from reference quarterly income, not a
   verified reproduction of original checkout accounting. Partial occupancy is
   proportional to guest count; pricing multipliers remain our own model.

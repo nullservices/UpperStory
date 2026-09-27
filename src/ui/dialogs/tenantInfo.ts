@@ -1,7 +1,7 @@
 import { configureDialog } from './accessibility';
 import type { HousekeepingAccess } from '../../sim/housekeepingAccess';
 import { hotelCheckoutCents } from '../../sim/hotelEconomy';
-import { officeQuarterRentCents } from '../../sim/money';
+import { officeQuarterRentCents, officeRentScoreAdjustment } from '../../sim/money';
 import { commercialOpeningMinute } from '../../sim/commercialPopulation';
 import { formatTimeOfDay } from '../../sim/time';
 import { CONFIG, TENANT_DATA, isHotel } from '../../data/config';
@@ -17,6 +17,7 @@ export interface TenantInfoData {
   cleaningRemaining?: number[];
   housekeepingAccess?: HousekeepingAccess;
   lobbyUpkeepQuarter?: number;
+  officeLeaseDaysRemaining?: number;
   noiseSources?: { type: TenantType; x: number; floor: number; floorDistance: number; gap: number; clearance: number }[];
 }
 
@@ -184,6 +185,11 @@ export class TenantInfo {
     if (tenant.type === 'office') {
       rows.push(this.line('Rent / quarter', `$${(officeQuarterRentCents(tenant) / 100).toLocaleString()}`));
       rows.push(this.line('Collection', tenant.state === 'open' ? 'Collected daily while occupied' : 'No rent until occupied'));
+      const adjustment = officeRentScoreAdjustment(tenant);
+      rows.push(this.line('Rent effect at next evaluation', `${adjustment > 0 ? '+' : ''}${adjustment} points`));
+      if (tenant.rentScoreAdjustment !== undefined) rows.push(this.line('Rent effect last evaluated', `${tenant.rentScoreAdjustment > 0 ? '+' : ''}${tenant.rentScoreAdjustment} points`));
+      if (tenant.state === 'open') rows.push(this.line('Minimum lease remaining', (data.officeLeaseDaysRemaining ?? 0) > 0
+        ? `${data.officeLeaseDaysRemaining!.toFixed(1)} days` : 'Complete; unhappy tenants may leave'));
     }
     const operatingCost = (TENANT_DATA[tenant.type] as { upkeepQuarter?: number }).upkeepQuarter;
     if (tenant.type === 'lobby') {

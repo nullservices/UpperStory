@@ -50,6 +50,11 @@ export function officeQuarterRentCents(tenant: Tenant): number {
   return Math.round(10_000_00 * CONFIG.PRICING_LEVELS[tenant.pricing].revenueMult);
 }
 
+/** Provisional satisfaction response, not a recovered SimTower formula. */
+export function officeRentScoreAdjustment(tenant: Tenant): number {
+  return [20, 10, 0, -20][tenant.pricing]!;
+}
+
 /** Dollars per quarter for built lobby cells at the current rating. */
 export function lobbyUpkeepQuarter(stars: number, cells: number): number {
   return cells * (stars >= 4 ? 1000 : stars === 3 ? 300 : 0);

@@ -33,6 +33,9 @@ export interface Tenant {
   grade: number;
   evalScore: number;
   noisePenalty?: number;
+  /** Minimum initial office tenancy; absent in older saves (no new grace period). */
+  officeLeaseUntilTick?: number;
+  rentScoreAdjustment?: number;
   daysVacant: number;
   daysGood: number;
   sold?: boolean;

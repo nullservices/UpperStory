@@ -114,6 +114,7 @@ function kindForTenant(type: keyof typeof TENANT_DATA): PersonKind | null {
 export function spawnTenantPeople(state: GameState, tenant: Tenant): void {
   const kind = kindForTenant(tenant.type);
   if (!kind) return;
+  if (tenant.type === 'office') tenant.officeLeaseUntilTick = state.tickCount + CONFIG.QUARTER_DAYS * CONFIG.DAY_TICKS;
   const schedule = CONFIG.SCHEDULES[kind];
   const now = state.calendar.minuteOfDay;
   let initialScheduleIndex = 0;

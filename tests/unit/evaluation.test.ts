@@ -24,6 +24,7 @@ describe('stepEvaluation', () => {
     spawnTenantPeople(state, office); // its workers exist…
     expect([...state.people.values()].filter((p) => p.tenantId === office.id)).toHaveLength(6);
 
+    state.tickCount = CONFIG.QUARTER_DAYS * CONFIG.DAY_TICKS;
     for (let i = 0; i < CONFIG.EVAL_VACANCY_DAYS; i++) stepEvaluation(state);
 
     expect(office.state).toBe('vacant');

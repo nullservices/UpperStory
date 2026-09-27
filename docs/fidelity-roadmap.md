@@ -95,7 +95,7 @@ for expected absence; vacant offices still advance their refill timer. Weekend
 office closure is described in historical gameplay accounts, including this
 [PC gameplay review](https://gamefaqs.gamespot.com/pc/565191-simtower/reviews/132369).
 Preserving evaluations is our implementation choice, not a recovered original
-formula. Lease lengths and move-out thresholds remain pending.
+formula. Exact renewal timing and move-out thresholds remain pending.
 Tests cover save/reload across weekend schedule entries, weekday resumption,
 grade retention and vacant-unit accounting.
 
@@ -105,10 +105,22 @@ three daily installments sum exactly to the quarterly amount. Average rent is
 $10,000 per the PC reference. The other tiers ($6,000/$8,000/$13,500) reuse our
 existing pricing multipliers and are provisional, not original values. Existing
 saves retain their pricing level. Vacant, damaged and unfinished offices earn
-no rent. Rent changes apply to subsequent settlements; lease locking and
-rent-driven satisfaction/demand are not implemented yet, so high rent currently
-has no additional dissatisfaction cost. Tests cover every tier, cent rounding,
+no rent. Rent changes apply to subsequent settlements. Tests cover every tier, cent rounding,
 grade independence, nonpaying states and saved selections.
+
+New office occupants now receive a minimum three-simulation-day term, starting
+when they are spawned after completion or repopulation. This follows the manual's
+one-quarter minimum, but the elapsed-tick interpretation is provisional. Daily
+evaluation still records dissatisfaction during that term; eviction waits until
+it expires. Weekends do not extend the term. Older saves without a lease timestamp
+receive no new grace period. Repairs that respawn occupants start a new term.
+Rent adjusts workday evaluation by +20/+10/0/-20 points from very low to high.
+These values are tuning approximations, not recovered formulas; lowering rent can
+clear a bad-grade streak at the next evaluation. The inspector shows the next
+rent effect, last evaluated effect and remaining minimum term. Tests cover the
+expiry boundary, recovery, replacement tenants, weekends and save compatibility.
+Quarterly renewal decisions, original rent tiers, lease price locking and original
+move-out thresholds remain unverified; this is not the complete original lease model.
 
 Noise now includes fast food, restaurants, shops and cinemas disturbing offices,
 and those businesses plus offices disturbing condos and hotel rooms. The existing

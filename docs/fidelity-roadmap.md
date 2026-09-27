@@ -73,6 +73,12 @@ cover stale walk targets, release from an earlier car, and save/reload. This
 extends the existing give-up policy; original demolition consequences still need
 comparison.
 
+Stair and escalator demolition now also cancels unfinished dependent journeys.
+An occupied connection rejects removal before any passenger or tile changes.
+Completed route legs and adjacent escalators sharing a landing are preserved.
+These are construction safety improvements; original-game demolition policy is
+still an explicit comparison gap.
+
 ## Work beyond elevators
 
 The facility catalogue exists. The remaining scope is primarily behavioral

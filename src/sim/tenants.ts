@@ -3,7 +3,8 @@ import { pushEvent } from './core/events';
 import { nextId } from './core/ids';
 import { demolishElevatorGroup, groupAt } from './elevators';
 import { spend } from './money';
-import { removeTenantPeople, spawnTenantPeople } from './people';
+import { giveUp, removeTenantPeople, spawnTenantPeople } from './people';
+import type { RouteLeg } from './routing';
 import type { GameState } from './state';
 import { demolishFloor, getFloor, topFloorIndex, floorContains, floorBounds, trimFloor } from './tower';
 
@@ -233,11 +234,17 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
   state.tower.structureRevision++;
 }
 
-/**
- * Composite demolish command used by the UI tool: tenants first, then stair
- * cells, then empty upper-floor edges or whole empty outermost floors.
- * Throws Error(reason) when nothing applies.
- */
+/** Validate occupancy before cancelling any route dependent on a connection. */
+function cancelConnectionTrips(state: GameState, matches: (leg: RouteLeg) => boolean): void {
+  const affected = [...state.people.values()].filter(p => p.route?.slice(p.legIndex).some(matches));
+  if (affected.some(p => (p.state === 'onStairs' || p.state === 'onEscalator') &&
+      p.route?.[p.legIndex] && matches(p.route[p.legIndex]!))) {
+    throw new Error('Wait for people to leave this connection before demolishing it');
+  }
+  for (const p of affected) giveUp(state, p);
+}
+
+/** Demolish a tenant, transport connection or empty outermost floor section. */
 export function demolishAt(state: GameState, floorIndex: number, x: number): void {
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) throw new Error('Nothing to demolish here');
@@ -259,6 +266,8 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
   }
   if (cell.content === 'stair') {
     const anchor = cell.transportX ?? x;
+    cancelConnectionTrips(state, leg => leg.mode === 'stair' && leg.x === anchor &&
+      (leg.from === floorIndex || leg.to === floorIndex));
     for (let cx = anchor; cx < anchor + (cell.transportWidth ?? 1); cx++) floor.cells[cx] = { content: 'empty', tenantId: -1 };
     state.tower.structureRevision++;
     return;
@@ -274,6 +283,8 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
     // The escalator spans floor..floor+1; its key uses the lower floor.
     const keyFloor = state.escalators.has(`${floorIndex}:${x}`) ? floorIndex : floorIndex - 1;
     if (!state.escalators.has(`${keyFloor}:${x}`)) throw new Error('Nothing to demolish here');
+    cancelConnectionTrips(state, leg => leg.mode === 'escalator' && leg.x === x &&
+      Math.min(leg.from, leg.to) === keyFloor);
     state.escalators.delete(`${keyFloor}:${x}`);
     // Keep shared landing cells alive if another escalator still uses them.
     for (const f of [keyFloor, keyFloor + 1]) {

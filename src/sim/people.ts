@@ -69,6 +69,8 @@ export interface Person {
   dayTracked: number;
   /** Completed cleaning jobs this operating day; absent in older saves. */
   roomsCleanedToday?: number;
+  /** Operating day when the shift-end return was issued. */
+  housekeepingShiftEndedDay?: number;
   /** Activity timer while 'inTenant' (eating/shopping); 0 = none. */
   activityTicksLeft: number;
   /** The commercial tenant being patronized (-1 = none); pays on arrival. */
@@ -418,6 +420,11 @@ function arrive(state: GameState, p: Person): void {
     return;
   }
   if (p.endState === 'cleaning') {
+    if (state.calendar.minuteOfDay >= CONFIG.HOUSEKEEPER_LAST_START_MIN) {
+      p.activityTenantId = -1;
+      applyAction(state, p, 'goHome');
+      return;
+    }
     p.state = 'cleaning';
     p.stairsTicksLeft = CONFIG.CLEAN_TICKS;
   } else if (p.endState === 'offscreen') {
@@ -566,7 +573,8 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       return;
     }
     case 'goWork': {
-      if ((p.roomsCleanedToday ?? 0) >= CONFIG.HOUSEKEEPER_ROOMS_PER_DAY) {
+      if ((p.roomsCleanedToday ?? 0) >= CONFIG.HOUSEKEEPER_ROOMS_PER_DAY ||
+          state.calendar.minuteOfDay >= CONFIG.HOUSEKEEPER_LAST_START_MIN) {
         p.activityTenantId = -1;
         applyAction(state, p, 'goHome');
         return;
@@ -655,6 +663,17 @@ export function stepPeople(state: GameState): void {
       p.scheduleIndex = 0;
       p.scheduleDone = false;
       p.jitterTicks = rngInt(state, -CONFIG.ARRIVAL_JITTER_TICKS, CONFIG.ARRIVAL_JITTER_TICKS);
+    }
+    // Finish the current vertical leg before sending staff home. Walking and
+    // queued assignments can be redirected immediately without teleporting.
+    if (p.kind === 'housekeeper' && state.calendar.minuteOfDay >= CONFIG.HOUSEKEEPER_SHIFT_END_MIN &&
+        p.housekeepingShiftEndedDay !== day && !['riding', 'onStairs', 'onEscalator'].includes(p.state)) {
+      detachFromTransport(state, p.id);
+      p.activityTenantId = -1;
+      p.stairsTicksLeft = 0;
+      p.scheduleDone = true;
+      p.housekeepingShiftEndedDay = day;
+      applyAction(state, p, 'goHome');
     }
     switch (p.state) {
       case 'offscreen': {

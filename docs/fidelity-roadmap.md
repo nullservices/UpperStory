@@ -90,8 +90,16 @@ Only bringing a dirty room to 100% counts; cancelled, timed-out and already-clea
 jobs do not. Repeat cleanings consume additional jobs. Old saves start at zero;
 the next operating day resets the count. The value comes from the reported game
 help text and PC reference, but daily accounting and equal treatment of all hotel
-types are provisional interpretations, not recovered formulas. Shift-end rules
-still need verification.
+types are provisional interpretations, not recovered formulas.
+
+New cleaning jobs stop at 16:30; active cleaning ends at 17:00. Staff finish a
+current elevator/stair/escalator leg before taking a route home, without a failed
+trip penalty. Late arrivals at a room do not begin cleaning. Partial cleanliness
+and unused quota persist until the next day. The inspector displays the hours.
+These times follow [Brad Stuart's historical gameplay FAQ](https://gamefaqs.gamespot.com/mac/564236-simtower/faqs/2168),
+which covers Macintosh versions; PC 1.0 equivalence and exact in-transit behavior
+remain unverified. Tests cover both cutoff boundaries, partial work, saves during
+a return transition and the next morning's resumption.
 
 VIP incidents now retain cleanliness at first arrival, so later room turnover
 does not replace that observation in the cleanliness check. Stress, connectivity

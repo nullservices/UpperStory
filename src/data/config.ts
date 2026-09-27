@@ -113,7 +113,7 @@ export const CONFIG = {
       { atMin: 720, action: 'goWork' },
       { atMin: 840, action: 'goWork' },
       { atMin: 960, action: 'goWork' },
-      { atMin: 1080, action: 'goHome' },
+      { atMin: 1020, action: 'goHome' },
     ],
     hotelGuest: [{ atMin: 660, action: 'leave' }], // checkout 11:00 (next day)
     // Visitors (diner/shopper) have no schedule — they arrive already on a trip
@@ -158,6 +158,8 @@ export const CONFIG = {
   HOTEL_CLEAN_DECAY_PER_TICK: 0.02,
   HOUSEKEEPER_CLEAN_PER_TICK: 0.6,
   HOUSEKEEPER_ROOMS_PER_DAY: 19,
+  HOUSEKEEPER_LAST_START_MIN: 990,
+  HOUSEKEEPER_SHIFT_END_MIN: 1020,
   CLEAN_TICKS: 600,
   DIRTY_HOTEL_THRESHOLD: 30,
   DIRTY_HOTEL_STRESS_PER_TICK: 0.08,

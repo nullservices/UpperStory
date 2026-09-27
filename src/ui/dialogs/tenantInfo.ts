@@ -211,6 +211,7 @@ export class TenantInfo {
     if (tenant.type === 'housekeeping') {
       rows.push(this.line('Rooms remaining per cleaner', data.cleaningRemaining?.join(' · ') || 'Staff not yet available'));
       rows.push(this.line('Daily limit', `${CONFIG.HOUSEKEEPER_ROOMS_PER_DAY} completed rooms per cleaner`));
+      rows.push(this.line('Shift', 'Last room starts before 16:30 · return home at 17:00'));
       rows.push(this.line('Assigned floors', data.housekeepingFloors?.length ? data.housekeepingFloors.map(floorLabel).join(', ') : 'None'));
       rows.push(this.line('Assignments', 'One cleaner per floor from this office'));
       rows.push(this.line('Extra coverage', 'Build another office to share a floor'));

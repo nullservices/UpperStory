@@ -16,7 +16,7 @@ export interface TenantInfoData {
   cleaningRemaining?: number[];
   housekeepingAccess?: HousekeepingAccess;
   lobbyUpkeepQuarter?: number;
-  noiseSources?: { type: TenantType; x: number; gap: number; clearance: number }[];
+  noiseSources?: { type: TenantType; x: number; floor: number; floorDistance: number; gap: number; clearance: number }[];
 }
 
 /**
@@ -205,8 +205,8 @@ export class TenantInfo {
       rows.push(this.line('Full room / night', `$${(hotelCheckoutCents(tenant) * TENANT_DATA[tenant.type].capacity / 100).toLocaleString()}`));
     }
     for (const source of data.noiseSources ?? []) {
-      rows.push(this.line(`${tenantTypeName(source.type)} at cell ${source.x + 1}`,
-        `${source.gap}/${source.clearance} cells clearance — needs ${source.clearance - source.gap} more`));
+      rows.push(this.line(`${tenantTypeName(source.type)} · ${floorLabel(source.floor)} · cell ${source.x + 1}`,
+        `${source.floorDistance === 0 ? 'Same floor' : 'Neighboring floor'} · ${source.gap}/${source.clearance} cells horizontal clearance`));
     }
     if (tenant.type === 'housekeeping') {
       rows.push(this.line('Rooms remaining per cleaner', data.cleaningRemaining?.join(' · ') || 'Staff not yet available'));

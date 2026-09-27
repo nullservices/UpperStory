@@ -131,12 +131,15 @@ comparison scenarios before it can be considered equivalent.
   algorithm. Workers without an eligible destination take a break at the office.
   Noise evaluation covers offices near fast food, restaurants, shops and cinemas,
   plus condos and all hotel types near those businesses or offices. It uses
-  same-floor edge spacing: 11 cells for offices and 21 for residential rooms.
+  horizontal edge spacing: 11 cells for offices and 21 for residential rooms.
   Extending the original office/fast-food and hotel/office distances to these
   additional pairs is an approximation. Open sources impose a nonstacking
-  20-point daily evaluation penalty and appear in the inspector. Vertical noise,
-  source-specific distances and penalty strength remain unverified; existing
-  placement restrictions still apply.
+  20-point daily evaluation penalty and appear with their floor in the inspector.
+  Noise also reaches immediately neighboring floor bands, accounting for the
+  full height of cinemas. Above/below propagation follows the manual's description,
+  but the one-floor reach is provisional: a full intervening floor insulates
+  rooms in this model. Original radial falloff, source-specific distances and
+  penalty strength remain unverified; existing placement restrictions still apply.
   Housekeeping floor assignments follow the PC reference. Cleaners now have a
   saved 19-completed-job allowance per operating day. Counting repeat cleanings
   and all hotel types equally is provisional; quotas, work timing and cleaning

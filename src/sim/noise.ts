@@ -1,9 +1,9 @@
-import { isHotel } from '../data/config';
+import { facilityHeight, isHotel } from '../data/config';
 import type { Tenant } from './tenants';
 import type { GameState } from './state';
 
-/** Same-floor noise model. Generalized spacing and penalty are approximations. */
-export interface NoiseSource { tenantId: number; gap: number; clearance: number }
+/** Nearby-floor noise model. Reach, spacing and penalty are approximations. */
+export interface NoiseSource { tenantId: number; gap: number; clearance: number; floorDistance: number }
 
 export function noiseSources(state: GameState, tenant: Tenant): NoiseSource[] {
   const residential = tenant.type === 'condo' || isHotel(tenant.type);
@@ -13,9 +13,15 @@ export function noiseSources(state: GameState, tenant: Tenant): NoiseSource[] {
   for (const source of state.tenants.values()) {
     const commercial = ['fastfood', 'restaurant', 'shop', 'cinema'].includes(source.type);
     if ((!commercial && !(residential && source.type === 'office')) ||
-        source.id === tenant.id || source.state !== 'open' || source.floor !== tenant.floor) continue;
+        source.id === tenant.id || source.state !== 'open') continue;
+    const sourceTop = source.floor + facilityHeight(source.type) - 1;
+    const tenantTop = tenant.floor + facilityHeight(tenant.type) - 1;
+    const floorDistance = Math.max(source.floor - tenantTop, tenant.floor - sourceTop, 0);
+    // Include all occupied bands of multi-story venues and their neighbors.
+    // A full intervening floor currently insulates them; exact falloff is unknown.
+    if (floorDistance > 1) continue;
     const gap = Math.max(source.x - (tenant.x + tenant.sizeCells), tenant.x - (source.x + source.sizeCells), 0);
-    if (gap < clearance) sources.push({ tenantId: source.id, gap, clearance });
+    if (gap < clearance) sources.push({ tenantId: source.id, gap, clearance, floorDistance });
   }
   return sources;
 }

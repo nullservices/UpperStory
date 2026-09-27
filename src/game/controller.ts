@@ -362,7 +362,7 @@ export class Controller {
         lobbyUpkeepQuarter: lobbyUpkeepQuarter(this.state.starLevel, tenant.sizeCells),
         noiseSources: noiseSources(this.state, tenant).map(source => {
           const room = this.state.tenants.get(source.tenantId)!;
-          return { type: room.type, x: room.x, gap: source.gap, clearance: source.clearance };
+          return { type: room.type, x: room.x, floor: room.floor, floorDistance: source.floorDistance, gap: source.gap, clearance: source.clearance };
         }),
         occupancy,
         housekeepingAccess: housekeepingAccess(this.state, tenant),

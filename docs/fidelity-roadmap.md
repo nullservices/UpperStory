@@ -83,10 +83,13 @@ still an explicit comparison gap.
 
 Noise now includes fast food, restaurants, shops and cinemas disturbing offices,
 and those businesses plus offices disturbing condos and hotel rooms. The existing
-11/21-cell same-floor distances and nonstacking 20-point penalty are generalized
-approximations. Tests cover each pair, exact clearance boundaries, inactive
-sources and daily evaluation. Vertical propagation and per-source tuning remain
-pending; this does not close the noise fidelity item.
+11/21-cell horizontal distances and nonstacking 20-point penalty are generalized
+approximations. Noise reaches the same and immediately neighboring floor bands,
+including both occupied floors of a cinema. The inspector identifies the source
+floor. Tests cover each pair, horizontal and vertical boundaries, inactive
+sources and daily evaluation. One intervening floor currently blocks noise;
+original radial falloff and per-source tuning remain unverified, so this does
+not close the noise fidelity item.
 
 Housekeeping now skips hotels with guests inside and rechecks room occupancy and
 operating state before each cleaning step. A newly occupied or damaged room

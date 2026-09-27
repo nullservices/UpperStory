@@ -81,6 +81,7 @@ export function setCarHome(state: GameState, groupId: number, carId: number, flo
   if (!group || !car) throw new Error('Elevator car not found');
   if (floor === null || !group.stops.includes(floor)) throw new Error('Home floor must be a serviced stop');
   if (car.homeFloor === floor) return;
+  if (group.kind === 'express') throw new Error('Express elevator waiting floors cannot be reassigned');
   car.homeFloor = floor;
   car.homeReassignmentPending = Math.abs(car.y - floor) > 1e-9;
 }

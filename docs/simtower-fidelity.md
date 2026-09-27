@@ -189,6 +189,10 @@ Mixed routes now support one elevator ride plus a stair/escalator chain at those
 floors, with existing flight limits and direction rules. Route preference between
 two-elevator and mixed alternatives remains approximate.
 Pages 51–52 exclude security and housekeeping from standard and express elevators.
+Page 52 also prohibits express waiting-floor reassignment; the simulation rejects
+these edits and the editor disables the control. Existing saved assignments are
+preserved. The first serviced floor remains our default for new cars; that
+default has not been verified against the original.
 New staff routes use service cars, including at transfers; public passengers
 cannot use service cars. Already-planned trips in older saves still finish.
 Staff eligibility for stairs remains unverified and unchanged. Towers that relied

@@ -190,6 +190,10 @@ export class ElevatorEditor {
         row.home.dataset.stops = homeOptions;
       }
       row.home.value = car.homeFloor == null ? '' : String(car.homeFloor);
+      row.home.disabled = group.kind === 'express';
+      row.home.title = group.kind === 'express'
+        ? 'Express elevator waiting floors cannot be reassigned.'
+        : 'Where this car waits when idle.';
     }
     for (const [carId, row] of this.rowEls) {
       if (seen.has(carId)) continue;

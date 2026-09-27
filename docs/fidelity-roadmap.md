@@ -30,7 +30,11 @@ remain unverified. The original manual specifies only one elevator change per
 trip, so rejecting journeys that require two changes is intentional fidelity.
 
 Batch 2: the manual's fixed express-stop rule is enforced in the simulation and
-editor. Previously disabled express stops remain unchanged in old saves and can
+editor. Page 52's restriction on express waiting-floor edits is also enforced
+in both layers. Existing saved homes (including unassigned cars) are retained;
+new cars still start with the first serviced floor as home, an implementation
+choice whose original default remains unverified.
+Previously disabled express stops remain unchanged in old saves and can
 be restored, but cannot be disabled again. Regression coverage includes restored
 connectivity and both directions of the one-change limit. Mixed routes now join
 one elevator ride with a stair or escalator chain at a ground/sky lobby. They

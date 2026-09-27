@@ -92,8 +92,20 @@ vacant, damaged or enters repairs before settlement. The pending revenue and
 paid-visit counters clear once, so reopening cannot collect the same earnings
 again. Tests include save/reload and a completed condo sale followed by damage
 before the quarter report. This fixes internal accounting; original payment
-timing remains unverified. Condo sale-price selection, repurchase on departure
-and resale accounting remain pending; current condos still sell once for $150,000.
+timing remains unverified.
+
+Condo inspectors now offer asking-price selection before sale and after move-out,
+and lock it while owned even when residents are temporarily away. The original
+purchase price is saved and reversed on move-out or demolition, following manual
+page 53. Replacement occupants produce a new sale. Pending transactions survive
+demolition and saves, and refunds appear as negative sale income at settlement.
+Average price remains $150,000; other tiers reuse provisional multipliers.
+Occupied legacy condos use their former fixed $150,000 price for refunds;
+already-vacant legacy condos reopen for sale without a retroactive refund.
+Exact buyer timing, price-driven demand/satisfaction and immediate transaction
+timing remain comparison gaps. Damaged rooms retain ownership through repair;
+disaster-specific compensation is not established. Tests cover price locks,
+resale, refund amounts, demolition before/after payout and legacy saves.
 
 Office workers now skip weekend arrival, lunch and return-to-office schedule
 entries and resume on the next weekday. The departure entry remains available

@@ -86,6 +86,11 @@ export function deserializeGame(json: string): GameState {
     throw new Error('Save file is missing its state');
   }
   const state = envelope.state as GameState;
+  // Previous versions retained a permanent sold flag after condo move-outs.
+  // Reopen those vacant units for sale without imposing a retroactive refund.
+  for (const tenant of state.tenants.values()) {
+    if (tenant.type === 'condo' && tenant.state === 'vacant' && tenant.condoSaleCents === undefined) tenant.sold = false;
+  }
   if (envelope.version < 3) state.tower.lobbyHeight = 2;
   if (![1, 2, 3].includes(state.tower.lobbyHeight)) throw new Error('Invalid lobby height');
   if (envelope.version === 1) {

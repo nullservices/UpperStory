@@ -3,6 +3,7 @@ import { pushEvent } from './core/events';
 import { nextId } from './core/ids';
 import { demolishElevatorGroup, groupAt } from './elevators';
 import { spend } from './money';
+import { sellCondo, repurchaseCondo } from './condoEconomy';
 import { giveUp, removeTenantPeople, spawnTenantPeople } from './people';
 import type { RouteLeg } from './routing';
 import type { GameState } from './state';
@@ -39,6 +40,7 @@ export interface Tenant {
   daysVacant: number;
   daysGood: number;
   sold?: boolean;
+  condoSaleCents?: number;
   movieAge?: number;
   visitsToday?: number;
   paidExternalVisits?: number;
@@ -58,9 +60,10 @@ export function isUnlocked(state: GameState, type: TenantType): boolean {
 export function cyclePricing(state: GameState, tenantId: number): void {
   const tenant = state.tenants.get(tenantId);
   if (!tenant) throw new Error('Tenant not found');
-  if (tenant.type === 'lobby' || tenant.type === 'condo') {
+  if (tenant.type === 'lobby') {
     throw new Error('This tenant has no pricing levels');
   }
+  if (tenant.type === 'condo' && (tenant.sold || tenant.state === 'open')) throw new Error('Condo prices cannot change while owned');
   tenant.pricing = ((tenant.pricing + 1) % CONFIG.PRICING_LEVELS.length) as 0 | 1 | 2 | 3;
 }
 
@@ -202,7 +205,7 @@ export function placeTenant(
   return tenant;
 }
 
-/** Demolish the tenant occupying a cell. No refund (matches the original). */
+/** Demolish a room; condo owners recover their original purchase price. */
 export function demolishTenant(state: GameState, floorIndex: number, x: number): void {
   const tenant = getTenantAt(state, floorIndex, x);
   if (!tenant) throw new Error('Nothing to demolish here');
@@ -226,6 +229,9 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
     state.tower.structureRevision++;
     return;
   }
+  repurchaseCondo(tenant);
+  // Preserve unsettled transactions after deleting the room itself.
+  state.money.pendingRemovedRoomRevenue = (state.money.pendingRemovedRoomRevenue ?? 0) + tenant.dailyRevenue;
   removeTenantPeople(state, tenant.id);
   for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
     const floor = getFloor(state.tower, f)!;
@@ -328,7 +334,7 @@ export function stepConstruction(state: GameState): void {
     tenant.constructionTicksLeft--;
     if (tenant.constructionTicksLeft > 0) continue;
     tenant.state = 'open';
-    if (tenant.type === 'condo' && !tenant.sold) { tenant.dailyRevenue += 150_000_00; tenant.sold = true; }
+    sellCondo(tenant);
     for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
       const floor = getFloor(state.tower, f);
       if (!floor) continue;

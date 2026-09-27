@@ -10,6 +10,8 @@ import type { Tenant } from './tenants';
  * last tick of each in-game day.
  */
 export interface MoneyState {
+  /** Net earned revenue/refunds retained when a room is demolished before settlement. */
+  pendingRemovedRoomRevenue?: number;
   balanceCents: number;
   dailyIncomeCents: number;
   dailyUpkeepCents: number;
@@ -62,7 +64,8 @@ export function lobbyUpkeepQuarter(stars: number, cells: number): number {
 
 /** End-of-day settlement: rent, commercial revenue and facility upkeep. */
 export function stepDailySettlement(state: GameState, settledDay = state.calendar.day): void {
-  let income = 0;
+  let income = state.money.pendingRemovedRoomRevenue ?? 0;
+  delete state.money.pendingRemovedRoomRevenue;
   let upkeep = 0;
 
   for (const tenant of state.tenants.values()) {

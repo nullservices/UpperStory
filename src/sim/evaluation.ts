@@ -4,6 +4,7 @@ import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
 import { noisePenalty } from './noise';
 import { officeRentScoreAdjustment } from './money';
+import { sellCondo, repurchaseCondo } from './condoEconomy';
 
 /**
  * Daily tenant evaluation (JudgeT equivalent): grades from occupancy,
@@ -60,6 +61,7 @@ export function stepEvaluation(state: GameState): void {
         tenant.daysGood++;
         if (tenant.daysGood >= CONFIG.EVAL_REPOPULATE_DAYS) {
           tenant.state = 'open';
+          sellCondo(tenant);
           tenant.daysGood = 0;
           tenant.daysVacant = 0;
           spawnTenantPeople(state, tenant);
@@ -79,6 +81,7 @@ export function stepEvaluation(state: GameState): void {
         const minimumTermComplete = tenant.type !== 'office' || state.tickCount >= (tenant.officeLeaseUntilTick ?? 0);
         if (tenant.daysVacant >= CONFIG.EVAL_VACANCY_DAYS && minimumTermComplete) {
           tenant.state = 'vacant';
+          repurchaseCondo(tenant);
           delete tenant.officeLeaseUntilTick;
           tenant.daysGood = 0;
           removeTenantPeople(state, tenant.id);

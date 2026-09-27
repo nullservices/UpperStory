@@ -16,6 +16,7 @@ economic comparisons have not been completed.
 | Hotel income | Single/twin/suite full-room baselines of $2k/$3k/$6k per night; guest shares paid at checkout with the selected pricing multiplier |
 | Commercial population | Fast food, shops and restaurants update at opening from preceding external visits; office lunch visits earn revenue without counting twice in population |
 | Economy | One-time condo sales, office rent, guest and visitor revenue, service upkeep, parking fees and film replacement |
+| Condo ownership | Select asking price before sale; lock while owned; reverse original sale on move-out/demolition; sell again to replacement occupants |
 | Progression | Population and facility gates, VIP approval, connected metro and the final cathedral wedding |
 | Incidents | Fire, bomb threats, infestation, VIP visits, excavation treasure, rain and debt notifications; responses, damage and repair |
 | Clock | Date changes and daily settlement at midnight; schedule cycles reset at 07:00 |

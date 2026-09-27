@@ -129,11 +129,14 @@ comparison scenarios before it can be considered equivalent.
   subject to available capacity. The nonparticipating worker is chosen by stable
   roster order; destination selection remains random, not a recovered original
   algorithm. Workers without an eligible destination take a break at the office.
-  Noise evaluation now covers same-floor office/fast-food spacing (11 cells)
-  and all hotel types near offices (21 cells), measured between room edges.
-  Active sources inside those distances impose a nonstacking 20-point daily
-  evaluation penalty, shown in the inspector. The penalty strength and other
-  noise pairs remain unverified; existing placement restrictions still apply.
+  Noise evaluation covers offices near fast food, restaurants, shops and cinemas,
+  plus condos and all hotel types near those businesses or offices. It uses
+  same-floor edge spacing: 11 cells for offices and 21 for residential rooms.
+  Extending the original office/fast-food and hotel/office distances to these
+  additional pairs is an approximation. Open sources impose a nonstacking
+  20-point daily evaluation penalty and appear in the inspector. Vertical noise,
+  source-specific distances and penalty strength remain unverified; existing
+  placement restrictions still apply.
   Housekeeping floor assignments follow the PC reference. Cleaners now have a
   saved 19-completed-job allowance per operating day. Counting repeat cleanings
   and all hotel types equally is provisional; quotas, work timing and cleaning

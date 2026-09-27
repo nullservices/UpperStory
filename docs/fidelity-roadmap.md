@@ -81,6 +81,13 @@ still an explicit comparison gap.
 
 ## Work beyond elevators
 
+Noise now includes fast food, restaurants, shops and cinemas disturbing offices,
+and those businesses plus offices disturbing condos and hotel rooms. The existing
+11/21-cell same-floor distances and nonstacking 20-point penalty are generalized
+approximations. Tests cover each pair, exact clearance boundaries, inactive
+sources and daily evaluation. Vertical propagation and per-source tuning remain
+pending; this does not close the noise fidelity item.
+
 Housekeeping now skips hotels with guests inside and rechecks room occupancy and
 operating state before each cleaning step. A newly occupied or damaged room
 releases its assignment. This uses actual guest presence rather than cached

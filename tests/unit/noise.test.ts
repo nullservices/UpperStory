@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { newTestGame } from '../helpers/simHarness';
 import { buildFloor, placeTenant, stepEvaluation } from '../../src/sim';
 import { noisePenalty, noiseSources } from '../../src/sim/noise';
+import type { TenantType } from '../../src/sim';
 
 it('uses edge spacing and clears office noise at eleven cells', () => {
   const state = newTestGame(); buildFloor(state, 2);
@@ -15,6 +16,35 @@ it('uses edge spacing and clears office noise at eleven cells', () => {
   food.x++;
   expect(noisePenalty(state, office)).toBe(0);
   stepEvaluation(state); expect(office.evalScore).toBe(100);
+});
+
+for (const receiver of ['office', 'condo', 'hotel', 'hotelTwin', 'hotelSuite'] as const) {
+  it.each(['fastfood', 'restaurant', 'shop', 'cinema'] satisfies TenantType[])(`${receiver} reacts to nearby %s without stacking complaints`, sourceType => {
+    const state = newTestGame(); state.starLevel = 5; buildFloor(state, 2);
+    // Use a valid separated layout, then exercise distance evaluation directly.
+    const tenant = placeTenant(state, receiver, 2, 20); tenant.state = 'open';
+    const source = placeTenant(state, 'fastfood', 2, 100); source.state = 'open'; source.type = sourceType;
+    const clearance = receiver === 'office' ? 11 : 21;
+    source.x = tenant.x + tenant.sizeCells + clearance - 1;
+    expect(noiseSources(state, tenant)).toEqual([{ tenantId: source.id, gap: clearance - 1, clearance }]);
+    const duplicate = { ...source, id: 999 };
+    state.tenants.set(duplicate.id, duplicate);
+    expect(noisePenalty(state, tenant)).toBe(20);
+    source.x++; duplicate.x++;
+    expect(noisePenalty(state, tenant)).toBe(0);
+    source.x--; source.state = 'damaged';
+    expect(noisePenalty(state, tenant)).toBe(0);
+  });
+}
+
+it('condos react to offices, while offices do not complain about other offices', () => {
+  const state = newTestGame(); state.starLevel = 5; buildFloor(state, 2);
+  const condo = placeTenant(state, 'condo', 2, 20); condo.state = 'open';
+  const office = placeTenant(state, 'office', 2, 70); office.state = 'open';
+  office.x = condo.x + condo.sizeCells + 20;
+  expect(noisePenalty(state, condo)).toBe(20);
+  expect(noisePenalty(state, office)).toBe(0);
+  stepEvaluation(state); expect(condo.noisePenalty).toBe(20);
 });
 
 it.each(['hotel', 'hotelTwin', 'hotelSuite'] as const)('requires twenty-one cells between %s and an office', type => {

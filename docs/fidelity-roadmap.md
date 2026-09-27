@@ -81,6 +81,18 @@ still an explicit comparison gap.
 
 ## Work beyond elevators
 
+Housekeeping now skips hotels with guests inside and rechecks room occupancy and
+operating state before each cleaning step. A newly occupied or damaged room
+releases its assignment. This uses actual guest presence rather than cached
+occupancy and retains existing cleaning rates. The 19-room quota and shift-end
+rules are still pending reference verification.
+
+VIP incidents now retain cleanliness at first arrival, so later room turnover
+does not replace that observation in the cleanliness check. Stress, connectivity
+and grade checks remain. Old incidents without an arrival observation fall back
+to current cleanliness. This evaluation adjustment is an implementation choice,
+not a recovered original formula.
+
 The facility catalogue exists. The remaining scope is primarily behavioral
 accuracy and validation, with some missing features identified below.
 

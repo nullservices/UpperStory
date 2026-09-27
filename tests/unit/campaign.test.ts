@@ -94,12 +94,14 @@ describe('incidents and recovery', () => {
   });
   it('requires a real successful VIP stay rather than an open suite alone', () => {
     const state = fixture(); const suite = placeTenant(state, 'hotelSuite', 2, 30); tickN(state, 2200);
+    suite.cleanliness = 100; // The successful-stay scenario starts with a prepared suite.
     const visit = startIncident(state, 'vip', suite.id);
     expect(visit.personId).toBeDefined();
     expect(state.people.get(visit.personId!)!.vip).toBe(true);
     placeTenant(state, 'housekeeping', 2, 60);
     tickN(state, CONFIG.DAY_TICKS);
     expect(visit.stayed).toBe(true);
+    expect(visit.arrivalCleanliness).toBeGreaterThanOrEqual(70);
     expect(state.campaign.vipApproved).toBe(true);
   });
   it('rejects a VIP stay when the suite has no route from the entrance', () => {

@@ -12,6 +12,8 @@ export interface Incident {
   id: number;
   personId?: number;
   stayed?: boolean;
+  /** Room condition when the VIP first reaches the suite; absent in old saves. */
+  arrivalCleanliness?: number;
   stress?: number;
   kind: IncidentKind;
   tenantId: number;
@@ -97,7 +99,10 @@ export function stepCampaign(state: GameState): void {
     const tenant = state.tenants.get(incident.tenantId);
     const vip = incident.personId === undefined ? undefined : state.people.get(incident.personId);
     if (vip) {
-      incident.stayed ||= vip.state === 'inTenant';
+      if (vip.state === 'inTenant' && tenant) {
+        incident.arrivalCleanliness ??= tenant.cleanliness;
+        incident.stayed = true;
+      }
       incident.stress = Math.max(incident.stress ?? 0, vip.stress + vip.failedTripsToday * 50);
     }
     let result: string | null = null;
@@ -111,7 +116,7 @@ export function stepCampaign(state: GameState): void {
       if (incident.kind === 'vip') {
         const guests = [...state.people.values()].filter(p => p.tenantId === tenant.id);
         const connected = pickupRoute(state, 1, tenant.floor, 'hotelGuest') !== null;
-        const happy = incident.stayed === true && (incident.stress ?? 0) < 50 && connected && tenant.cleanliness >= 70 && tenant.grade >= 2 && guests.every(p => p.stress < 50 && p.failedTripsToday === 0);
+        const happy = incident.stayed === true && (incident.stress ?? 0) < 50 && connected && (incident.arrivalCleanliness ?? tenant.cleanliness) >= 70 && tenant.grade >= 2 && guests.every(p => p.stress < 50 && p.failedTripsToday === 0);
         c.vipApproved ||= happy;
         result = happy ? 'The VIP approved your tower. A favorable inspection is recorded.' : 'The VIP was disappointed. Improve suite cleanliness, access and service before the next visit.';
       } else {

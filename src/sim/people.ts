@@ -474,6 +474,11 @@ export function giveUp(state: GameState, p: Person): void {
 
 // --- Schedule action handlers ---
 
+function hotelHasGuestInside(state: GameState, hotelId: number): boolean {
+  return [...state.people.values()].some(p => p.kind === 'hotelGuest' &&
+    p.tenantId === hotelId && p.state === 'inTenant');
+}
+
 function applyAction(state: GameState, p: Person, action: ScheduleAction): void {
   switch (action) {
     case 'gotoOffice': {
@@ -563,7 +568,7 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       // Other offices may help on that floor, but never in the same room.
       let dirtiest: Tenant | null = null;
       for (const t of state.tenants.values()) {
-        if (!isHotel(t.type) || t.state !== 'open') continue;
+        if (!isHotel(t.type) || t.state !== 'open' || hotelHasGuestInside(state, t.id)) continue;
         if ([...state.people.values()].some(other => {
           if (other.id === p.id || other.kind !== 'housekeeper' || other.activityTenantId < 0 || other.state === 'offscreen') return false;
           const assigned = state.tenants.get(other.activityTenantId);
@@ -731,13 +736,14 @@ export function stepPeople(state: GameState): void {
       case 'cleaning': {
         p.stairsTicksLeft--;
         const hotel = state.tenants.get(p.activityTenantId);
-        if (hotel && isHotel(hotel.type)) {
+        const canClean = hotel && isHotel(hotel.type) && hotel.state === 'open' && !hotelHasGuestInside(state, hotel.id);
+        if (canClean) {
           hotel.cleanliness = Math.min(
             100,
             hotel.cleanliness + CONFIG.HOUSEKEEPER_CLEAN_PER_TICK,
           );
         }
-        if (p.stairsTicksLeft <= 0 || !hotel || hotel.state !== 'open' || hotel.cleanliness >= 100) {
+        if (p.stairsTicksLeft <= 0 || !canClean || hotel.cleanliness >= 100) {
           p.state = 'inTenant';
           p.stairsTicksLeft = 0;
           p.activityTenantId = -1;

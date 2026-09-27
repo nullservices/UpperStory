@@ -27,6 +27,9 @@ export function stepEvaluation(state: GameState): void {
   for (const tenant of state.tenants.values()) {
     if (tenant.type === 'lobby' || (tenant.state === 'constructing' || tenant.state === 'damaged')) continue;
     if (tenant.capacity <= 0) continue;
+    // Weekend absence is expected, not a failed commute. Retain the last
+    // workday grade and dissatisfaction streak; vacant units still refill.
+    if (tenant.type === 'office' && tenant.state === 'open' && state.calendar.day % 3 === 0) continue;
 
     // Condos grade on stress (residents are home most of the day); offices
     // grade on actual presence at the 15:00 evaluation.

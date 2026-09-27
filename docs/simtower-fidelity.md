@@ -129,6 +129,10 @@ comparison scenarios before it can be considered equivalent.
   subject to available capacity. The nonparticipating worker is chosen by stable
   roster order; destination selection remains random, not a recovered original
   algorithm. Workers without an eligible destination take a break at the office.
+  Office workers take weekends off and resume their commute the next weekday.
+  Open offices retain their previous grade and dissatisfaction streak on weekends;
+  vacant office refill timers continue. This avoids grading expected absence as
+  a failed commute, but is not a recovered original evaluation formula.
   Noise evaluation covers offices near fast food, restaurants, shops and cinemas,
   plus condos and all hotel types near those businesses or offices. It uses
   horizontal edge spacing: 11 cells for offices and 21 for residential rooms.

@@ -87,6 +87,18 @@ still an explicit comparison gap.
 
 ## Work beyond elevators
 
+Office workers now skip weekend arrival, lunch and return-to-office schedule
+entries and resume on the next weekday. The departure entry remains available
+for workers already inside in older saves. Open offices retain their last
+workday grade and dissatisfaction streak over the weekend, avoiding a penalty
+for expected absence; vacant offices still advance their refill timer. Weekend
+office closure is described in historical gameplay accounts, including this
+[PC gameplay review](https://gamefaqs.gamespot.com/pc/565191-simtower/reviews/132369).
+Preserving evaluations is our implementation choice, not a recovered original
+formula. Lease lengths, rent selection and move-out thresholds remain pending.
+Tests cover save/reload across weekend schedule entries, weekday resumption,
+grade retention and vacant-unit accounting.
+
 Noise now includes fast food, restaurants, shops and cinemas disturbing offices,
 and those businesses plus offices disturbing condos and hotel rooms. The existing
 11/21-cell horizontal distances and nonstacking 20-point penalty are generalized

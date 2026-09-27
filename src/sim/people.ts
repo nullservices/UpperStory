@@ -339,6 +339,8 @@ function scheduleCheck(state: GameState, p: Person): ScheduleAction | null {
   if (state.calendar.minuteOfDay < entry.atMin + p.jitterTicks) return null;
   p.scheduleIndex = (p.scheduleIndex + 1) % schedule.length;
   if (p.scheduleIndex === 0) p.scheduleDone = true; // day's entries exhausted
+  // Keep the departure entry so workers already inside in older saves can leave.
+  if (p.kind === 'officeWorker' && operatingDay(state) % 3 === 0 && entry.action !== 'goHome') return null;
   return entry.action;
 }
 

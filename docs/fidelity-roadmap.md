@@ -87,6 +87,14 @@ still an explicit comparison gap.
 
 ## Work beyond elevators
 
+Daily settlement now collects previously earned revenue even if a room becomes
+vacant, damaged or enters repairs before settlement. The pending revenue and
+paid-visit counters clear once, so reopening cannot collect the same earnings
+again. Tests include save/reload and a completed condo sale followed by damage
+before the quarter report. This fixes internal accounting; original payment
+timing remains unverified. Condo sale-price selection, repurchase on departure
+and resale accounting remain pending; current condos still sell once for $150,000.
+
 Office workers now skip weekend arrival, lunch and return-to-office schedule
 entries and resume on the next weekday. The departure entry remains available
 for workers already inside in older saves. Open offices retain their last

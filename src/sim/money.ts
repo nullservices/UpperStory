@@ -66,6 +66,12 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
   let upkeep = 0;
 
   for (const tenant of state.tenants.values()) {
+    // Earned sales survive closure, vacancy and repair. Only new rent/upkeep
+    // depends on the room's operating state at settlement.
+    income += tenant.dailyRevenue;
+    tenant.dailyRevenue = 0;
+    tenant.paidExternalVisits = 0;
+    tenant.paidOfficeVisits = 0;
     if (tenant.state !== 'open') continue;
     if (tenant.type === 'office') {
       income += quarterlyShare(officeQuarterRentCents(tenant), settledDay);
@@ -83,11 +89,6 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
     }
     if (tenant.type === 'cinema') tenant.movieAge = (tenant.movieAge ?? 0) + 1;
     if (tenant.type === 'parkingSpace' && [...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === tenant.floor && t.state === 'open')) income += 5000;
-    // Meals, shop sales and hotel nights accumulate here during the day.
-    income += tenant.dailyRevenue;
-    tenant.dailyRevenue = 0;
-    tenant.paidExternalVisits = 0;
-    tenant.paidOfficeVisits = 0;
   }
 
   upkeep += state.escalators.size * quarterlyShare(5000_00, settledDay);

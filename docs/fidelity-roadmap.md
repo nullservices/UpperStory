@@ -95,9 +95,20 @@ for expected absence; vacant offices still advance their refill timer. Weekend
 office closure is described in historical gameplay accounts, including this
 [PC gameplay review](https://gamefaqs.gamespot.com/pc/565191-simtower/reviews/132369).
 Preserving evaluations is our implementation choice, not a recovered original
-formula. Lease lengths, rent selection and move-out thresholds remain pending.
+formula. Lease lengths and move-out thresholds remain pending.
 Tests cover save/reload across weekend schedule entries, weekday resumption,
 grade retention and vacant-unit accounting.
+
+Office inspectors now offer rent selection and show the quarterly amount.
+Occupied offices collect the selected rent rather than a grade multiplier;
+three daily installments sum exactly to the quarterly amount. Average rent is
+$10,000 per the PC reference. The other tiers ($6,000/$8,000/$13,500) reuse our
+existing pricing multipliers and are provisional, not original values. Existing
+saves retain their pricing level. Vacant, damaged and unfinished offices earn
+no rent. Rent changes apply to subsequent settlements; lease locking and
+rent-driven satisfaction/demand are not implemented yet, so high rent currently
+has no additional dissatisfaction cost. Tests cover every tier, cent rounding,
+grade independence, nonpaying states and saved selections.
 
 Noise now includes fast food, restaurants, shops and cinemas disturbing offices,
 and those businesses plus offices disturbing condos and hotel rooms. The existing

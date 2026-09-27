@@ -1,6 +1,7 @@
 import { configureDialog } from './accessibility';
 import type { HousekeepingAccess } from '../../sim/housekeepingAccess';
 import { hotelCheckoutCents } from '../../sim/hotelEconomy';
+import { officeQuarterRentCents } from '../../sim/money';
 import { commercialOpeningMinute } from '../../sim/commercialPopulation';
 import { formatTimeOfDay } from '../../sim/time';
 import { CONFIG, TENANT_DATA, isHotel } from '../../data/config';
@@ -180,6 +181,10 @@ export class TenantInfo {
     if (isPricable(tenant.type)) {
       rows.push(this.line('Pricing', CONFIG.PRICING_LEVELS[tenant.pricing]!.label));
     }
+    if (tenant.type === 'office') {
+      rows.push(this.line('Rent / quarter', `$${(officeQuarterRentCents(tenant) / 100).toLocaleString()}`));
+      rows.push(this.line('Collection', tenant.state === 'open' ? 'Collected daily while occupied' : 'No rent until occupied'));
+    }
     const operatingCost = (TENANT_DATA[tenant.type] as { upkeepQuarter?: number }).upkeepQuarter;
     if (tenant.type === 'lobby') {
       rows.push(this.line('Built width', `${tenant.sizeCells} cells`));
@@ -243,7 +248,7 @@ export class TenantInfo {
   private makePricingButton(): HTMLDivElement {
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;justify-content:flex-end;';
-    const btn = this.button('Change pricing');
+    const btn = this.button(this.tenant?.type === 'office' ? 'Change rent' : 'Change pricing');
     btn.style.color = C.accent;
     btn.title = 'Cycle: very low → low → average → high';
     btn.addEventListener('click', () => this.actions?.cyclePricing());
@@ -302,9 +307,9 @@ function stars(grade: number): string {
   return s;
 }
 
-/** cyclePricing() applies to every tenant type but the three static ones. */
+/** Rooms with player-adjustable rent or commercial prices. */
 function isPricable(type: TenantType): boolean {
-  return isHotel(type) || ['fastfood', 'restaurant', 'shop', 'cinema', 'partyHall'].includes(type);
+  return isHotel(type) || ['office', 'fastfood', 'restaurant', 'shop', 'cinema', 'partyHall'].includes(type);
 }
 
 function tenantTypeName(type: TenantType): string {

@@ -11,7 +11,7 @@ import {
 import { newTestGame } from '../helpers/simHarness';
 
 describe('daily settlement', () => {
-  it('collects grade-adjusted rents plus commercial revenue, pays upkeep', () => {
+  it('collects selected office rent plus commercial revenue, pays upkeep', () => {
     const state = newTestGame();
     buildFloor(state, 2);
     placeTenant(state, 'office', 2, 10);
@@ -29,7 +29,7 @@ describe('daily settlement', () => {
     stepDailySettlement(state);
 
     const expectedIncome =
-      Math.round(CONFIG.OFFICE_RENT_DAILY_DOLLARS * 100 * rentMultiplier(3)) +
+      Math.floor(10_000_00 / 3) +
       Math.round(CONFIG.CONDO_RENT_DAILY_DOLLARS * 100 * rentMultiplier(4)) +
       5_000_00;
     expect(state.money.dailyIncomeCents).toBe(expectedIncome);

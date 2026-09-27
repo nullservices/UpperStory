@@ -23,7 +23,7 @@ export interface Tenant {
   /** People currently inside, refreshed every tick. */
   occupancy: number;
   capacity: number;
-  /** Pricing level index into CONFIG.PRICING_LEVELS (commercial only). */
+  /** Pricing level index into CONFIG.PRICING_LEVELS (office rent or commercial prices). */
   pricing: 0 | 1 | 2 | 3;
   /** 0..100 — hotels only; decays with occupancy, restored by housekeepers. */
   cleanliness: number;
@@ -51,11 +51,11 @@ export function isUnlocked(state: GameState, type: TenantType): boolean {
   return state.starLevel >= TENANT_DATA[type].unlockedAtStar;
 }
 
-/** Cycle a commercial tenant's pricing level (very low → low → avg → high). */
+/** Cycle office rent or commercial pricing (very low → low → avg → high). */
 export function cyclePricing(state: GameState, tenantId: number): void {
   const tenant = state.tenants.get(tenantId);
   if (!tenant) throw new Error('Tenant not found');
-  if (tenant.type === 'lobby' || tenant.type === 'office' || tenant.type === 'condo') {
+  if (tenant.type === 'lobby' || tenant.type === 'condo') {
     throw new Error('This tenant has no pricing levels');
   }
   tenant.pricing = ((tenant.pricing + 1) % CONFIG.PRICING_LEVELS.length) as 0 | 1 | 2 | 3;

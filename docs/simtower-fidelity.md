@@ -107,6 +107,11 @@ comparison scenarios before it can be considered equivalent.
   implementation choices pending original-game comparison.
 - Compare facility demand, rents, upkeep, staffing coverage, event probabilities
   and disaster response behavior against original gameplay.
+  Office rent is now player-selected in the inspector and collected in three
+  exact daily installments per quarter, independent of grade. The documented
+  average is $10,000; other tiers still use provisional pricing multipliers.
+  Rent-driven satisfaction and lease locking remain absent, so raising rent
+  currently adds income without an additional satisfaction penalty.
   Hotel nightly baselines are derived from reference quarterly income, not a
   verified reproduction of original checkout accounting. Partial occupancy is
   proportional to guest count; pricing multipliers remain our own model.

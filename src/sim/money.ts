@@ -1,6 +1,7 @@
 import { CONFIG, TENANT_DATA, type TenantTypeData } from '../data/config';
 import { pushEvent } from './core/events';
 import type { GameState } from './state';
+import type { Tenant } from './tenants';
 
 /**
  * Money is stored in integer cents (deterministic, no float drift) and
@@ -44,6 +45,11 @@ export function rentMultiplier(grade: number): number {
   return 0.4 + 0.15 * grade;
 }
 
+/** Average PC reference rent; other tiers use provisional pricing multipliers. */
+export function officeQuarterRentCents(tenant: Tenant): number {
+  return Math.round(10_000_00 * CONFIG.PRICING_LEVELS[tenant.pricing].revenueMult);
+}
+
 /** Dollars per quarter for built lobby cells at the current rating. */
 export function lobbyUpkeepQuarter(stars: number, cells: number): number {
   return cells * (stars >= 4 ? 1000 : stars === 3 ? 300 : 0);
@@ -57,9 +63,7 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
   for (const tenant of state.tenants.values()) {
     if (tenant.state !== 'open') continue;
     if (tenant.type === 'office') {
-      income += Math.round(
-        CONFIG.OFFICE_RENT_DAILY_DOLLARS * 100 * rentMultiplier(tenant.grade),
-      );
+      income += quarterlyShare(officeQuarterRentCents(tenant), settledDay);
     } else if (tenant.type === 'condo') {
       income += Math.round(
         CONFIG.CONDO_RENT_DAILY_DOLLARS * 100 * rentMultiplier(tenant.grade),

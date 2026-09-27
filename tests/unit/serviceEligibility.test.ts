@@ -5,10 +5,10 @@ import { spawnTenantPeople, stepPeople, type PersonKind } from '../../src/sim/pe
 import { stepElevators } from '../../src/sim/elevators';
 import { newTestGame, setClock } from '../helpers/simHarness';
 
-function fixture() {
+function fixture(kind: 'standard' | 'express' = 'standard') {
   const state = newTestGame(); state.starLevel = 5;
   for (let floor = 2; floor <= 5; floor++) buildFloor(state, floor);
-  const standard = placeElevatorGroup(state, 1, 5, 10);
+  const standard = placeElevatorGroup(state, 1, 5, 10, kind);
   rebuildRouting(state);
   return { state, standard };
 }
@@ -55,8 +55,8 @@ it('does not assign an unreachable hotel until a service shaft connects it', () 
   expect(staff.filter(p => p.activityTenantId === hotel.id)).toHaveLength(1);
 });
 
-it('finishes an existing standard-car staff trip loaded from an older save', () => {
-  const fixtureState = fixture();
+it.each(['standard', 'express'] as const)('finishes an existing %s-car staff trip loaded from an older save', kind => {
+  const fixtureState = fixture(kind);
   const { standard } = fixtureState;
   let state = fixtureState.state;
   const office = placeTenant(state, 'housekeeping', 5, 70);
@@ -73,4 +73,24 @@ it('finishes an existing standard-car staff trip loaded from an older save', () 
   }
   expect(state.people.get(p.id)).toMatchObject({ state: 'inTenant', pos: { floor: 5, x: 70 }, failedTripsToday: 0 });
   expect(pickupRoute(state, 5, 1, 'housekeeper')).toBeNull();
+});
+
+it.each(['housekeeper', 'guard'] as const)('%s cannot use express cars directly or in a sky-lobby transfer', kind => {
+  const state = newTestGame(); state.starLevel = 5;
+  state.money.balanceCents = 2_000_000_000;
+  for (let floor = 2; floor <= 20; floor++) buildFloor(state, floor);
+  placeTenant(state, 'skyLobby', 15, 44);
+  const express = placeElevatorGroup(state, 1, 20, 44, 'express');
+  placeElevatorGroup(state, 15, 20, 70, 'service');
+  rebuildRouting(state);
+  for (const [from, to] of [[1, 15], [15, 1], [1, 20], [20, 1]] as const) {
+    expect(pickupRoute(state, from, to, kind)).toBeNull();
+  }
+  for (const publicKind of ['officeWorker', 'resident', 'hotelGuest', 'diner', 'shopper'] as const) {
+    expect(pickupRoute(state, 1, 15, publicKind)?.[0]?.groupId).toBe(express.id);
+    expect(pickupRoute(state, 15, 1, publicKind)?.[0]?.groupId).toBe(express.id);
+  }
+  const service = placeElevatorGroup(state, 1, 20, 90, 'service');
+  rebuildRouting(state);
+  expect(pickupRoute(state, 1, 20, kind)?.[0]?.groupId).toBe(service.id);
 });

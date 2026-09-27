@@ -222,7 +222,7 @@ function servingGroups(
     if (!group) continue;
     // The manual excludes security and housekeeping from standard cars.
     // Express eligibility remains unchanged pending original-game comparison.
-    if (group.kind === 'express' || (group.kind === 'service' ? isStaff(kind) : !isStaff(kind))) {
+    if (group.kind === 'service' ? isStaff(kind) : !isStaff(kind)) {
       groups.push(group);
     }
   }

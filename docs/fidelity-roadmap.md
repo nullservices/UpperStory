@@ -42,8 +42,10 @@ excludes security and housekeeping staff from standard elevators and identifies
 service cars for infrastructure staff. New routes enforce that separation;
 existing saved journeys finish normally. Tests cover both staff roles, every
 public passenger kind, and housekeeping access gained by adding a service shaft.
-Staff use of express cars and stairs remains unchanged and unverified, as do
-route-choice priorities. Those comparisons remain before closing this batch.
+Page 52 also excludes staff from express cars. New direct and transfer routes
+enforce this restriction, while public riders retain express access and old
+staff journeys finish. Staff use of stairs and route-choice priorities remain
+unverified. Those comparisons remain before closing this batch.
 
 Hotel inspectors now distinguish missing operating housekeeping offices from
 missing routes, report how many offices can reach the floor, and show active

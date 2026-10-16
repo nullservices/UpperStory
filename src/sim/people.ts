@@ -1,10 +1,10 @@
-import { operatingDay } from './time';
+import { isWeekend, operatingDay } from './time';
 import { hotelCheckoutCents } from './hotelEconomy';
 import { recordCommercialVisit } from './commercialEconomy';
 import { CONFIG, TENANT_DATA, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { rngInt, rngNext } from './core/rng';
-import { joinQueue, leaveQueue, pressCall } from './queues';
+import { joinQueue, leaveQueue, pressCall, queueHead } from './queues';
 import { pickupRoute, type RouteLeg } from './routing';
 import type { GameState } from './state';
 import { patienceTicks } from './stress';
@@ -214,11 +214,13 @@ function capacityCounts(state: GameState): Map<number, number> {
   for (const person of state.people.values()) {
     const id = person.kind === 'hotelGuest' ? person.tenantId : person.activityTenantId;
     counts.set(id, (counts.get(id) ?? 0) + 1);
+    // Hotel guests at the pool also count against the pool's capacity.
+    if (person.kind === 'hotelGuest' && person.activityTenantId >= 0) counts.set(person.activityTenantId, (counts.get(person.activityTenantId) ?? 0) + 1);
   }
   patronCache.set(state, { tick: state.tickCount, counts });
   return counts;
 }
-function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): number | undefined {
+function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant, origin?: { floor: number; x: number }): number | undefined {
   if (state.people.size >= CONFIG.MAX_PEOPLE) return;
   const counts = capacityCounts(state);
   const open = (type: string): Tenant[] =>
@@ -235,6 +237,11 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
     if (eateries.length === 0) return;
     target = weightedPick(state, eateries);
     activityTicks = CONFIG.EAT_TICKS;
+  } else if (kind === 'shopper' && preferred) {
+    // Bank customers: a visit to one particular branch.
+    if ((counts.get(preferred.id) ?? 0) >= preferred.capacity) return;
+    target = preferred;
+    activityTicks = CONFIG.BANK_VISIT_TICKS;
   } else if (kind === 'shopper') {
     const shops = [...open('shop'), ...(state.calendar.minuteOfDay >= 720 ? open('cinema') : []), ...(state.calendar.minuteOfDay >= 1080 ? open('partyHall') : [])];
     if (shops.length === 0) return;
@@ -255,7 +262,7 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
     // Hotel guests with a checkout already passed today stay until tomorrow.
     scheduleDone: kind === 'hotelGuest',
     state: 'walking',
-    pos: { floor: CONFIG.LOBBY_FLOOR_INDEX, x: rngInt(state, 0, 10) },
+    pos: origin ? { ...origin } : { floor: CONFIG.LOBBY_FLOOR_INDEX, x: rngInt(state, 0, 10) },
     target: null,
     destination: tenantCenter(state, target.id),
     endState: 'inTenant',
@@ -278,8 +285,9 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant): n
   return id;
 }
 
-export function spawnVIP(state: GameState, tenant: Tenant): number | undefined {
-  const id = spawnVisitor(state, 'hotelGuest', tenant);
+/** A VIP arrives at the lobby, or at `origin` (a helipad) when given. */
+export function spawnVIP(state: GameState, tenant: Tenant, origin?: { floor: number; x: number }): number | undefined {
+  const id = spawnVisitor(state, 'hotelGuest', tenant, origin);
   const person = id === undefined ? undefined : state.people.get(id);
   if (person) person.vip = true;
   return id;
@@ -297,6 +305,13 @@ function spawnExternalVisitors(state: GameState): void {
       if (tenant.type !== 'fastfood' || tenant.state !== 'open' || tenant.externalDemand === undefined) continue;
       const due = Math.min(tenant.externalDemand, Math.floor((now - 720) / 60 * tenant.externalDemand) + 1);
       if ((tenant.externalArrivals ?? 0) < due) spawnVisitor(state, 'diner', tenant);
+    }
+  }
+  // Banks serve weekday customers during business hours, rain or shine.
+  if (!isWeekend(state) && now >= CONFIG.BANK_OPEN_MIN && now < CONFIG.BANK_CLOSE_MIN) {
+    for (const tenant of state.tenants.values()) {
+      if (tenant.type !== 'bank' || tenant.state !== 'open') continue;
+      if (rngNext(state) < CONFIG.BANK_CUSTOMER_RATE) spawnVisitor(state, 'shopper', tenant);
     }
   }
   if (state.campaign.weather === 'rain' && rngNext(state) < 0.5) return;
@@ -341,7 +356,7 @@ function scheduleCheck(state: GameState, p: Person): ScheduleAction | null {
   p.scheduleIndex = (p.scheduleIndex + 1) % schedule.length;
   if (p.scheduleIndex === 0) p.scheduleDone = true; // day's entries exhausted
   // Keep the departure entry so workers already inside in older saves can leave.
-  if (p.kind === 'officeWorker' && operatingDay(state) % 3 === 0 && entry.action !== 'goHome') return null;
+  if (p.kind === 'officeWorker' && isWeekend(state) && entry.action !== 'goHome') return null;
   return entry.action;
 }
 
@@ -350,10 +365,11 @@ function scheduleCheck(state: GameState, p: Person): ScheduleAction | null {
 function chargePatron(state: GameState, p: Person): void {
   const tenant = state.tenants.get(p.activityTenantId);
   if (!tenant) return;
-  if (recordCommercialVisit(tenant, p.kind === 'officeWorker', state.calendar.day)) return;
+  if (recordCommercialVisit(tenant, p.kind === 'officeWorker', operatingDay(state))) return;
   const pricing = CONFIG.PRICING_LEVELS[tenant.pricing]!;
   const base =
-    tenant.type === 'cinema' ? 25 : tenant.type === 'partyHall' ? 75 : tenant.type === 'fastfood'
+    tenant.type === 'bank' ? CONFIG.BANK_FEE_DOLLARS : tenant.type === 'rooftopPool' ? CONFIG.POOL_FEE_DOLLARS
+    : tenant.type === 'cinema' ? 25 : tenant.type === 'partyHall' ? 75 : tenant.type === 'fastfood'
       ? CONFIG.FASTFOOD_MEAL_DOLLARS
       : tenant.type === 'restaurant'
         ? CONFIG.RESTAURANT_MEAL_DOLLARS
@@ -363,6 +379,11 @@ function chargePatron(state: GameState, p: Person): void {
 }
 
 // --- Trip management ---
+
+/** Re-plan the rest of a journey from where the person now stands. */
+export function resumeTrip(state: GameState, p: Person): void {
+  beginTrip(state, p);
+}
 
 function beginTrip(state: GameState, p: Person): void {
   const dest = p.destination;
@@ -486,12 +507,35 @@ export function giveUp(state: GameState, p: Person): void {
 
 // --- Schedule action handlers ---
 
+/** Office worker ranks by id, built at most once per people step. */
+let officeRanks: Map<number, number> | null = null;
+
+/** Position of a worker in their office's id-ordered roster. */
+function officeRosterRank(state: GameState, p: Person): number {
+  if (!officeRanks) {
+    officeRanks = new Map();
+    const nextRank = new Map<number, number>();
+    const workers = [...state.people.values()].filter(other => other.kind === 'officeWorker').sort((a, b) => a.id - b.id);
+    for (const worker of workers) {
+      const rank = nextRank.get(worker.tenantId) ?? 0;
+      officeRanks.set(worker.id, rank);
+      nextRank.set(worker.tenantId, rank + 1);
+    }
+  }
+  return officeRanks.get(p.id) ?? 0;
+}
+
 function hotelHasGuestInside(state: GameState, hotelId: number): boolean {
   return [...state.people.values()].some(p => p.kind === 'hotelGuest' &&
     p.tenantId === hotelId && p.state === 'inTenant');
 }
 
 function applyAction(state: GameState, p: Person, action: ScheduleAction): void {
+  // A schedule call ends any pool visit in progress.
+  if ((p.kind === 'resident' || p.kind === 'hotelGuest') && p.activityTenantId >= 0) {
+    p.activityTenantId = -1;
+    p.activityTicksLeft = 0;
+  }
   switch (action) {
     case 'gotoOffice': {
       p.pos = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
@@ -528,10 +572,7 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       if (p.state === 'offscreen') return;
       // Five workers per six-person office buy weekday fast-food lunches.
       // Stable roster order keeps participation consistent across save/load.
-      const coworkers = [...state.people.values()]
-        .filter(other => other.kind === 'officeWorker' && other.tenantId === p.tenantId)
-        .sort((a, b) => a.id - b.id);
-      if (operatingDay(state) % 3 === 0 || coworkers.findIndex(other => other.id === p.id) % 6 === 5) return;
+      if (isWeekend(state) || officeRosterRank(state, p) % 6 === 5) return;
       const eateries = [...state.tenants.values()].filter(
         (t) =>
           t.type === 'fastfood' &&
@@ -584,14 +625,22 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       }
       // A housekeeping office sends at most one cleaner to each floor.
       // Other offices may help on that floor, but never in the same room.
+      // Gather occupied rooms and other cleaners' assignments in one pass.
+      const occupiedHotels = new Set<number>();
+      const claimedRooms = new Set<number>();
+      const claimedFloors = new Set<number>();
+      for (const other of state.people.values()) {
+        if (other.kind === 'hotelGuest' && other.state === 'inTenant') occupiedHotels.add(other.tenantId);
+        if (other.id === p.id || other.kind !== 'housekeeper' || other.activityTenantId < 0 || other.state === 'offscreen') continue;
+        const assigned = state.tenants.get(other.activityTenantId);
+        if (assigned?.state !== 'open') continue;
+        claimedRooms.add(assigned.id);
+        if (other.tenantId === p.tenantId) claimedFloors.add(assigned.floor);
+      }
       let dirtiest: Tenant | null = null;
       for (const t of state.tenants.values()) {
-        if (!isHotel(t.type) || t.state !== 'open' || hotelHasGuestInside(state, t.id)) continue;
-        if ([...state.people.values()].some(other => {
-          if (other.id === p.id || other.kind !== 'housekeeper' || other.activityTenantId < 0 || other.state === 'offscreen') return false;
-          const assigned = state.tenants.get(other.activityTenantId);
-          return assigned?.state === 'open' && (assigned.id === t.id || (other.tenantId === p.tenantId && assigned.floor === t.floor));
-        })) continue;
+        if (!isHotel(t.type) || t.state !== 'open' || occupiedHotels.has(t.id)) continue;
+        if (claimedRooms.has(t.id) || claimedFloors.has(t.floor)) continue;
         if (pickupRoute(state, p.pos.floor, t.floor, 'housekeeper') === null) continue;
         if (!dirtiest || t.cleanliness < dirtiest.cleanliness) dirtiest = t;
       }
@@ -612,6 +661,40 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
       p.endState = 'offscreen';
       beginTrip(state, p);
       return;
+    }
+  }
+}
+
+// --- Rooftop pool (Upper Story original) ---
+
+/** Residents and hotel guests swim in the evening, and all day at weekends. */
+function stepPoolVisits(state: GameState): void {
+  if (state.tickCount % CONFIG.POOL_CHECK_TICKS !== 0) return;
+  const now = state.calendar.minuteOfDay;
+  const opens = isWeekend(state) ? CONFIG.POOL_WEEKEND_START_MIN : CONFIG.POOL_EVENING_START_MIN;
+  if (now < opens || now >= CONFIG.POOL_CLOSE_MIN) return;
+  const pools: Tenant[] = [];
+  for (const t of state.tenants.values()) if (t.type === 'rooftopPool' && t.state === 'open') pools.push(t);
+  if (pools.length === 0) return;
+  const eligible: Person[] = [];
+  for (const p of state.people.values()) {
+    if ((p.kind === 'resident' || p.kind === 'hotelGuest') && !p.vip && p.state === 'inTenant' &&
+        p.activityTicksLeft === 0 && p.activityTenantId < 0) eligible.push(p);
+  }
+  if (eligible.length === 0) return;
+  const counts = capacityCounts(state);
+  for (const pool of pools) {
+    for (let i = 0; i < CONFIG.POOL_VISITORS_PER_CHECK; i++) {
+      if ((counts.get(pool.id) ?? 0) >= pool.capacity) break;
+      const p = eligible[rngInt(state, 0, eligible.length - 1)]!;
+      if (p.activityTenantId >= 0 || p.state !== 'inTenant') continue;
+      if (pickupRoute(state, p.pos.floor, pool.floor, p.kind) === null) continue;
+      p.destination = tenantCenter(state, pool.id);
+      p.endState = 'inTenant';
+      p.activityTicksLeft = CONFIG.POOL_VISIT_TICKS;
+      p.activityTenantId = pool.id;
+      counts.set(pool.id, (counts.get(pool.id) ?? 0) + 1);
+      beginTrip(state, p);
     }
   }
 }
@@ -654,7 +737,9 @@ function stepHotels(state: GameState): void {
 
 export function stepPeople(state: GameState): void {
   const day = operatingDay(state);
+  officeRanks = null; // rosters only change outside this step
   spawnExternalVisitors(state);
+  stepPoolVisits(state);
   stepHotels(state);
   for (const p of state.people.values()) {
     // Daily rollover: fresh stress counters, fresh arrival jitter, and the
@@ -689,11 +774,13 @@ export function stepPeople(state: GameState): void {
         if (p.activityTicksLeft > 0) {
           p.activityTicksLeft--;
           if (p.activityTicksLeft === 0) {
-            // Workers return to work; external customers leave the tower.
-            p.destination = p.kind === 'officeWorker'
+            // Workers return to work, residents and guests to their rooms
+            // (after a pool visit); external customers leave the tower.
+            const returnsHome = p.kind === 'officeWorker' || p.kind === 'resident' || p.kind === 'hotelGuest';
+            p.destination = returnsHome
               ? tenantCenter(state, p.tenantId)
               : { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
-            p.endState = p.kind === 'officeWorker' ? 'inTenant' : 'offscreen';
+            p.endState = returnsHome ? 'inTenant' : 'offscreen';
             p.activityTenantId = -1;
             beginTrip(state, p);
             break;
@@ -706,7 +793,8 @@ export function stepPeople(state: GameState): void {
       case 'walking': {
         if (!p.target) {
           continueTrip(state, p);
-          if (p.state !== 'walking') break;
+          // Departing visitors are deleted on arrival without changing state.
+          if (p.state !== 'walking' || !state.people.has(p.id)) break;
           if (!p.target) {
             arrive(state, p);
             break;
@@ -719,11 +807,9 @@ export function stepPeople(state: GameState): void {
           p.pos.x = target.x;
           const leg = p.route?.[p.legIndex];
           if (leg?.mode === 'elevator') {
-            const joined = joinQueue(state, p.id, leg.from, leg.dir > 0 ? 'up' : 'down');
-            if (!joined) {
-              giveUp(state, p);
-              break;
-            }
+            // A full hall queue leaves later arrivals waiting beside it; they
+            // join as places free up and give up only when patience runs out.
+            joinQueue(state, p.id, leg.from, leg.dir > 0 ? 'up' : 'down');
             pressCall(state, leg.from, leg.dir > 0 ? 'up' : 'down');
             p.state = 'waiting';
             p.waitTicks = 0;
@@ -745,6 +831,12 @@ export function stepPeople(state: GameState): void {
         break;
       }
       case 'waiting': {
+        const leg = p.route?.[p.legIndex];
+        // Overflow waiters retry on staggered ticks; rush hours hold thousands.
+        if (leg?.mode === 'elevator' && (state.tickCount + p.id) % 8 === 0) {
+          const dir = leg.dir > 0 ? 'up' : 'down';
+          if (!queueHead(state, leg.from, dir).includes(p.id) && joinQueue(state, p.id, leg.from, dir)) pressCall(state, leg.from, dir);
+        }
         p.waitTicks++;
         if (p.waitTicks > patienceTicks(p.stress)) giveUp(state, p);
         break;

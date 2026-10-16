@@ -84,6 +84,9 @@ describe('star progression', () => {
     placeTenant(state, 'cathedral', 97, 100).state = 'open';
     rebuildRouting(state);
     stepProgression(state); expect(state.starLevel).toBe(5);
+    expect(state.campaign.weddingBookedDay).toBeDefined();
+    // Offices empty out at the weekend; the booked wedding still goes ahead.
+    for (const id of [...state.people.keys()].slice(9_000)) state.people.delete(id);
     state.calendar.day = 3; state.calendar.minuteOfDay = 720;
     stepProgression(state);
     expect(state.starLevel).toBe(6);

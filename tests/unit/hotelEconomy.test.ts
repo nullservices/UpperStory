@@ -35,3 +35,19 @@ it('prices partial occupancy by guest share and applies the selected price level
   room.pricing = 0; expect(hotelCheckoutCents(room)).toBe(900_00);
   room.pricing = 3; expect(hotelCheckoutCents(room)).toBe(2025_00);
 });
+
+it('charges once when a departing guest steps off stairs onto the lobby exit', () => {
+  const state = newTestGame(); state.starLevel = 5;
+  buildFloor(state, 2); placeElevatorGroup(state, 1, 2, 10);
+  const room = placeTenant(state, 'hotel', 2, 20); room.state = 'open';
+  rebuildRouting(state);
+  state.tickCount++;
+  const id = spawnVIP(state, room)!;
+  const person = state.people.get(id)!; person.vip = false;
+  // A finished stair leg leaves the guest walking with no target at its column.
+  Object.assign(person, { state: 'walking', pos: { floor: 1, x: 0 }, target: null,
+    destination: { floor: 1, x: 0 }, endState: 'offscreen', route: [], legIndex: 0 });
+  stepPeople(state);
+  expect(state.people.has(id)).toBe(false);
+  expect(room.dailyRevenue).toBe(hotelCheckoutCents(room));
+});

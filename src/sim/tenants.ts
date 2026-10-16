@@ -1,13 +1,14 @@
-import { CONFIG, KINSOKU_FORBIDDEN, TENANT_DATA, facilityHeight, type TenantTypeData } from '../data/config';
+import { CONFIG, KINSOKU_FORBIDDEN, TENANT_DATA, facilityHeight, isRoofOnly, type TenantTypeData } from '../data/config';
 import { pushEvent } from './core/events';
 import { nextId } from './core/ids';
 import { demolishElevatorGroup, groupAt } from './elevators';
 import { spend } from './money';
-import { sellCondo, repurchaseCondo } from './condoEconomy';
+import { sellCondo, repurchaseCondo, condoHasAccess } from './condoEconomy';
+import { floorLabel } from './campaign';
 import { giveUp, removeTenantPeople, spawnTenantPeople } from './people';
 import type { RouteLeg } from './routing';
 import type { GameState } from './state';
-import { demolishFloor, getFloor, topFloorIndex, floorContains, floorBounds, trimFloor } from './tower';
+import { demolishFloor, getFloor, topFloorIndex, floorContains, floorBounds, trimFloor, stairLowerFloor } from './tower';
 
 export type TenantType = keyof typeof TENANT_DATA;
 export type TenantState = 'constructing' | 'open' | 'vacant' | 'damaged';
@@ -88,8 +89,9 @@ function kinsokuViolation(
 ): string | null {
   const check = (neighbor: Tenant | undefined): string | null => {
     if (!neighbor) return null;
+    // Either side's rule forbids the pairing.
     const forbidden =
-      KINSOKU_FORBIDDEN[type]?.includes(neighbor.type) ??
+      KINSOKU_FORBIDDEN[type]?.includes(neighbor.type) ||
       KINSOKU_FORBIDDEN[neighbor.type]?.includes(type);
     return forbidden ? `Not allowed next to a ${neighbor.type}` : null;
   };
@@ -114,13 +116,21 @@ export function placementError(
   if (!floor) return 'Build this floor first';
   if (!isUnlocked(state, type)) return `Requires ${data.unlockedAtStar}★`;
   if (data.floorRestriction !== undefined && floorIndex !== data.floorRestriction) {
-    return `Must be placed on floor ${data.floorRestriction}`;
+    return `Must be placed on ${floorLabel(data.floorRestriction)}`;
+  }
+  if (type === 'skyLobby' && !(CONFIG.SKY_LOBBY_FLOORS as readonly number[]).includes(floorIndex)) {
+    return 'Sky lobbies go on floors 15, 30, 45, 60, 75 and 90';
   }
   const existingLobby = type === 'lobby' ? [...state.tenants.values()].find(t => t.type === 'lobby') : undefined;
   if (existingLobby && x !== existingLobby.x - 1 && x !== existingLobby.x + existingLobby.sizeCells) return 'Extend the lobby from either edge';
   if (data.requiresFullFloor && x !== 0) return 'The lobby spans the whole floor';
   if (data.basementOnly && floorIndex + facilityHeight(type) - 1 > 0) return 'Build this facility entirely below ground';
   if (!data.basementOnly && type !== 'lobby' && floorIndex <= 0) return 'No tenants in the basement';
+  if (isRoofOnly(type)) {
+    if (floorIndex <= CONFIG.LOBBY_FLOOR_INDEX) return 'Build this on the roof of an upper floor';
+    const above = floorBounds(state, floorIndex + 1);
+    if (getFloor(state.tower, floorIndex + 1) && above.lo < x + data.sizeCells && above.hi > x) return 'Roof only: the floor above covers this spot';
+  }
   const sharedTypes = type === 'cinema' || type === 'partyHall' ? ['cinema', 'partyHall'] : ['fastfood', 'restaurant', 'shop'].includes(type) ? ['fastfood', 'restaurant', 'shop'] : null;
   if (sharedTypes) {
     const limit = sharedTypes[0] === 'cinema' ? 16 : 512;
@@ -212,8 +222,9 @@ export function demolishTenant(state: GameState, floorIndex: number, x: number):
   if (tenant.type === 'lobby') {
     if (x !== tenant.x && x !== tenant.x + tenant.sizeCells - 1) throw new Error('Trim the lobby from either edge');
     if (groupAt(state, floorIndex, x)) throw new Error('Remove the elevator before trimming its lobby');
-    const above = getFloor(state.tower, floorIndex + 1)?.cells[x];
-    if (above?.content === 'stair') throw new Error('Remove the stairs before trimming their lobby');
+    for (const landing of [floorIndex + 1, floorIndex - 1]) {
+      if (getFloor(state.tower, landing)?.cells[x]?.content === 'stair') throw new Error('Remove the stairs before trimming their lobby');
+    }
     for (const key of state.escalators.keys()) {
       const [lower, anchor] = key.split(':').map(Number) as [number, number];
       if (lower !== floorIndex && lower + 1 !== floorIndex) continue;
@@ -263,9 +274,12 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
   // Lobby landings retain lobby tiles; inspect the transport above them.
   if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX && cell.content !== 'elevatorLobby' && cell.content !== 'elevatorShaft') {
     const landing = getFloor(state.tower, floorIndex + 1)?.cells[x];
-    if (landing?.content === 'stair') {
-      demolishAt(state, floorIndex + 1, x);
-      return;
+    // Prefer the stair up to floor 2; the B1 stair is also selectable on B1.
+    for (const stairFloor of [floorIndex + 1, floorIndex - 1]) {
+      if (getFloor(state.tower, stairFloor)?.cells[x]?.content === 'stair') {
+        demolishAt(state, stairFloor, x);
+        return;
+      }
     }
     if (landing?.content === 'escalator' && state.escalators.has(`${floorIndex}:${landing.transportX ?? x}`)) cell = landing;
   }
@@ -274,9 +288,11 @@ export function demolishAt(state: GameState, floorIndex: number, x: number): voi
     return;
   }
   if (cell.content === 'stair') {
+    // One stair is one link; adjacent stairs in the same column stay usable.
     const anchor = cell.transportX ?? x;
+    const lower = stairLowerFloor(floorIndex);
     cancelConnectionTrips(state, leg => leg.mode === 'stair' && leg.x === anchor &&
-      (leg.from === floorIndex || leg.to === floorIndex));
+      Math.min(leg.from, leg.to) === lower);
     for (let cx = anchor; cx < anchor + (cell.transportWidth ?? 1); cx++) floor.cells[cx] = { content: 'empty', tenantId: -1 };
     state.tower.structureRevision++;
     return;
@@ -334,7 +350,8 @@ export function stepConstruction(state: GameState): void {
     tenant.constructionTicksLeft--;
     if (tenant.constructionTicksLeft > 0) continue;
     tenant.state = 'open';
-    sellCondo(tenant);
+    if (tenant.type === 'condo' && !tenant.sold && !condoHasAccess(state, tenant)) tenant.state = 'vacant';
+    else sellCondo(tenant);
     for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
       const floor = getFloor(state.tower, f);
       if (!floor) continue;
@@ -346,7 +363,7 @@ export function stepConstruction(state: GameState): void {
     state.tower.structureRevision++;
     pushEvent(state, { type: 'TENANT_COMPLETED', tenantId: tenant.id });
     // The occupants move in (6 workers per office, 3 residents per condo).
-    spawnTenantPeople(state, tenant);
+    if (tenant.state === 'open') spawnTenantPeople(state, tenant);
   }
 }
 

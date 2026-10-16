@@ -1,10 +1,11 @@
 import { CONFIG } from '../data/config';
+import { isWeekendDay } from './time';
 import type { Tenant } from './tenants';
 
 /** Calibrated income curves, not a recovered original-game formula. */
 export function recordCommercialVisit(tenant: Tenant, officeWorker: boolean, day: number): boolean {
   if (!['fastfood', 'restaurant', 'shop'].includes(tenant.type)) return false;
-  const weekend = day % 3 === 0;
+  const weekend = isWeekendDay(day);
   const natural = tenant.paidExternalVisits ?? 0;
   const workers = tenant.paidOfficeVisits ?? 0;
   const total = (external: number, office: number): number => {

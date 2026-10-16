@@ -8,7 +8,7 @@ import { createInitialState, population, setupNewGame } from '../../src/sim';
 import { scenarioTower, tickN } from '../helpers/simHarness';
 
 const state = createInitialState(20260907);
-setupNewGame(state);
+setupNewGame(state, true); // fixture: prebuilt full-width lobby
 scenarioTower(state);
 
 // Day 1: construction + settling; day 2: morning commute, checked at 11:30

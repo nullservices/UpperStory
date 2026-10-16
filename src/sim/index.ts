@@ -47,6 +47,8 @@ export {
   carWorldY,
   carSpeed,
   stepElevators,
+  repairElevatorCar,
+  repairElevatorCarError,
 } from './elevators';
 export type { ElevatorGroup, ElevatorCar, ElevatorKind } from './elevators';
 export {
@@ -77,7 +79,8 @@ export {
 } from './queues';
 export type { QueueDir } from './queues';
 export { patienceTicks, lobbyWaitStressMultiplier, stepStress } from './stress';
-export { tickToMinute, minuteToTick, formatTimeOfDay, stepTime } from './time';
+export { tickToMinute, minuteToTick, formatTimeOfDay, stepTime, isWeekend, isWeekendDay, towerDate, formatTowerDate } from './time';
+export type { TowerDate } from './time';
 export type { Calendar } from './time';
 export { seedRng, rngNext, rngRange, rngInt, rngPick } from './core/rng';
 export { nextId } from './core/ids';
@@ -92,6 +95,25 @@ export {
 } from './money';
 export type { MoneyState } from './money';
 export { stepEvaluation } from './evaluation';
+export {
+  recordEvent,
+  startIncident,
+  respondToIncident,
+  responseQuote,
+  stepCampaign,
+} from './campaign';
+export type { Incident, IncidentKind, IncidentResponse, ResponseQuote, HistoryEntry, CampaignState } from './campaign';
+export { takeLoan, takeLoanError, repayLoan, repayLoanError, loanLimitCents } from './bank';
+export {
+  blackoutActive,
+  elevatorsPowered,
+  hasOpenGenerator,
+  fireStationCovers,
+  maintenanceReaches,
+  reachableSecurityCount,
+} from './services';
 export { stepProgression } from './progression';
 export { serializeGame, deserializeGame, SAVE_VERSION } from './save';
 export type { SaveEnvelope } from './save';
+export { towerMetrics, flattenMetrics } from './metrics';
+export type { TowerMetrics } from './metrics';

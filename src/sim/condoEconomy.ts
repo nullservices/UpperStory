@@ -1,5 +1,13 @@
 import { CONFIG } from '../data/config';
 import type { Tenant } from './tenants';
+import type { GameState } from './state';
+import { checkRouting, pickupRoute } from './routing';
+
+export function condoHasAccess(state: GameState, tenant: Tenant): boolean {
+  checkRouting(state);
+  return pickupRoute(state, CONFIG.LOBBY_FLOOR_INDEX, tenant.floor, 'resident') !== null &&
+    pickupRoute(state, tenant.floor, CONFIG.LOBBY_FLOOR_INDEX, 'resident') !== null;
+}
 
 /** Average sale is reference-backed; other tiers use provisional multipliers. */
 export function condoSaleCents(tenant: Tenant): number {

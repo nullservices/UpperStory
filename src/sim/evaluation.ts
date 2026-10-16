@@ -1,10 +1,11 @@
-import { CONFIG, isHotel } from '../data/config';
+import { CONFIG, isHotel, isUngradedService } from '../data/config';
+import { isWeekend } from './time';
 import { pushEvent } from './core/events';
 import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
-import { noisePenalty } from './noise';
+import { noiseIndex, noisePenalty } from './noise';
 import { officeRentScoreAdjustment } from './money';
-import { sellCondo, repurchaseCondo } from './condoEconomy';
+import { sellCondo, repurchaseCondo, condoHasAccess } from './condoEconomy';
 
 /**
  * Daily tenant evaluation (JudgeT equivalent): grades from occupancy,
@@ -25,24 +26,38 @@ export function stepEvaluation(state: GameState): void {
   const hasSecurity = [...state.tenants.values()].some(
     (t) => t.type === 'security' && t.state === 'open',
   );
+  const noise = noiseIndex(state);
+  const medicalFloors = [...state.tenants.values()]
+    .filter(t => t.type === 'medical' && t.state === 'open').map(t => t.floor);
+  // Upper Story original: a helipad's medevac extends medical cover tower-wide.
+  const medevac = medicalFloors.length > 0 && [...state.tenants.values()].some(t => t.type === 'helipad' && t.state === 'open');
+  const poolFloors = [...state.tenants.values()]
+    .filter(t => t.type === 'rooftopPool' && t.state === 'open').map(t => t.floor);
+  // One pass over people instead of one per tenant. Each tenant only changes
+  // its own roster below, after reading it, so the snapshot stays accurate.
+  const stressByTenant = new Map<number, { sum: number; count: number }>();
+  for (const p of state.people.values()) {
+    const entry = stressByTenant.get(p.tenantId) ?? { sum: 0, count: 0 };
+    entry.sum += p.dayStress;
+    entry.count++;
+    stressByTenant.set(p.tenantId, entry);
+  }
 
   for (const tenant of state.tenants.values()) {
     if (tenant.type === 'lobby' || (tenant.state === 'constructing' || tenant.state === 'damaged')) continue;
-    if (tenant.capacity <= 0) continue;
+    if (tenant.capacity <= 0 || isUngradedService(tenant.type)) continue;
     // Weekend absence is expected, not a failed commute. Retain the last
     // workday grade and dissatisfaction streak; vacant units still refill.
-    if (tenant.type === 'office' && tenant.state === 'open' && state.calendar.day % 3 === 0) continue;
+    if ((tenant.type === 'office' || tenant.type === 'bank') && tenant.state === 'open' && isWeekend(state)) continue;
 
     // Condos grade on stress (residents are home most of the day); offices
     // grade on actual presence at the 15:00 evaluation.
     const ratio = tenant.type === 'condo' ? 1 : tenant.occupancy / tenant.capacity;
-    const people = [...state.people.values()].filter((p) => p.tenantId === tenant.id);
-    const avgStress = people.length
-      ? people.reduce((sum, p) => sum + p.dayStress, 0) / people.length
-      : 0;
+    const roster = stressByTenant.get(tenant.id);
+    const avgStress = roster ? roster.sum / roster.count : 0;
 
     let score = 100 * ratio - avgStress * 0.6;
-    tenant.noisePenalty = noisePenalty(state, tenant);
+    tenant.noisePenalty = noisePenalty(state, tenant, noise);
     score -= tenant.noisePenalty;
     if (tenant.type === 'office') {
       tenant.rentScoreAdjustment = officeRentScoreAdjustment(tenant);
@@ -50,7 +65,8 @@ export function stepEvaluation(state: GameState): void {
     }
     if (isHotel(tenant.type)) score -= (100 - tenant.cleanliness) * 0.5;
     if (hasSecurity) score += 5;
-    if ([...state.tenants.values()].some(t => t.type === 'medical' && t.state === 'open' && Math.abs(t.floor - tenant.floor) <= 20)) score += 5;
+    if (medevac || medicalFloors.some(floor => Math.abs(floor - tenant.floor) <= 20)) score += 5;
+    if ((tenant.type === 'condo' || isHotel(tenant.type)) && poolFloors.some(floor => Math.abs(floor - tenant.floor) <= CONFIG.POOL_REACH_FLOORS)) score += CONFIG.POOL_EVAL_BONUS;
     score -= Math.max(0, state.campaign.waste - 30) * 0.3;
     tenant.evalScore = Math.min(Math.max(Math.round(score), 0), 100);
     tenant.grade = gradeFromScore(tenant.evalScore);
@@ -58,6 +74,10 @@ export function stepEvaluation(state: GameState): void {
     if (tenant.type === 'office' || tenant.type === 'condo') {
       // Vacant units refill on a timer (an empty unit can't grade itself up).
       if (tenant.state === 'vacant') {
+        if (tenant.type === 'condo' && !condoHasAccess(state, tenant)) {
+          tenant.daysGood = 0;
+          continue;
+        }
         tenant.daysGood++;
         if (tenant.daysGood >= CONFIG.EVAL_REPOPULATE_DAYS) {
           tenant.state = 'open';

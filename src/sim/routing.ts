@@ -4,7 +4,7 @@ import type { ElevatorGroup } from './elevators';
 import type { PersonKind } from './people';
 import { queueLength } from './queues';
 import type { GameState } from './state';
-import { getFloor } from './tower';
+import { getFloor, stairCellFloor } from './tower';
 
 /** Mirrors people.ts's isStaff without a runtime import cycle. */
 function isStaff(kind: PersonKind): boolean {
@@ -53,6 +53,8 @@ export function rebuildRouting(state: GameState): void {
   rt.revision = state.tower.structureRevision;
 
   for (const group of state.elevatorGroups.values()) {
+    // A shaft whose every car is broken down cannot carry anyone.
+    if (group.cars.length > 0 && group.cars.every(car => car.outOfService)) continue;
     for (const f of group.stops) {
       const list = rt.groupsServing.get(f) ?? [];
       list.push(group.id);
@@ -82,50 +84,38 @@ export function rebuildRouting(state: GameState): void {
 
 // --- Stairs ---
 
-function stairAt(state: GameState, floorIndex: number, x: number): boolean {
-  const cell = getFloor(state.tower, floorIndex)?.cells[x];
-  return cell?.content === 'stair' && (cell.transportX ?? x) === x;
-}
-
-/** Adjacent floors a,b linked by a stair at column c (lobby = ground level). */
-function stairLink(state: GameState, c: number, a: number, b: number): boolean {
-  if (Math.abs(a - b) !== 1) return false;
-  if (b === CONFIG.LOBBY_FLOOR_INDEX) return stairAt(state, a, c);
-  if (a === CONFIG.LOBBY_FLOOR_INDEX) return stairAt(state, b, c);
-  return stairAt(state, a, c) && stairAt(state, b, c);
+/** Columns of stairs linking `lower` and `lower + 1` (one stair = one link). */
+function stairColumns(state: GameState, lower: number): number[] {
+  if (!getFloor(state.tower, lower) || !getFloor(state.tower, lower + 1)) return [];
+  const columns: number[] = [];
+  getFloor(state.tower, stairCellFloor(lower))?.cells.forEach((cell, x) => {
+    if (cell.content === 'stair' && (cell.transportX ?? x) === x) columns.push(x);
+  });
+  return columns;
 }
 
 /**
- * Stair route within a short hop: a single stair column must connect the
- * span contiguously (or reach the lobby floor as the ground connection).
+ * Stair route within a short hop: one stair per floor, walking across a
+ * landing when consecutive stairs are offset. A continuous column is preferred.
  */
 function stairRoute(state: GameState, from: number, to: number): RouteLeg[] | null {
   const span = Math.abs(to - from);
   if (span === 0 || span > CONFIG.STAIR_MAX_FLOORS) return null;
   const dir: 1 | -1 = to > from ? 1 : -1;
-  const fromFloor = getFloor(state.tower, from);
-  if (!fromFloor) return null;
-  const candidateColumns: number[] = [];
-  const candidateFloor = from === CONFIG.LOBBY_FLOOR_INDEX ? getFloor(state.tower, from + 1) ?? fromFloor : fromFloor;
-  candidateFloor.cells.forEach((cell, x) => {
-    if (cell.content === 'stair' && (cell.transportX ?? x) === x) candidateColumns.push(x);
-  });
-  for (const c of candidateColumns) {
-    let ok = true;
-    for (let f = from; f !== to; f += dir) {
-      if (!stairLink(state, c, f, f + dir)) {
-        ok = false;
-        break;
-      }
-    }
-    if (!ok) continue;
-    const legs: RouteLeg[] = [];
-    for (let f = from; f !== to; f += dir) {
-      legs.push({ mode: 'stair', from: f, to: f + dir, dir, x: c });
-    }
-    return legs;
+  const steps: number[][] = [];
+  for (let f = from; f !== to; f += dir) {
+    const columns = stairColumns(state, Math.min(f, f + dir));
+    if (columns.length === 0) return null;
+    steps.push(columns);
   }
-  return null;
+  const shared = steps[0]!.find(c => steps.every(columns => columns.includes(c)));
+  const legs: RouteLeg[] = [];
+  let x = shared ?? steps[0]![0]!;
+  for (let i = 0, f = from; f !== to; i++, f += dir) {
+    if (shared === undefined) x = steps[i]!.reduce((best, c) => Math.abs(c - x) < Math.abs(best - x) ? c : best);
+    legs.push({ mode: 'stair', from: f, to: f + dir, dir, x });
+  }
+  return legs;
 }
 
 // --- Escalators ---

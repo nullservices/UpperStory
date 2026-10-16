@@ -4,11 +4,12 @@ import type { GameState } from './state';
 /**
  * Stress accrual (StressT equivalent). Stress grows while moving/waiting and
  * decays while at rest; waiting in a tall lobby stresses more
- * (CalcLobbyStress equivalent). Patience while queuing scales with stress.
+ * (CalcLobbyStress equivalent). Stressed people are less patient in queues.
  */
 
 export function patienceTicks(stress: number): number {
-  return CONFIG.PATIENCE_BASE_TICKS + stress / CONFIG.PATIENCE_STRESS_DIVISOR;
+  const clamped = Math.min(Math.max(stress, 0), CONFIG.STRESS_MAX);
+  return CONFIG.PATIENCE_BASE_TICKS - clamped / CONFIG.PATIENCE_STRESS_DIVISOR;
 }
 
 /** Multiplier for queue-wait stress on a floor (worse higher up). */

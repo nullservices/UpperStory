@@ -49,7 +49,7 @@ function step(state: GameState) {
   stepElevators(state);
 }
 
-it('a full second-shaft queue rejects the transfer without losing existing waiters after load', () => {
+it('a full second-shaft queue keeps the transfer waiting beside it, then admits it when a place frees', () => {
   const fixture = journey(true, false);
   let state = fixture.state;
   let reached = false;
@@ -74,11 +74,26 @@ it('a full second-shaft queue rejects the transfer without losing existing waite
   pressCall(state, leg.from, dir);
   state = deserializeGame(serializeGame(state));
   stepPeople(state);
-  expect(state.people.get(fixture.id)).toMatchObject({ state: 'offscreen', failedTripsToday: 1, route: null });
+  // Waiting beside the full queue: no failed trip, existing order intact.
+  expect(state.people.get(fixture.id)).toMatchObject({ state: 'waiting', failedTripsToday: 0 });
   expect(queueLength(state, leg.from, dir, leg.groupId)).toBe(40);
   expect(state.queues[`${leg.from}:${dir}`]).toEqual(waitingIds);
   expect(callPending(state, leg.from, dir)).toBe(true);
   expect([...state.elevatorGroups.values()].flatMap(g => g.cars.flatMap(c => c.passengers))).not.toContain(fixture.id);
+  // A place frees up (survives a save in between): the overflow passenger joins at the back.
+  state.queues[`${leg.from}:${dir}`]!.shift();
+  state = deserializeGame(serializeGame(state));
+  state.tickCount += (8 - (state.tickCount + fixture.id) % 8) % 8; // overflow retries are staggered
+  stepPeople(state);
+  expect(state.queues[`${leg.from}:${dir}`]).toEqual([...waitingIds.slice(1), fixture.id]);
+  // Patience still applies to overflow waiters.
+  const overflow = state.people.get(fixture.id)!;
+  state.queues[`${leg.from}:${dir}`]!.pop();
+  overflow.waitTicks = 10_000;
+  state.queues[`${leg.from}:${dir}`]!.push(9999); // queue full again
+  state.people.set(9999, { ...overflow, id: 9999, waitTicks: 0 });
+  stepPeople(state);
+  expect(state.people.get(fixture.id)).toMatchObject({ state: 'offscreen', failedTripsToday: 1, route: null });
 });
 
 for (const sky of [false, true]) for (const reverse of [false, true]) {

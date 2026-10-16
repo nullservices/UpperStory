@@ -91,3 +91,11 @@ it('closes the previous quarter at midnight using the day that just ended', () =
   tick(state);
   expect(state.events.some(e => e.type === 'QUARTER_REPORT')).toBe(false);
 });
+
+it('formats the SimTower quarter calendar', async () => {
+  const { formatTowerDate } = await import('../../src/sim');
+  expect(formatTowerDate(1)).toBe('1st WD / 1st Qtr / Year 1');
+  expect(formatTowerDate(3)).toBe('WE / 1st Qtr / Year 1');
+  expect(formatTowerDate(4)).toBe('1st WD / 2nd Qtr / Year 1');
+  expect(formatTowerDate(13)).toBe('1st WD / 1st Qtr / Year 2');
+});

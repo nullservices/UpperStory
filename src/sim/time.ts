@@ -69,3 +69,37 @@ export function formatTimeOfDay(minuteOfDay: number): string {
 export function operatingDay(state: GameState): number {
   return state.calendar.day - (state.calendar.minuteOfDay >= 1440 ? 1 : 0);
 }
+
+/** Every third day is the weekend (two weekdays, then one weekend day). */
+export function isWeekendDay(day: number): boolean {
+  return day % 3 === 0;
+}
+
+/** Weekend for the current 07:00–07:00 operating day. */
+export function isWeekend(state: GameState): boolean {
+  return isWeekendDay(operatingDay(state));
+}
+
+export interface TowerDate {
+  /** 1-based year; four quarters per year. */
+  year: number;
+  /** 1..4 */
+  quarter: number;
+  /** 0 = first weekday, 1 = second weekday, 2 = weekend. */
+  dayOfQuarter: number;
+}
+
+/** SimTower calendar: each quarter is two weekdays then a weekend day. */
+export function towerDate(day: number): TowerDate {
+  const index = Math.max(0, day - 1);
+  const quarterIndex = Math.floor(index / CONFIG.QUARTER_DAYS);
+  return { year: Math.floor(quarterIndex / 4) + 1, quarter: (quarterIndex % 4) + 1, dayOfQuarter: index % CONFIG.QUARTER_DAYS };
+}
+
+/** "1st WD / 2nd Qtr / Year 3" style label. */
+export function formatTowerDate(day: number): string {
+  const { year, quarter, dayOfQuarter } = towerDate(day);
+  const ordinal = (n: number): string => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`;
+  const dayLabel = dayOfQuarter === 2 ? 'WE' : `${ordinal(dayOfQuarter + 1)} WD`;
+  return `${dayLabel} / ${ordinal(quarter)} Qtr / Year ${year}`;
+}

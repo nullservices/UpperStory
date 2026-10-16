@@ -13,7 +13,7 @@ export const CONFIG = {
   /** Player-facing floor width in placement cells. (Original stored 375 fine tiles/floor.) */
   FLOOR_WIDTH_CELLS: 375,
   /** World-pixel height of one floor band at zoom 1. */
-  FLOOR_HEIGHT_PX: 20,
+  FLOOR_HEIGHT_PX: 24,
   /** The lobby floor is visually this many floors tall. */
   LOBBY_HEIGHT_FLOORS: 1,
   /** Floor index of B1 (below ground). */
@@ -29,9 +29,11 @@ export const CONFIG = {
   /** Floor N (N≥2) costs base + step×(N−2). */
   FLOOR_COST_BASE_DOLLARS: 15_000,
   FLOOR_COST_STEP_DOLLARS: 5_000,
-  /** One stair cell. */
+  /** One stair link between two adjacent floors. */
   STAIR_COST_DOLLARS: 5_000,
   MAX_STAIRS_ESCALATORS: 64,
+  /** Original manual: sky lobbies only every 15 floors. */
+  SKY_LOBBY_FLOORS: [15, 30, 45, 60, 75, 90],
 
   // --- Day cycle (reverse-engineered: 2600 ticks/day, day starts 7:00 AM) ---
   DAY_TICKS: 2600,
@@ -48,7 +50,6 @@ export const CONFIG = {
   ],
 
   // --- Vertical transport (approx — tune) ---
-  ELEVATOR_CAPACITY: 21,
   /** Capacities documented in tower-docs, Elevator Header byte 2. */
   ELEVATOR_CAPACITIES: { standard: 21, express: 42, service: 10 },
   /** Floors per tick at speed level 1 (level 2/3 in ELEVATOR_SPEED_LEVELS). */
@@ -75,7 +76,8 @@ export const CONFIG = {
   STAIR_MAX_FLOORS: 4,
   ESCALATOR_MAX_FLOORS: 7,
   PATIENCE_BASE_TICKS: 400,
-  PATIENCE_STRESS_DIVISOR: 10,
+  /** Patience lost per stress point is 1/divisor: max stress waits 12.5% less (approx). */
+  PATIENCE_STRESS_DIVISOR: 2,
   STRESS_WALK_PER_TICK: 0.02,
   STRESS_WAIT_PER_TICK: 0.15,
   STRESS_RIDE_PER_TICK: 0.05,
@@ -128,17 +130,15 @@ export const CONFIG = {
   SHOPPER_SPAWN_RATE: 0.15,
   HOTEL_GUEST_SPAWN_RATE: 0.12,
   SHOPPER_WINDOW_MIN: 540, // 09:00
-  SHOPPER_WINDOW_MAX: 1080, // 18:00
   GUEST_WINDOW_MIN: 660, // 11:00
   GUEST_WINDOW_MAX: 1380, // 23:00
-  /** Hard cap on tracked people (M5 perf target: 5,000 at 60 fps). */
+  /** Hard cap on tracked people (perf smoke covers ~18,000). */
   MAX_PEOPLE: 30_000,
   EAT_TICKS: 250,
   SHOP_TICKS: 180,
   GUEST_CHECKIN_TICKS: 100,
 
   // --- Economy (approx — tune by playtest) ---
-  OFFICE_RENT_DAILY_DOLLARS: 3_333,
   CONDO_RENT_DAILY_DOLLARS: 0,
   /** Full-occupancy room income calibrated from $6k/$9k/$18k per quarter. */
   HOTEL_ROOM_NIGHTLY_DOLLARS: { hotel: 2000, hotelTwin: 3000, hotelSuite: 6000 },
@@ -171,14 +171,79 @@ export const CONFIG = {
   EVAL_VACANCY_DAYS: 3, // grade ≤ 1 for this many days → tenant vacates
   EVAL_REPOPULATE_DAYS: 2, // grade ≥ 2 for this many days → vacant refills
 
+  // --- Incidents (approx) ---
+  /** Ticks before an unanswered fire damages its room (and a neighbor). */
+  FIRE_DEADLINE_TICKS: 900,
+  BOMB_DEADLINE_TICKS: 900,
+  /** Paid fire department: cost and arrival delay. */
+  FIRE_RESCUE_COST_DOLLARS: 50_000,
+  FIRE_RESCUE_DELAY_TICKS: 150,
+  /** Rescue from a reachable fire station (Upper Story original). */
+  FIRE_STATION_RESCUE_COST_DOLLARS: 20_000,
+  FIRE_STATION_RESCUE_DELAY_TICKS: 60,
+  /** Fire stations and their firefighters cover this many floors each way. */
+  FIRE_STATION_REACH_FLOORS: 20,
+  /** Free security firefighting: one office's arrival delay and success odds. */
+  SECURITY_FIRE_DELAY_TICKS: 300,
+  SECURITY_FIRE_BASE_CHANCE: 0.4,
+  /** Extra success chance per additional reachable office, up to the cap. */
+  SECURITY_FIRE_CHANCE_PER_OFFICE: 0.15,
+  SECURITY_FIRE_MAX_CHANCE: 0.9,
+  /** One reachable security office searches in this many ticks; n offices take 1/n. */
+  BOMB_SEARCH_TICKS: 500,
+  /** An unanswered fire tries to spread this often. */
+  FIRE_SPREAD_INTERVAL_TICKS: 250,
+  /** Chance each neighbouring room catches per spread attempt. */
+  FIRE_SPREAD_CHANCE: 0.6,
+  /** At most this many rooms ignite from one fire per attempt. */
+  FIRE_SPREAD_MAX_PER_STEP: 2,
+  /** Spread never pushes the tower past this many simultaneous fires. */
+  FIRE_MAX_ACTIVE: 8,
+
+  // --- Breakdowns and blackouts (Upper Story originals; approx) ---
+  /** A car breaks down about once per this many days (from 2★). */
+  ELEVATOR_BREAKDOWN_MEAN_DAYS: 12,
+  /** Breakdown odds when a maintenance office can reach the shaft. */
+  MAINTENANCE_BREAKDOWN_FACTOR: 0.25,
+  /** Reachable mechanics fix a broken car after this many ticks. */
+  MAINTENANCE_REPAIR_TICKS: 200,
+  ELEVATOR_REPAIR_COST_DOLLARS: 10_000,
+  /** Daily blackout odds by weather (from 2★). */
+  BLACKOUT_CHANCE_CLEAR: 0.03,
+  BLACKOUT_CHANCE_RAIN: 0.15,
+  BLACKOUT_MIN_MINUTES: 60,
+  BLACKOUT_MAX_MINUTES: 120,
+
+  // --- Bank, pool (Upper Story originals; approx) ---
+  /** Weekday customer arrival chance per tick for each open bank, 09:00–17:00. */
+  BANK_CUSTOMER_RATE: 0.02,
+  BANK_VISIT_TICKS: 120,
+  BANK_FEE_DOLLARS: 150,
+  BANK_OPEN_MIN: 540,
+  BANK_CLOSE_MIN: 1020,
+  /** Credit line: per open bank, plus per person in the tower. */
+  LOAN_BASE_DOLLARS: 500_000,
+  LOAN_PER_PERSON_DOLLARS: 200,
+  /** Interest on the outstanding principal, charged at each quarter's settlement. */
+  LOAN_INTEREST_QUARTER: 0.03,
+  /** Pool visits: evenings daily, all day at weekends. */
+  POOL_EVENING_START_MIN: 1020,
+  POOL_WEEKEND_START_MIN: 600,
+  POOL_CLOSE_MIN: 1320,
+  /** Visitors sent per open pool every POOL_CHECK_TICKS. */
+  POOL_VISITORS_PER_CHECK: 2,
+  POOL_CHECK_TICKS: 20,
+  POOL_VISIT_TICKS: 200,
+  POOL_FEE_DOLLARS: 10,
+  /** Condos and hotel rooms within this many floors of a pool grade higher. */
+  POOL_REACH_FLOORS: 10,
+  POOL_EVAL_BONUS: 8,
+
   // --- Render (tunable but render-side) ---
   /** World-pixel width of one placement cell at zoom 1. */
   CELL_WIDTH_PX: 12,
 
-  // --- Camera ---
-  MIN_ZOOM: 0.5,
-  MAX_ZOOM: 3,
-  ZOOM_STEP: 1.15,
+  // Camera zoom levels live in src/render/cameraLayout.ts (ZOOM_LEVELS).
 } as const;
 
 export interface TenantTypeData {
@@ -290,6 +355,19 @@ export const TENANT_DATA = {
   recycling: { sizeCells: 25, heightFloors: 2, costDollars: 500_000, constructionTicks: 2600, unlockedAtStar: 3, capacity: 0, basementOnly: true, upkeepQuarter: 50_000 },
   metro: { sizeCells: 30, heightFloors: 3, costDollars: 1_000_000, constructionTicks: 3900, unlockedAtStar: 4, capacity: 0, basementOnly: true, floorRestriction: -8, limit: 1, upkeepQuarter: 100_000 },
   cathedral: { sizeCells: 28, heightFloors: 4, costDollars: 3_000_000, constructionTicks: 5200, unlockedAtStar: 5, capacity: 0, floorRestriction: 97, limit: 1 },
+  // --- Modern additions (Upper Story originals, not in SimTower) ---
+  /** Firefighters respond faster and cheaper to fires on nearby floors. */
+  fireStation: { sizeCells: 20, costDollars: 300_000, constructionTicks: 1800, unlockedAtStar: 2, capacity: 4, limit: 4, upkeepQuarter: 30_000 },
+  /** Business-hours customers; unlocks loans. */
+  bank: { sizeCells: 20, costDollars: 250_000, constructionTicks: 1600, unlockedAtStar: 3, capacity: 20, limit: 8 },
+  /** Roof only. VIPs fly in; medevac extends medical cover. */
+  helipad: { sizeCells: 24, costDollars: 600_000, constructionTicks: 2000, unlockedAtStar: 4, capacity: 0, limit: 1, upkeepQuarter: 40_000 },
+  /** Roof only. Lifts nearby homes' and hotel rooms' evaluations. */
+  rooftopPool: { sizeCells: 30, costDollars: 400_000, constructionTicks: 2200, unlockedAtStar: 3, capacity: 30, limit: 4, upkeepQuarter: 25_000 },
+  /** Mechanics keep elevator cars from breaking down. */
+  maintenance: { sizeCells: 12, costDollars: 80_000, constructionTicks: 900, unlockedAtStar: 2, capacity: 3, limit: 10, upkeepQuarter: 15_000 },
+  /** Basement only. Keeps elevators and lights running through blackouts. */
+  generator: { sizeCells: 16, costDollars: 200_000, constructionTicks: 1200, unlockedAtStar: 3, capacity: 0, basementOnly: true, limit: 4, upkeepQuarter: 20_000 },
 
 } as const satisfies Record<string, TenantTypeData>;
 
@@ -319,6 +397,16 @@ export const KINSOKU_FORBIDDEN: Partial<
   condo: ['restaurant', 'fastfood'], // smells and crowds
   hotel: ['fastfood'], // noise
 };
+
+/** Facilities that occupy a roof: nothing may be built above them. */
+export function isRoofOnly(type: string): boolean {
+  return type === 'rooftopPool' || type === 'helipad';
+}
+
+/** Staffless service facilities: evaluation does not grade them on occupancy. */
+export function isUngradedService(type: string): boolean {
+  return type === 'fireStation' || type === 'maintenance' || type === 'generator' || isRoofOnly(type);
+}
 
 /** Hotel IDs share guest, housekeeping and evaluation behavior. */
 export function isHotel(type: string): boolean {

@@ -24,6 +24,9 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm test
+      - run: npm run smoke
+      - run: npm run perf
+      - run: npm run playthrough -- --days 30 --target 3 --no-csv
       - run: npm run build
         env:
           VITE_BASE_PATH: /UpperStory/

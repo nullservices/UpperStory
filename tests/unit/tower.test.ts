@@ -84,18 +84,17 @@ describe('tower floors', () => {
 });
 
 describe('stairs', () => {
-  it('stairs accept lobby clicks and need a stair below higher floors', () => {
+  it('stairs accept lobby clicks and link any adjacent built floors', () => {
     const state = newTestGame();
     buildFloor(state, 2);
     buildFloor(state, 3);
     expect(stairPlacementError(state, 1, 5)).toBeNull();
     // floor 2: below is the lobby floor — allowed
     expect(stairPlacementError(state, 2, 5)).toBeNull();
-    // floor 3: below floor 2 has no stair at col 5 — blocked
-    expect(stairPlacementError(state, 3, 5)).toBe('Needs a stair directly below');
-    placeStair(state, 2, 5);
+    // floor 3 links 2↔3 on its own; no stair below is required.
     expect(stairPlacementError(state, 3, 5)).toBeNull();
     expect(() => placeStair(state, 3, 5)).not.toThrow();
+    expect(stairPlacementError(state, 4, 5)).toBe('Build this floor first');
   });
 
   it('placeStair deducts cost and sets the cell', () => {
@@ -128,22 +127,23 @@ describe('grid math', () => {
 
   it('floorTopY: B1 at ground level, floors stack upward without overlap', () => {
     expect(floorTopY(0)).toBe(0);
-    expect(floorTopY(1)).toBe(-20);
-    expect(floorTopY(2)).toBe(-40);
-    expect(floorTopY(5)).toBe(-100);
+    expect(floorTopY(1)).toBe(-CONFIG.FLOOR_HEIGHT_PX);
+    expect(floorTopY(2)).toBe(-2 * CONFIG.FLOOR_HEIGHT_PX);
+    expect(floorTopY(5)).toBe(-5 * CONFIG.FLOOR_HEIGHT_PX);
     for (let i = 2; i < 50; i++) {
       expect(floorTopY(i)).toBe(floorTopY(i - 1) - CONFIG.FLOOR_HEIGHT_PX);
     }
   });
 
   it('floorIndexAtWorldY maps bands correctly', () => {
-    expect(floorIndexAtWorldY(10)).toBe(0); // B1
+    const h = CONFIG.FLOOR_HEIGHT_PX;
+    expect(floorIndexAtWorldY(h / 2)).toBe(0); // B1
     expect(floorIndexAtWorldY(0)).toBe(0);
-    expect(floorIndexAtWorldY(-20)).toBe(1); // lobby
-    expect(floorIndexAtWorldY(-50)).toBe(3);
-    expect(floorIndexAtWorldY(-60)).toBe(3); // boundary belongs to floor 3
-    expect(floorIndexAtWorldY(-200)).toBe(10);
-    expect(floorIndexAtWorldY(500)).toBe(CONFIG.MIN_FLOOR_INDEX); // deep underground clamps to B1
+    expect(floorIndexAtWorldY(-h)).toBe(1); // lobby
+    expect(floorIndexAtWorldY(-2.5 * h)).toBe(3);
+    expect(floorIndexAtWorldY(-3 * h)).toBe(3); // boundary belongs to floor 3
+    expect(floorIndexAtWorldY(-10 * h)).toBe(10);
+    expect(floorIndexAtWorldY(25 * h)).toBe(CONFIG.MIN_FLOOR_INDEX); // deep underground clamps to B1
   });
 
   it('cellIndexAtWorldX clamps to floor width', () => {

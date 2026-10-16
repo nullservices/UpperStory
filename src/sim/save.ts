@@ -9,7 +9,7 @@ import type { GameState } from './state';
  * Version bumps go through the migration chain in `deserialize`.
  */
 
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 export interface SaveEnvelope {
   version: number;
@@ -76,7 +76,7 @@ export function deserializeGame(json: string): GameState {
   if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
     throw new Error('Not a TowerProject save file');
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, SAVE_VERSION].includes(envelope.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, SAVE_VERSION].includes(envelope.version)) {
     // Migration chain slot: handle older versions here as they appear.
     throw new Error(
       `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
@@ -117,6 +117,15 @@ export function deserializeGame(json: string): GameState {
     for (const tenant of state.tenants.values()) {
       if (tenant.type === 'fastfood' && tenant.state === 'open') tenant.tradingDays ??= 5;
     }
+  }
+  if (envelope.version < 10) {
+    // Version 10 adds loans, breakdowns, blackouts, fire spread and journal
+    // locations, all optional. Existing fires start their spread clock now
+    // rather than spreading the moment an old save loads.
+    for (const incident of state.campaign.incidents) {
+      if (incident.kind === 'fire') incident.nextSpreadTick ??= state.tickCount + CONFIG.FIRE_SPREAD_INTERVAL_TICKS;
+    }
+    state.money.loanCents ??= 0;
   }
   return state;
 }

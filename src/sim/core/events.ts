@@ -10,7 +10,7 @@ export type SimEvent =
   | { type: 'TENANT_COMPLETED'; tenantId: number }
   | { type: 'PERSON_GAVE_UP'; personId: number; floor: number }
   | { type: 'LEVEL_UP'; starLevel: number }
-  | { type: 'QUARTER_REPORT'; quarter: number; income: number; upkeep: number };
+  | { type: 'QUARTER_REPORT'; quarter: number; income: number; upkeep: number; /** Loan interest included in upkeep. */ interest?: number };
 
 export function pushEvent(state: { events: SimEvent[] }, event: SimEvent): void {
   state.events.push(event);

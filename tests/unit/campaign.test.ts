@@ -40,7 +40,7 @@ describe('complete facility catalog', () => {
     expect(() => placeTenant(state, 'recycling', 2, 100)).toThrow('below ground');
     const recycling = placeTenant(state, 'recycling', -1, 100);
     expect(recycling.floor).toBe(-1);
-    expect(() => placeTenant(state, 'metro', -3, 60)).toThrow('floor -8');
+    expect(() => placeTenant(state, 'metro', -3, 60)).toThrow('B9');
     placeTenant(state, 'metro', -8, 60);
     expect(() => placeTenant(state, 'metro', -8, 100)).toThrow('Maximum');
     expect(() => placeTenant(state, 'cathedral', 10, 200)).toThrow('floor 97');
@@ -48,6 +48,16 @@ describe('complete facility catalog', () => {
 });
 
 describe('incidents and recovery', () => {
+  it('refuses a paid response that could not arrive before the deadline', () => {
+    const state = fixture();
+    const office = placeTenant(state, 'office', 2, 30); tickN(state, 1300);
+    const incident = startIncident(state, 'fire', office.id);
+    state.tickCount = incident.deadline - 100; // rescue needs 150 ticks
+    const money = state.money.balanceCents;
+    expect(() => respondToIncident(state, incident.id, 'rescue')).toThrow('Too late');
+    expect(state.money.balanceCents).toBe(money);
+    expect(incident.response).toBeNull();
+  });
   it('fire rescue prevents damage, while an unanswered fire closes rooms and requires paid repair', () => {
     const state = fixture();
     const office = placeTenant(state, 'office', 2, 30); tickN(state, 1300);

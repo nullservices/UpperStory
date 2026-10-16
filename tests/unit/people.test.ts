@@ -90,9 +90,14 @@ describe('daily schedules', () => {
 });
 
 describe('stress', () => {
-  it('patience grows with stress', () => {
+  it('stressed people are less patient, moderately', () => {
     expect(patienceTicks(0)).toBe(CONFIG.PATIENCE_BASE_TICKS);
-    expect(patienceTicks(100)).toBe(CONFIG.PATIENCE_BASE_TICKS + 10);
+    expect(patienceTicks(50)).toBeLessThan(patienceTicks(0));
+    expect(patienceTicks(100)).toBeLessThan(patienceTicks(50));
+    expect(patienceTicks(100)).toBe(CONFIG.PATIENCE_BASE_TICKS - 50);
+    // Out-of-range stress is clamped.
+    expect(patienceTicks(500)).toBe(patienceTicks(CONFIG.STRESS_MAX));
+    expect(patienceTicks(-5)).toBe(CONFIG.PATIENCE_BASE_TICKS);
   });
 
   it('waiting high up stresses more (lobby modifier)', () => {

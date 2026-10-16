@@ -1,5 +1,10 @@
 import { CONFIG } from '../data/config';
-import { giveUp } from './people';
+import { isWeekendDay } from './time';
+import { spend } from './money';
+import { giveUp, resumeTrip } from './people';
+import { floorLabel, recordEvent } from './campaign';
+import { elevatorsPowered, maintenanceReaches } from './services';
+import { checkRouting } from './routing';
 import {
   callPending,
   clearCall,
@@ -35,16 +40,17 @@ function activePeriod(state: GameState): number {
   return period;
 }
 
+/** Elevator schedules follow the calendar date, switching at midnight. */
 export function activePriority(state: GameState, group: ElevatorGroup): ElevatorPriority {
-  return group.schedule?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 'normal';
+  return group.schedule?.[isWeekendDay(state.calendar.day) ? 'weekend' : 'weekday'][activePeriod(state)] ?? 'normal';
 }
 
 export function activeWaitingResponse(state: GameState, group: ElevatorGroup): number {
-  return group.waitingResponse?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 5;
+  return group.waitingResponse?.[isWeekendDay(state.calendar.day) ? 'weekend' : 'weekday'][activePeriod(state)] ?? 5;
 }
 
 export function activeDepartureDelay(state: GameState, group: ElevatorGroup): number {
-  return group.departureDelay?.[state.calendar.day % 3 === 0 ? 'weekend' : 'weekday'][activePeriod(state)] ?? 0;
+  return group.departureDelay?.[isWeekendDay(state.calendar.day) ? 'weekend' : 'weekday'][activePeriod(state)] ?? 0;
 }
 
 export function setDepartureDelay(state: GameState, groupId: number, day: 'weekday' | 'weekend', period: number, seconds: number): void {
@@ -128,6 +134,12 @@ export interface ElevatorCar {
   homeReassignmentPending?: boolean;
   /** Absolute game-clock deadline, sampled when the car opens its doors. */
   departureAt?: number;
+  /** A broken car: it stops at the nearest floor and takes no passengers until repaired. */
+  outOfService?: boolean;
+  /** Scheduled breakdown (seeded daily roll). */
+  breakdownAtTick?: number;
+  /** Mechanics finish repairing a broken car at this tick. */
+  repairAtTick?: number;
 }
 
 export function carSpeed(car: ElevatorCar): number {
@@ -186,8 +198,10 @@ export function elevatorPlacementError(
     if (f !== CONFIG.LOBBY_FLOOR_INDEX && !floorContains(state, f, x, width)) return 'Extend this floor first';
     if (f === CONFIG.LOBBY_FLOOR_INDEX) {
       if (!lobbyCovers(state, x, width)) return `Extend the lobby beneath all ${width} shaft cells`;
-      const upper = getFloor(state.tower, f + 1);
-      if (upper?.cells.slice(x, x + width).some(c => c.content === 'stair')) return 'Space is occupied';
+      // Stairs to floor 2 and B1 land on lobby tiles.
+      for (const landing of [f + 1, f - 1]) {
+        if (getFloor(state.tower, landing)?.cells.slice(x, x + width).some(c => c.content === 'stair')) return 'Space is occupied';
+      }
       for (const key of state.escalators.keys()) {
         const [lowerFloor, anchor] = key.split(':').map(Number) as [number, number];
         if (lowerFloor !== f && lowerFloor + 1 !== f) continue;
@@ -280,7 +294,7 @@ export function placeElevatorGroup(
   const error = elevatorPlacementError(state, floorLo, floorHi, x, kind);
   if (error) throw new Error(error);
   const cost = CONFIG.ELEVATOR_PRICES[kind].shaft * 100;
-  if (!spendHelper(state, cost)) throw new Error('Not enough funds');
+  if (!spend(state, cost)) throw new Error('Not enough funds');
   return makeGroup(state, floorLo, floorHi, x, kind);
 }
 
@@ -353,9 +367,7 @@ export function addElevatorCar(state: GameState, groupId: number): void {
   const group = state.elevatorGroups.get(groupId);
   if (!group) throw new Error('Elevator not found');
   if (group.cars.length >= CONFIG.MAX_CARS_PER_SHAFT) throw new Error('Max cars reached');
-  const cost = CONFIG.ELEVATOR_PRICES[group.kind].car * 100;
-  if (cost > state.money.balanceCents) throw new Error('Not enough funds');
-  state.money.balanceCents -= cost;
+  if (!spend(state, CONFIG.ELEVATOR_PRICES[group.kind].car * 100)) throw new Error('Not enough funds');
   group.cars.push({
     id: state.nextEntityId++,
     y: group.serviceLo,
@@ -389,9 +401,7 @@ export function upgradeCarSpeed(state: GameState, groupId: number, carId: number
   const car = group?.cars.find((c) => c.id === carId);
   if (!car) throw new Error('Car not found');
   if (car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length) throw new Error('Max speed');
-  const cost = CONFIG.ELEVATOR_SPEED_UPGRADE_COST_DOLLARS * 100;
-  if (cost > state.money.balanceCents) throw new Error('Not enough funds');
-  state.money.balanceCents -= cost;
+  if (!spend(state, CONFIG.ELEVATOR_SPEED_UPGRADE_COST_DOLLARS * 100)) throw new Error('Not enough funds');
   car.speedLevel = (car.speedLevel + 1) as 1 | 2 | 3;
   state.tower.structureRevision++;
 }
@@ -425,7 +435,7 @@ export function setElevatorServiceRange(state: GameState, groupId: number, lo: n
   const group = state.elevatorGroups.get(groupId)!;
   if (lo === group.serviceLo && hi === group.serviceHi) return;
   const overlap = Math.max(0, Math.min(hi, group.serviceHi) - Math.max(lo, group.serviceLo) + 1);
-  spendHelper(state, (hi - lo + 1 - overlap) * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100);
+  spend(state, (hi - lo + 1 - overlap) * CONFIG.ELEVATOR_SHAFT_COST_PER_FLOOR_DOLLARS * 100);
   clearCells(state, group);
   group.serviceLo = lo;
   group.serviceHi = hi;
@@ -503,7 +513,7 @@ export function placeEscalator(
 ): void {
   const error = escalatorPlacementError(state, floorIndex, x);
   if (error) throw new Error(error);
-  if (!spendHelper(state, CONFIG.ESCALATOR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
+  if (!spend(state, CONFIG.ESCALATOR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
   for (const f of [floorIndex, floorIndex + 1]) {
     if (f === CONFIG.LOBBY_FLOOR_INDEX) continue;
     for (let cx = x; cx < x + 8; cx++) getFloor(state.tower, f)!.cells[cx] = { content: 'escalator', tenantId: -1, transportX: x, transportWidth: 8 };
@@ -512,20 +522,131 @@ export function placeEscalator(
   state.tower.structureRevision++;
 }
 
-function spendHelper(state: GameState, cents: number): boolean {
-  if (state.money.balanceCents < cents) return false;
-  state.money.balanceCents -= cents;
-  return true;
-}
-
 // --- Simulation step ---
 
 export function stepElevators(state: GameState): void {
+  // During a blackout without a generator, cars hold where they are; doors
+  // already opening may finish their cycle.
+  const powered = elevatorsPowered(state);
+  const assignMechanics = state.tickCount % 50 === 0;
   for (const group of state.elevatorGroups.values()) {
     for (const car of group.cars) {
+      if (car.breakdownAtTick !== undefined && !car.outOfService && state.tickCount >= car.breakdownAtTick) breakDown(state, group, car);
+      if (car.outOfService) {
+        if (assignMechanics && car.repairAtTick === undefined) dispatchMechanics(state, group, car);
+        stepBrokenCar(state, group, car, powered);
+        continue;
+      }
+      if (!powered && car.state !== 'doors') continue;
       stepCar(state, group, car);
     }
   }
+}
+
+// --- Breakdowns (Upper Story original) ---
+
+function brokenFloor(group: ElevatorGroup, car: ElevatorCar): number {
+  return Math.max(group.serviceLo, Math.min(group.serviceHi, Math.round(car.y)));
+}
+
+function breakDown(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
+  delete car.breakdownAtTick;
+  delete car.departureAt;
+  delete car.homeReassignmentPending;
+  car.outOfService = true;
+  const floor = brokenFloor(group, car);
+  // A moving car coasts to the nearest floor; otherwise it stays put.
+  car.targetFloor = car.state === 'moving' ? floor : null;
+  recordEvent(state, `An elevator car broke down at ${floorLabel(floor)}.`, { floor, x: group.x });
+  dispatchMechanics(state, group, car);
+  // Routing skips shafts whose every car is out of service.
+  state.tower.structureRevision++;
+}
+
+function dispatchMechanics(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
+  if (!maintenanceReaches(state, brokenFloor(group, car))) return;
+  car.repairAtTick = state.tickCount + CONFIG.MAINTENANCE_REPAIR_TICKS;
+}
+
+/** Riders leave a broken car and continue their journey from this floor. */
+function unloadBrokenCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
+  const floor = Math.round(car.y);
+  car.lastFloor = floor;
+  checkRouting(state); // replan around shafts that just lost their last car
+  for (const pid of [...car.passengers]) {
+    car.passengers.splice(car.passengers.indexOf(pid), 1);
+    const p = state.people.get(pid);
+    if (!p) continue;
+    p.pos = { floor, x: group.x + 1 };
+    p.state = 'walking';
+    p.target = null;
+    p.waitTicks = 0;
+    const leg = p.route?.[p.legIndex];
+    if (leg?.mode === 'elevator' && leg.to === floor) p.legIndex++;
+    else resumeTrip(state, p);
+  }
+}
+
+function stepBrokenCar(state: GameState, group: ElevatorGroup, car: ElevatorCar, powered: boolean): void {
+  if (car.repairAtTick !== undefined && state.tickCount >= car.repairAtTick) {
+    restoreCar(state, group, car);
+    recordEvent(state, `Mechanics repaired an elevator car at ${floorLabel(Math.round(car.y))}.`, { floor: Math.round(car.y), x: group.x });
+    return;
+  }
+  if (car.state === 'doors') {
+    car.doorsTicksLeft--;
+    if (car.doorsTicksLeft > 0) return;
+  } else if (car.state === 'moving') {
+    if (!powered) return;
+    const target = car.targetFloor ?? brokenFloor(group, car);
+    const dist = target - car.y;
+    if (Math.abs(dist) > carSpeed(car)) {
+      car.y += Math.sign(dist) * carSpeed(car);
+      for (const pid of car.passengers) {
+        const p = state.people.get(pid);
+        if (p) p.pos = { floor: car.y, x: group.x + 0.5 };
+      }
+      return;
+    }
+    car.y = target;
+  }
+  car.state = 'idle';
+  car.dir = 0;
+  car.targetFloor = null;
+  car.doorsTicksLeft = 0;
+  if (car.passengers.length > 0) unloadBrokenCar(state, group, car);
+}
+
+function restoreCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
+  if (car.passengers.length > 0) unloadBrokenCar(state, group, car);
+  delete car.outOfService;
+  delete car.repairAtTick;
+  car.state = 'idle';
+  car.dir = 0;
+  car.targetFloor = null;
+  car.lastFloor = brokenFloor(group, car);
+  car.y = car.lastFloor;
+  state.tower.structureRevision++;
+}
+
+/** Reason a manual repair cannot be ordered, or null. */
+export function repairElevatorCarError(state: GameState, groupId: number, carId: number): string | null {
+  const car = state.elevatorGroups.get(groupId)?.cars.find(c => c.id === carId);
+  if (!car) return 'Elevator car not found';
+  if (!car.outOfService) return 'This car is running normally';
+  if (CONFIG.ELEVATOR_REPAIR_COST_DOLLARS * 100 > state.money.balanceCents) return 'Not enough funds';
+  return null;
+}
+
+/** Paid manual repair of a broken car; it returns to service immediately. */
+export function repairElevatorCar(state: GameState, groupId: number, carId: number): void {
+  const error = repairElevatorCarError(state, groupId, carId);
+  if (error) throw new Error(error);
+  if (!spend(state, CONFIG.ELEVATOR_REPAIR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
+  const group = state.elevatorGroups.get(groupId)!;
+  const car = group.cars.find(c => c.id === carId)!;
+  restoreCar(state, group, car);
+  recordEvent(state, `Elevator car repaired at ${floorLabel(Math.round(car.y))}.`, { floor: Math.round(car.y), x: group.x });
 }
 
 function stepCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
@@ -633,7 +754,7 @@ function pickTarget(state: GameState, group: ElevatorGroup, car: ElevatorCar): n
 
 function movingCarPreferred(state: GameState, group: ElevatorGroup, idle: ElevatorCar, floor: number, dir: QueueDir): boolean {
   const direction = dir === 'up' ? 1 : -1;
-  return group.cars.some(car => car.id !== idle.id && !car.homeReassignmentPending && car.state === 'moving' && car.dir === direction &&
+  return group.cars.some(car => car.id !== idle.id && !car.outOfService && !car.homeReassignmentPending && car.state === 'moving' && car.dir === direction &&
     car.passengers.length < elevatorCapacity(group.kind) && car.targetFloor !== null &&
     (floor - car.y) * direction >= 0 && (car.targetFloor - floor) * direction >= 0 &&
     Math.abs(car.y - floor) - Math.abs(idle.y - floor) < activeWaitingResponse(state, group));

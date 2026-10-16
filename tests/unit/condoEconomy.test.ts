@@ -1,10 +1,11 @@
 import { expect, it } from 'vitest';
 import { CONFIG } from '../../src/data/config';
-import { buildFloor, cyclePricing, demolishTenant, deserializeGame, placeTenant, serializeGame, stepConstruction, stepDailySettlement, stepEvaluation } from '../../src/sim';
+import { buildFloor, cyclePricing, demolishTenant, deserializeGame, placeTenant, placeStair, serializeGame, stepConstruction, stepDailySettlement, stepEvaluation } from '../../src/sim';
 import { newTestGame } from '../helpers/simHarness';
 
 function fixture() {
   const state = newTestGame(); buildFloor(state, 2);
+  placeStair(state, 2, 0);
   const condo = placeTenant(state, 'condo', 2, 20);
   cyclePricing(state, condo.id); // high, before occupants move in
   condo.constructionTicksLeft = 1; stepConstruction(state);

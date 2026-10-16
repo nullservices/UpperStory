@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "smoke": "tsx tests/smoke/headless.ts",
     "perf": "tsx tests/smoke/perf.ts",
+    "playthrough": "tsx tests/playthrough/run.ts",
     "lint": "eslint src tests"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 import { CONFIG } from '../data/config';
-import { recordEvent } from './campaign';
+import { recordEvent, roofFacilityUnder } from './campaign';
 import { rngInt } from './core/rng';
-import { spend } from './money';
+import { addMoney, spend } from './money';
 import type { GameState } from './state';
 
 export type CellContent =
@@ -74,6 +74,7 @@ export function floorExtensionError(state: GameState, index: number, x: number):
   if (x >= bounds.lo && x < bounds.hi) return 'Floor already built here';
   const lo = bounds.lo === bounds.hi ? x : Math.min(x, bounds.lo); const hi = bounds.lo === bounds.hi ? x + 1 : Math.max(x + 1, bounds.hi);
   if (!floorContains(state, index <= 0 ? index + 1 : index - 1, lo, hi - lo)) return index <= 0 ? 'Extend the basement or lobby above first' : 'Extend the floor or lobby below first';
+  if (index > CONFIG.LOBBY_FLOOR_INDEX && roofFacilityUnder(state, index - 1, lo, hi)) return 'A rooftop facility occupies the roof below';
   if ((hi - lo - (bounds.hi - bounds.lo)) * 500_00 > state.money.balanceCents) return 'Not enough funds';
   return null;
 }
@@ -138,6 +139,10 @@ export function buildFloorError(state: GameState, index: number): string | null 
   if (index > CONFIG.LOBBY_FLOOR_INDEX && !getFloor(state.tower, index - 1)) {
     return 'Build lower floors first';
   }
+  if (index > CONFIG.LOBBY_FLOOR_INDEX) {
+    const support = floorBounds(state, index - 1);
+    if (roofFacilityUnder(state, index - 1, support.lo, support.hi)) return 'A rooftop facility occupies the roof below';
+  }
   if (floorCostDollars(index) * 100 > state.money.balanceCents) {
     return 'Not enough funds';
   }
@@ -157,7 +162,7 @@ export function buildFloor(state: GameState, index: number): Floor {
   }
   if (index < 0 && !state.campaign.treasureFound && rngInt(state, 0, 7) === 0) {
     state.campaign.treasureFound = true;
-    state.money.balanceCents += 1_000_000 * 100;
+    addMoney(state, 1_000_000 * 100);
     recordEvent(state, 'Excavation uncovered hidden treasure worth $1,000,000.');
   }
   return floor;
@@ -215,32 +220,55 @@ export function lobbyCovers(state: GameState, x: number, width: number): boolean
   return [...state.tenants.values()].some(t => t.type === 'lobby' && t.state === 'open' && x >= t.x && x + width <= t.x + t.sizeCells);
 }
 
+/**
+ * Each stair links exactly two adjacent floors, as in the original. Its cells
+ * sit on the floor farther from the lobby (which keeps its own tiles): floor
+ * N ≥ 2 links N−1↔N, and basement N ≤ 0 links N↔N+1 (B1 reaches the lobby).
+ * Legacy saves only stored stairs above the lobby, so their meaning is unchanged.
+ */
+export function stairCellFloor(lowerFloor: number): number {
+  return lowerFloor + 1 > CONFIG.LOBBY_FLOOR_INDEX ? lowerFloor + 1 : lowerFloor;
+}
+
+/** Lower floor of the link recorded by stair cells on `floorIndex`. */
+export function stairLowerFloor(floorIndex: number): number {
+  return floorIndex > CONFIG.LOBBY_FLOOR_INDEX ? floorIndex - 1 : floorIndex;
+}
+
+/** The hovered lobby places the lobby↔2 stair; other floors hold their own link. */
+function stairTargetFloor(floorIndex: number): number {
+  return floorIndex === CONFIG.LOBBY_FLOOR_INDEX ? floorIndex + 1 : floorIndex;
+}
+
 /** Human-readable reason a stair placement would fail, or null. */
 export function stairPlacementError(state: GameState, floorIndex: number, x: number): string | null {
-  if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX) floorIndex++;
+  floorIndex = stairTargetFloor(floorIndex);
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) return 'Build this floor first';
-  if (floorIndex <= CONFIG.LOBBY_FLOOR_INDEX) return 'Stairs start above the lobby';
+  const lower = stairLowerFloor(floorIndex);
+  const other = lower === floorIndex ? lower + 1 : lower;
+  if (!getFloor(state.tower, other)) return 'Build both floors first';
   if (!Number.isInteger(x) || x < 0 || x + 8 > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
-  if (floorIndex === CONFIG.LOBBY_FLOOR_INDEX + 1 && !lobbyCovers(state, x, 8)) return 'Extend the lobby beneath all 8 stair cells';
+  if (other === CONFIG.LOBBY_FLOOR_INDEX) {
+    if (!lobbyCovers(state, x, 8)) return `Extend the lobby ${floorIndex > other ? 'beneath' : 'above'} all 8 stair cells`;
+    for (const group of state.elevatorGroups.values()) {
+      if (group.serviceLo <= other && group.serviceHi >= other && x < group.x + (group.widthCells ?? 2) && x + 8 > group.x) return 'Space is occupied';
+    }
+  }
   if (!floorContains(state, floorIndex, x, 8)) return 'Extend this floor first';
+  if (other !== CONFIG.LOBBY_FLOOR_INDEX && !floorContains(state, other, x, 8)) return 'Extend both floors first';
   if (floor.cells.slice(x, x + 8).some(cell => cell.content !== 'empty')) return 'Space is occupied';
   if (stairEscalatorCount(state) >= CONFIG.MAX_STAIRS_ESCALATORS) return 'Maximum 64 stairs and escalators combined';
-  // Stairwell continuity: stair below (or the lobby floor beneath).
-  const below = getFloor(state.tower, floorIndex - 1);
-  if (below && below.index !== CONFIG.LOBBY_FLOOR_INDEX && (below.cells[x]?.content !== 'stair' || (below.cells[x]?.transportX ?? x) !== x)) {
-    return 'Needs a stair directly below';
-  }
   if (CONFIG.STAIR_COST_DOLLARS * 100 > state.money.balanceCents) return 'Not enough funds';
   return null;
 }
 
-/** Place a stair cell, deducting its cost. Throws Error(reason) if invalid. */
+/** Place one stair link, deducting its cost. Throws Error(reason) if invalid. */
 export function placeStair(state: GameState, floorIndex: number, x: number): void {
   const error = stairPlacementError(state, floorIndex, x);
   if (error) throw new Error(error);
   if (!spend(state, CONFIG.STAIR_COST_DOLLARS * 100)) throw new Error('Not enough funds');
-  const floor = getFloor(state.tower, floorIndex === CONFIG.LOBBY_FLOOR_INDEX ? floorIndex + 1 : floorIndex)!;
+  const floor = getFloor(state.tower, stairTargetFloor(floorIndex))!;
   for (let cx = x; cx < x + 8; cx++) floor.cells[cx] = { content: 'stair', tenantId: -1, transportX: x, transportWidth: 8 };
   state.tower.structureRevision++;
 }

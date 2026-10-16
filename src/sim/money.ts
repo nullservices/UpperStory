@@ -17,6 +17,10 @@ export interface MoneyState {
   dailyUpkeepCents: number;
   quarterIncomeCents: number;
   quarterUpkeepCents: number;
+  /** Outstanding bank loan principal (Upper Story original). */
+  loanCents?: number;
+  /** Interest charged at the most recent quarter's settlement. */
+  lastQuarterInterestCents?: number;
 }
 
 /** Returns false (and changes nothing) when funds are insufficient. */
@@ -90,6 +94,7 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
       tenant.reportedPopulation = Math.min(tenant.capacity, tenant.visitsToday ?? 0);
       tenant.visitsToday = 0;
     }
+    if (tenant.type === 'rooftopPool') tenant.visitsToday = 0;
     if (tenant.type === 'cinema') tenant.movieAge = (tenant.movieAge ?? 0) + 1;
     if (tenant.type === 'parkingSpace' && [...state.tenants.values()].some(t => t.type === 'parkingRamp' && t.floor === tenant.floor && t.state === 'open')) income += 5000;
   }
@@ -112,12 +117,24 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
     delta: income - upkeep,
   });
 
+  // Loan interest is charged with the quarter's settlement, as an expense.
+  let interest = 0;
+  if (settledDay % CONFIG.QUARTER_DAYS === 0 && (state.money.loanCents ?? 0) > 0) {
+    interest = Math.round(state.money.loanCents! * CONFIG.LOAN_INTEREST_QUARTER);
+    state.money.balanceCents -= interest;
+    state.money.dailyUpkeepCents += interest;
+    state.money.quarterUpkeepCents += interest;
+    state.money.lastQuarterInterestCents = interest;
+    pushEvent(state, { type: 'MONEY_CHANGED', balance: state.money.balanceCents, delta: -interest });
+  }
+
   if (settledDay % CONFIG.QUARTER_DAYS === 0) {
     pushEvent(state, {
       type: 'QUARTER_REPORT',
       quarter: Math.floor(settledDay / CONFIG.QUARTER_DAYS),
       income: state.money.quarterIncomeCents,
       upkeep: state.money.quarterUpkeepCents,
+      ...(interest > 0 ? { interest } : {}),
     });
     state.money.quarterIncomeCents = 0;
     state.money.quarterUpkeepCents = 0;

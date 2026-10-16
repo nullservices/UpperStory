@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { buildFloor, deserializeGame, placeTenant, serializeGame, stepConstruction, stepDailySettlement } from '../../src/sim';
+import { buildFloor, deserializeGame, placeTenant, placeStair, serializeGame, stepConstruction, stepDailySettlement } from '../../src/sim';
 import { newTestGame } from '../helpers/simHarness';
 
 it.each(['vacant', 'damaged', 'constructing'] as const)('settles previously earned revenue once while %s without charging new rent', status => {
@@ -24,6 +24,7 @@ it.each(['vacant', 'damaged', 'constructing'] as const)('settles previously earn
 it('retains a completed condo sale if damage occurs before its first settlement', () => {
   const state = newTestGame(); buildFloor(state, 2);
   const condo = placeTenant(state, 'condo', 2, 20);
+  placeStair(state, 2, 0);
   condo.constructionTicksLeft = 1; stepConstruction(state);
   expect(condo.dailyRevenue).toBe(150_000_00);
   condo.state = 'damaged';

@@ -1,4 +1,4 @@
-import { Graphics, Text } from 'pixi.js';
+import { Graphics } from 'pixi.js';
 import { CONFIG, TENANT_DATA, facilityHeight } from '../data/config';
 import type { Tool } from '../game/controller';
 import { elevatorBuildPlan } from '../game/elevatorBuild';
@@ -34,16 +34,8 @@ const WHITE = 0xffffff;
  */
 export class PlacementPreview {
   readonly graphics = new Graphics();
-  private readonly errorText = new Text({
-    text: '',
-    style: { fontSize: 9, fill: 0xdd4444, fontFamily: 'monospace' },
-  });
 
-  constructor() {
-    // Graphics extends Container: the error label rides along with it.
-    this.graphics.addChild(this.errorText);
-  }
-
+  /** Placement errors are explained by the UI's cursor tooltip; this only tints the footprint. */
   draw(
     state: GameState,
     tool: Tool | null,
@@ -53,7 +45,6 @@ export class PlacementPreview {
   ): void {
     const g = this.graphics;
     g.clear();
-    this.errorText.visible = false;
     if (!tool) return;
     const cell = CONFIG.CELL_WIDTH_PX;
     const valid = hoverError === null;
@@ -66,7 +57,6 @@ export class PlacementPreview {
         g.rect(plan.lo * cell, floorTopY(plan.floor, state.tower.lobbyHeight), (plan.hi - plan.lo) * cell, bandHeightPx(plan.floor, state.tower.lobbyHeight)).fill(
           !plan.error ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (plan.error) this.showError(plan.error, plan.lo * cell, floorTopY(plan.floor, state.tower.lobbyHeight), cell);
         break;
       }
       case 'select':
@@ -89,7 +79,6 @@ export class PlacementPreview {
         g.rect(x, y, cell * plan.width, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (hoverError) this.showError(hoverError, x, y, cell * plan.width);
         break;
       }
       case 'escalatorUp':
@@ -103,7 +92,6 @@ export class PlacementPreview {
         g.rect(x, y, cell * 8, h).fill(
           ok ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (!ok) this.showError(err, x, y, cell * 8);
         // Direction glyph, tinted with the rect's validity.
         const cx = x + cell * 4;
         const cy = y + h / 2;
@@ -131,17 +119,9 @@ export class PlacementPreview {
         g.rect(x, y, width, h).fill(
           valid ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        if (hoverError) this.showError(hoverError, x, y, width);
         break;
       }
     }
-  }
-
-  /** Error caption anchored just right of the preview rect. */
-  private showError(message: string, x: number, y: number, width: number): void {
-    this.errorText.text = message;
-    this.errorText.position.set(x + width + 6, y + 1);
-    this.errorText.visible = true;
   }
 }
 

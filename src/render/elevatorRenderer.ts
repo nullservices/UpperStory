@@ -1,5 +1,5 @@
 import { shaftWidth } from '../sim/elevators';
-import { Container, Graphics } from 'pixi.js';
+import { Container, Graphics, Sprite } from 'pixi.js';
 import { CONFIG } from '../data/config';
 import {
   carWorldY,
@@ -9,125 +9,152 @@ import {
   type ElevatorGroup,
   type GameState,
 } from '../sim';
+import { advanceAnimClock } from './animClock';
+import { carOutOfService, towerUnpowered } from './simCompat';
+import { hash32 } from './sprites/pixmap';
 import type { Motion } from './motion';
 import { ELEVATOR_COLORS } from './palette';
+import { DOOR_STEPS, brokenCarTexture, carTexture, machineRoom, shaftSegment, type LandingKind } from './sprites/elevator';
 
-/** Car body: 14px tall strip inset inside the housing. */
-const CAR_H = 14;
-/** Seat pips color (drawn when the car carries passengers). */
-const PIP_COLOR = 0xd8b84a;
-/** Darker shaft visible inside the translucent housing. */
-const SHAFT_INNER = 0x526761;
-/** Housing tint for service shafts (staff-only, M3). */
-const SERVICE_HOUSING = 0x8a9e9b;
-/** Housing tint for express shafts (M4) — between the standard and service. */
-const EXPRESS_HOUSING = 0x9b9c88;
+/** Car inset from its floor band: top gap and bottom gap (slab). */
+const CAR_TOP_INSET = 3;
+const CAR_BOTTOM_INSET = 3;
+const CAR_H = CONFIG.FLOOR_HEIGHT_PX - CAR_TOP_INSET - CAR_BOTTOM_INSET;
 
 /**
- * Vertical transport view: one shaft housing per elevator group, its cars
- * (with a small occupancy pips row), and red call lamps beside the serviced
- * floors that have a pending call. Redrawn every frame.
+ * Vertical transport view, in pixel art (sprites/elevator.ts). The shafts
+ * (housing, dark well, rails, slabs and a landing door frame with indicator
+ * at every served stop) are cached textures placed once per structure edit;
+ * the cars are pooled sprites whose door frames step open and closed while a
+ * car is in its 'doors' state. Cables, direction and call lamps are a small
+ * per-frame Graphics. Riders are drawn by the people view on top.
  */
 export class ElevatorView {
   readonly container = new Container();
-  private readonly graphics = new Graphics();
+  private readonly shafts = new Container();
+  private readonly carLayer = new Container();
+  private readonly cables = new Graphics();
+  private readonly lamps = new Graphics();
+  private readonly carPool: Sprite[] = [];
+  private signature = '';
+  private anim = 0;
+  private tower: GameState['tower'] | null = null;
 
   constructor() {
-    this.container.addChild(this.graphics);
+    this.container.eventMode = 'none';
+    this.container.addChild(this.shafts, this.cables, this.carLayer, this.lamps);
   }
 
   draw(state: GameState, alpha = 1, motion?: Motion): void {
-    const g = this.graphics;
-    g.clear();
-    for (const group of state.elevatorGroups.values()) {
-      this.drawGroup(g, state, group, alpha, motion);
+    this.anim = advanceAnimClock(state, alpha);
+    // Blackout without a generator: cars sit dark (the sim holds them).
+    this.carLayer.tint = towerUnpowered(state) ? 0x50566e : 0xffffff;
+    // Stop toggles do not always bump the structure revision; fold them in.
+    let signature = String(state.tower.structureRevision);
+    for (const group of state.elevatorGroups.values()) signature += `|${group.id}:${group.stops.length}:${group.disabledStops?.length ?? 0}`;
+    if (this.tower !== state.tower || this.signature !== signature) {
+      this.tower = state.tower;
+      this.signature = signature;
+      for (const child of this.shafts.removeChildren()) child.destroy();
+      for (const group of state.elevatorGroups.values()) this.drawShaft(state, group);
     }
+    this.cables.clear();
+    this.lamps.clear();
+    let used = 0;
+    for (const group of state.elevatorGroups.values()) used = this.drawCars(state, group, alpha, used, motion);
+    for (let i = used; i < this.carPool.length; i++) this.carPool[i]!.visible = false;
   }
 
-  private drawGroup(g: Graphics, state: GameState, group: ElevatorGroup, alpha: number, motion?: Motion): void {
-    // --- Housing: one translucent column from the top serviced band down to
-    // the bottom of the lowest serviced band (a shaft serving B1 ends at the
-    // ground line; the lobby band is included whenever the group serves it,
-    // because the lobby's cells stay lobby cells).
+  private drawShaft(state: GameState, group: ElevatorGroup): void {
     const cell = CONFIG.CELL_WIDTH_PX;
-    const top = floorTopY(group.serviceHi, state.tower.lobbyHeight);
-    const loFloor = getFloor(state.tower, group.serviceLo);
-    const bottom = floorTopY(group.serviceLo, state.tower.lobbyHeight) + (loFloor ? floorHeightPx(loFloor, state.tower.lobbyHeight) : bandFallbackPx(group.serviceLo, state.tower.lobbyHeight));
-    const housingX = group.x * cell - 1;
-    const housingW = cell * shaftWidth(group) + 2;
-    g.rect(housingX, top, housingW, bottom - top).fill({
-      color:
-        group.kind === 'service'
-          ? SERVICE_HOUSING
-          : group.kind === 'express'
-            ? EXPRESS_HOUSING
-            : ELEVATOR_COLORS.shaftHousing,
-      alpha: 0.8,
-    });
-    // Thin darker shaft between the two door columns.
-    g.rect((group.x + shaftWidth(group) / 2) * cell - 3, top, 6, bottom - top).fill({
-      color: SHAFT_INNER,
-      alpha: 1,
-    });
+    const lh = state.tower.lobbyHeight;
+    const x = group.x * cell;
+    const w = shaftWidth(group) * cell;
+    const stops = new Set(group.stops);
+    const disabled = new Set(group.disabledStops ?? []);
+    for (let f = group.serviceLo; f <= group.serviceHi; f++) {
+      const floor = getFloor(state.tower, f);
+      const h = floor ? floorHeightPx(floor, lh) : f === CONFIG.LOBBY_FLOOR_INDEX ? CONFIG.FLOOR_HEIGHT_PX * lh : CONFIG.FLOOR_HEIGHT_PX;
+      const landing: LandingKind = !floor || !stops.has(f) ? 'pass' : disabled.has(f) ? 'off' : 'stop';
+      const segment = new Sprite(shaftSegment(group.kind, w, h, landing, CAR_H));
+      segment.position.set(x, floorTopY(f, lh));
+      segment.roundPixels = true;
+      this.shafts.addChild(segment);
+    }
+    const cap = new Sprite(machineRoom(group.kind, w));
+    cap.position.set(x - 1, floorTopY(group.serviceHi, lh) - 5);
+    cap.roundPixels = true;
+    this.shafts.addChild(cap);
+  }
 
-    // Guide rails make the moving cabin legible against the shaft.
-    g.rect(housingX + 2, top, 1, bottom - top).fill(0xd2d8c5);
-    g.rect(housingX + housingW - 3, top, 1, bottom - top).fill(0xd2d8c5);
+  private drawCars(state: GameState, group: ElevatorGroup, alpha: number, used: number, motion?: Motion): number {
+    const cell = CONFIG.CELL_WIDTH_PX;
+    const lh = state.tower.lobbyHeight;
+    const x = group.x * cell;
+    const w = shaftWidth(group) * cell;
+    const shaftTop = floorTopY(group.serviceHi, lh);
+    const g = this.cables;
     for (const car of group.cars) {
-      const carTop = (motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y, state.tower.lobbyHeight)) + 3;
-      const left = group.x * cell + 1, width = cell * shaftWidth(group) - 2;
-      g.rect(left, carTop - 1, width, CAR_H + 2).fill(0x405e59);
-      g.rect(left + 1, carTop, width - 2, CAR_H).fill(0xf2d49a);
-      if (car.passengers.length > 0) this.drawPips(g, group, carTop, car.passengers.length);
+      const y = Math.round(motion?.carY(state, car.id, car.y, alpha) ?? carWorldY(car.y, lh));
+      const top = y + CAR_TOP_INSET;
+      const left = x + 2, cw = w - 4;
+      // Hoist cables from the machine room.
+      const cableX = x + Math.floor(w / 2);
+      if (top > shaftTop) {
+        g.rect(cableX - 2, shaftTop, 1, top - shaftTop).fill(0x6a6e78);
+        g.rect(cableX + 1, shaftTop, 1, top - shaftTop).fill(0x8a8e98);
+      }
       const open = car.state === 'doors'
         ? Math.max(0, Math.min(1, car.doorsTicksLeft >= CONFIG.ELEVATOR_DOOR_TICKS ? alpha : 1 - alpha))
         : 0;
-      const doorWidth = (width - 2) / 2 * (1 - open);
-      if (doorWidth > 0) {
-        g.rect(left + 1, carTop + 1, doorWidth, CAR_H - 2).fill({ color: 0x87a9a5, alpha: 0.65 });
-        g.rect(left + width - 1 - doorWidth, carTop + 1, doorWidth, CAR_H - 2).fill({ color: 0x87a9a5, alpha: 0.65 });
-        g.rect(left + 1 + doorWidth, carTop + 1, 1, CAR_H - 2).fill(0x587a74);
-        g.rect(left + width - 1 - doorWidth, carTop + 1, 1, CAR_H - 2).fill(0x587a74);
+      const step = Math.round(open * (DOOR_STEPS - 1));
+      const sprite = this.carAt(used++);
+      const broken = carOutOfService(car);
+      sprite.texture = broken ? brokenCarTexture(group.kind, cw, CAR_H) : carTexture(group.kind, cw, CAR_H, step);
+      sprite.position.set(left, top);
+      sprite.visible = true;
+      if (broken) {
+        // Sparks spitting from the car roof on the pause-aware clock.
+        const tick = Math.floor(this.anim / 90);
+        for (let k = 0; k < 3; k++) {
+          const h = hash32(tick * 7 + k * 131 + car.id * 977);
+          if (h % 3 === 0) continue;
+          const sx = left + 2 + (h % Math.max(1, cw - 4));
+          const sy = top - 1 - ((h >> 8) % 4);
+          this.lamps.rect(sx, sy, 1, 1).fill((h >> 4) % 2 ? 0xfff4bc : 0xffb030);
+          if ((h >> 12) % 2) this.lamps.rect(sx + ((h >> 13) % 2 ? 1 : -1), sy - 1, 1, 1).fill(0xffdc58);
+        }
+        continue;
       }
-      g.rect(left + 2, carTop, width - 4, 1).fill(0xfff4d6);
-      const arrowY = carTop - 5;
-      if (car.dir === 1) g.moveTo(left + 8, arrowY + 3).lineTo(left + 11, arrowY).lineTo(left + 14, arrowY + 3).stroke({ color: 0x4a8c67, width: 1.5 });
-      else if (car.dir === -1) g.moveTo(left + 8, arrowY).lineTo(left + 11, arrowY + 3).lineTo(left + 14, arrowY).stroke({ color: 0xb77c41, width: 1.5 });
+      // Direction lamp on the car header.
+      const ax = left + cw - 6, ay = top - 3;
+      if (car.dir === 1) this.lamps.poly([ax, ay + 3, ax + 2, ay, ax + 4, ay + 3]).fill(ELEVATOR_COLORS.arrowUp);
+      else if (car.dir === -1) this.lamps.poly([ax, ay, ax + 2, ay + 3, ax + 4, ay]).fill(ELEVATOR_COLORS.arrowDown);
     }
 
-    // --- Call lamps: a 3x3 light beside the shaft for each pending direction
-    // on a serviced floor that exists (up lamp near the band top, down lamp
-    // near the bottom, the door strip the stopped car occupies).
+    // Call lamps beside the shaft for each pending direction on a serviced
+    // floor (up near the band top, down below it).
     for (let f = group.serviceLo; f <= group.serviceHi; f++) {
       const call = state.floorCalls.get(f);
       if (!call || (!call.up && !call.down)) continue;
       if (!getFloor(state.tower, f)) continue;
-      const bandTop = carWorldY(f, state.tower.lobbyHeight);
-      if (call.up) g.rect(group.x * cell - 5, bandTop + 2, 3, 3).fill({ color: ELEVATOR_COLORS.callLight, alpha: 1 });
-      if (call.down) g.rect(group.x * cell - 5, bandTop + 15, 3, 3).fill({ color: ELEVATOR_COLORS.callLight, alpha: 1 });
+      const bandTop = carWorldY(f, lh);
+      const lx = x - 5;
+      this.lamps.rect(lx - 1, bandTop + 5, 6, 11).fill(0x2a2a30);
+      if (call.up) this.lamps.poly([lx, bandTop + 9, lx + 2, bandTop + 6, lx + 4, bandTop + 9]).fill(ELEVATOR_COLORS.callLight);
+      if (call.down) this.lamps.poly([lx, bandTop + 12, lx + 2, bandTop + 15, lx + 4, bandTop + 12]).fill(ELEVATOR_COLORS.callLight);
     }
+    return used;
   }
 
-  /** 2x2 seat pips (3px pitch, 3 rows of 5) along the top of the car body. */
-  private drawPips(g: Graphics, group: ElevatorGroup, carTop: number, count: number): void {
-    const cell = CONFIG.CELL_WIDTH_PX;
-    const startX = group.x * cell + 4;
-    const perRow = 5;
-    const total = Math.min(count, perRow * 3);
-    for (let i = 0; i < total; i++) {
-      const row = Math.floor(i / perRow);
-      const col = i % perRow;
-      g.rect(startX + col * 3, carTop + 3 + row * 3, 2, 2).fill({
-        color: PIP_COLOR,
-        alpha: 1,
-      });
+  private carAt(index: number): Sprite {
+    let sprite = this.carPool[index];
+    if (!sprite) {
+      sprite = new Sprite();
+      sprite.roundPixels = true;
+      this.carPool.push(sprite);
+      this.carLayer.addChild(sprite);
     }
+    return sprite;
   }
-}
-
-/** Band height for an index whose Floor object may not be at hand. */
-function bandFallbackPx(index: number, lobbyHeight: number): number {
-  return index === CONFIG.LOBBY_FLOOR_INDEX
-    ? CONFIG.FLOOR_HEIGHT_PX * lobbyHeight
-    : CONFIG.FLOOR_HEIGHT_PX;
 }

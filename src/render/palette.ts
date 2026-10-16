@@ -1,62 +1,116 @@
 import type { CellContent, PersonKind, Tenant, TenantType } from '../sim';
 
 /**
- * Flat-color art for the M1 tower. Every sim concept maps to a color here;
- * this file is the seam where pixel-art tiles/sprites later replace
- * procedural blocks — the sim never changes.
+ * Art seam for the procedural tower. Every color the world renderers share
+ * lives here; the visual language follows the classic cutaway-tower look
+ * (bright sky, green street line, tan soil, cream framed rooms) with all art
+ * drawn procedurally — the sim never changes when this file does.
  */
 export const PALETTE = {
-  skyTop: 0x0a1024,
-  skyBottom: 0x1e2c4d,
-  ground: 0x2b3123,
-  basementBg: 0x15181f,
-  floorBg: 0x242a3a,
-  gridLine: 0x303a52,
-  floorLabel: 0x7d8db1,
-  scaffold: 0x8a6d3b,
-  stair: 0x6e7b8f,
-  escalator: 0x7f9f5f,
+  /** Daytime sky gradient (screen-space, top → horizon). */
+  skyTop: 0x2f6fd6,
+  skyBottom: 0xa9d8ff,
+  /** Night sky gradient. */
+  nightSkyTop: 0x060a1f,
+  nightSkyBottom: 0x1b2856,
+  /** Dawn/dusk horizon glow. */
+  duskGlow: 0xf2a25a,
+  cloud: 0xffffff,
+  cloudShade: 0xd4e6fa,
+  /** Street-level grass line and the soil band below ground. */
+  grass: 0x4fae3a,
+  grassLight: 0x86d35e,
+  grassDark: 0x2f7d25,
+  soil: 0xa5784a,
+  soilDark: 0x8a6239,
+  soilLight: 0xbf935f,
+  soilDeep: 0x7a5432,
+  /** Built but unfurnished floor space. */
+  floorBg: 0xcdc6b4,
+  floorBgShade: 0xb9b19d,
+  basementBg: 0xa79f8e,
+  basementShade: 0x948b79,
+  /** Floor slab (bottom of each band) and the tower's outer walls. */
+  slab: 0x5b564c,
+  slabLight: 0x8d877a,
+  shell: 0x3c3934,
+  roof: 0x6d6a63,
+  roofLight: 0xd9d4c6,
+  floorLabel: 0x2a3a5a,
+  /** Room frame shared by every furnished room. */
+  roomDivider: 0x4a463e,
+  roomCeiling: 0xd6cfbf,
+  scaffold: 0xc0813a,
+  scaffoldDark: 0x8a5a28,
+  stair: 0x8e877a,
+  stairWell: 0xd9d2c2,
+  escalator: 0x4d7fae,
+  escalatorRail: 0x2c4f73,
   elevatorShaft: 0x4a4a55,
   elevatorLobby: 0x6a4f8f,
   facility: 0x9e4a4a,
+  gridLine: 0x303a52,
 } as const;
 
-/** Body color per tenant type (lobby is a Tenant now, not a cell kind). */
+/**
+ * Body color per tenant type — used by the minimap and as the dominant hue
+ * of each room's art (signage, upholstery).
+ */
 export const TENANT_COLORS: Record<TenantType, number> = {
-  lobby: 0xc9a227,
-  office: 0x3d6b9e,
-  condo: 0x8a5f3d,
-  fastfood: 0xd17a3f,
-  security: 0x4a5a8a,
-  housekeeping: 0x8a6a5a,
-  hotel: 0xa06ab0,
-  restaurant: 0x4f9e6a,
-  shop: 0xc78a3d,
-  skyLobby: 0x6a9fb5,
-  hotelTwin: 0xa06ab0, hotelSuite: 0xb09a6a, partyHall: 0xb08a78, cinema: 0x556477,
-  medical: 0x90b5a5, parkingRamp: 0x89948a, parkingSpace: 0x768b92, recycling: 0x78966b, metro: 0x739693, cathedral: 0xc3ab7d,
-};
-
-/** Body color per person kind (M2). */
-export const PERSON_COLORS: Record<PersonKind, number> = {
-  officeWorker: 0x355d72,
-  resident: 0x9c5e3e,
-  hotelGuest: 0x81517f,
-  diner: 0xab743c,
-  shopper: 0x447e57,
-  guard: 0x3d5a99,
-  housekeeper: 0x756346,
+  lobby: 0xd9c38a,
+  office: 0x6f8fb8,
+  condo: 0xc9824a,
+  fastfood: 0xe0452e,
+  security: 0x3f5fa8,
+  housekeeping: 0x9aa7a0,
+  hotel: 0x4f7fc0,
+  restaurant: 0x8a2f35,
+  shop: 0x3f9a58,
+  skyLobby: 0x7fb3cf,
+  hotelTwin: 0x5aa060, hotelSuite: 0xb58a3a, partyHall: 0xe07fa0, cinema: 0xb3262f,
+  medical: 0xd8403a, parkingRamp: 0x8f8f8a, parkingSpace: 0x7a7a76, recycling: 0x3d7a3a, metro: 0x2f5fb3, cathedral: 0xc9b07a,
+  fireStation: 0xc8281e, bank: 0x2a5a8a, helipad: 0x5a5e66, rooftopPool: 0x3aa8d8, maintenance: 0xd09a2a, generator: 0x6a6a3a,
 };
 
 /**
- * Elevator hardware colors (M2): shaft housing, car bodies, and the red call
- * lamps beside each serviced floor's door.
+ * Person silhouette color per kind. People read as small dark figures; the
+ * hue only hints at who they are (stress blends toward pink/red).
+ */
+export const PERSON_COLORS: Record<PersonKind, number> = {
+  officeWorker: 0x1d2a44,
+  resident: 0x3b2618,
+  hotelGuest: 0x2c1f3e,
+  diner: 0x2f2a1c,
+  shopper: 0x1e3424,
+  guard: 0x1a2c6e,
+  housekeeper: 0x4a3a2a,
+};
+
+/** Stress ramp for impatient people: dark → pink → red. */
+export const STRESS_COLORS = { pink: 0xf07aa8, red: 0xe02020 } as const;
+
+/**
+ * Elevator hardware colors: shaft interior, landing doors, car bodies, and
+ * the red call lamps beside each serviced floor's door.
  */
 export const ELEVATOR_COLORS = {
-  shaftHousing: 0x82958a,
-  carBody: 0xc2c8b6,
-  carDoorsOpen: 0xe3e4d3,
-  callLight: 0xe05555,
+  shaftHousing: 0x3b3f4a,
+  shaftInner: 0x23262e,
+  serviceHousing: 0x4a4238,
+  expressHousing: 0x2f3c52,
+  rail: 0x6a7080,
+  door: 0x9aa3ad,
+  doorLight: 0xc3cad2,
+  doorFrame: 0x5d6470,
+  carBody: 0xf6e7a6,
+  carShade: 0xd9c47a,
+  carFrame: 0x5a4a1e,
+  serviceCar: 0xd9d9d0,
+  expressCar: 0xf3c76b,
+  carDoorsOpen: 0xfff6d6,
+  callLight: 0xff3b2f,
+  arrowUp: 0x3fbf5f,
+  arrowDown: 0xff8a2f,
 } as const;
 
 /**
@@ -86,4 +140,11 @@ export function cellColor(content: CellContent, tenant?: Tenant): number {
     default:
       return PALETTE.floorBg;
   }
+}
+
+/** Linear RGB blend of two 0xRRGGBB colors. */
+export function lerpRgb(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
+  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
+  return (Math.round(ar + (br - ar) * t) << 16) | (Math.round(ag + (bg - ag) * t) << 8) | Math.round(ab + (bb - ab) * t);
 }

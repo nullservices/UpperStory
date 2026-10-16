@@ -1,6 +1,5 @@
 import { Application, Container, type FederatedPointerEvent } from 'pixi.js';
-import { CONFIG } from '../data/config';
-import { cameraAnchor, initialCameraZoom } from './cameraLayout';
+import { CHROME_INSETS, cameraAnchor, chromeLeft, initialCameraZoom, stepZoom } from './cameraLayout';
 
 /**
  * Camera over the tower world. World coordinates are pixels at zoom 1
@@ -17,6 +16,7 @@ export class Camera {
   x = 0;
   y = 0;
   zoom = 1;
+  private wheelDelta = 0;
 
   private dragging = false;
   private last = { x: 0, y: 0 };
@@ -39,28 +39,30 @@ export class Camera {
   }
 
   /**
-   * Center the view on the demo tower's lower floors. The x offset keeps the
-   * tower clear of the DOM tool palette (a ~160px strip on the left).
+   * Frame the tower's lower floors: its left edge just clear of the floating
+   * palette, street level about four fifths down the visible area, so the sky you
+   * build into gets most of the screen and a few basements still show.
    */
   center(): void {
-    const width = this.app.screen.width;
-    this.zoom = Math.max(CONFIG.MIN_ZOOM, initialCameraZoom(width));
-    this.x = width <= 620 ? 184 : 230;
-    this.y = this.app.screen.height * 0.79;
+    const { width, height } = this.app.screen;
+    this.zoom = initialCameraZoom(width);
+    this.x = chromeLeft(width) + 40; // room for the floor labels left of the tower
+    this.y = CHROME_INSETS.top + (height - CHROME_INSETS.top - CHROME_INSETS.bottom) * 0.82;
     this.apply();
   }
 
   zoomBy(factor: number): void {
     const { x: cx, y: cy } = cameraAnchor(this.app.screen.width, this.app.screen.height);
     const world = this.screenToWorld(cx, cy);
-    this.zoom = Math.min(CONFIG.MAX_ZOOM, Math.max(CONFIG.MIN_ZOOM, this.zoom * factor));
+    this.zoom = stepZoom(this.zoom, factor - 1);
     this.x = cx - world.x * this.zoom;
     this.y = cy - world.y * this.zoom;
     this.apply();
   }
 
   apply(): void {
-    this.view.position.set(this.x, this.y);
+    // Whole screen pixels keep sprite edges crisp.
+    this.view.position.set(Math.round(this.x), Math.round(this.y));
     this.view.scale.set(this.zoom);
   }
 
@@ -101,11 +103,11 @@ export class Camera {
 
   private onWheel(e: WheelEvent): void {
     e.preventDefault();
-    const factor = e.deltaY < 0 ? CONFIG.ZOOM_STEP : 1 / CONFIG.ZOOM_STEP;
-    const newZoom = Math.min(
-      Math.max(this.zoom * factor, CONFIG.MIN_ZOOM),
-      CONFIG.MAX_ZOOM,
-    );
+    // Trackpads send many small deltas: step one level per notch's worth.
+    this.wheelDelta += e.deltaMode === 0 ? e.deltaY : e.deltaY * 100;
+    if (Math.abs(this.wheelDelta) < 100) return;
+    const newZoom = stepZoom(this.zoom, -Math.sign(this.wheelDelta));
+    this.wheelDelta = 0;
     if (newZoom === this.zoom) return;
 
     // Zoom around the cursor: keep the world point under it stationary.

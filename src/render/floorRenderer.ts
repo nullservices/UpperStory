@@ -1,230 +1,494 @@
-import { floorBounds } from '../sim/tower';
-import { Container, Graphics, Text } from 'pixi.js';
+import { floorBounds, stairLowerFloor } from '../sim/tower';
+import { CanvasSource, Container, Graphics, Sprite, Text, Texture, TilingSprite } from 'pixi.js';
 import { facilityHeight, isHotel, CONFIG } from '../data/config';
-import { floorHeightPx, floorTopY, type GameState, type Tenant } from '../sim';
+import { floorHeightPx, floorTopY, type Floor, type GameState, type Tenant } from '../sim';
+import { PALETTE, lerpRgb } from './palette';
+import { animTime } from './animClock';
+import { ambient } from './ambient';
+import { isLit, nightAlpha } from './dayNight';
+import { cinemaScreen, isOpenAir, poolWater, roomKey, roomLook, roomTextures, roomVariant, type RoomLook } from './roomArt';
+import { roomLighting } from './roomLighting';
+import { towerUnpowered } from './simCompat';
+import { filmFrames, rippleFrames } from './sprites/effects';
+import { hash32 } from './sprites/pixmap';
+import { BAND_TILE_W, emptyBandTexture, flightTexture, wellTexture } from './sprites/structure';
+import { StreetView } from './street';
 
-/** Original procedural cutaway art. Structure is cached between building edits. */
+/** World extent of the backdrop (ground band) around the tower. */
+const GROUND_LEFT = -4000;
+const GROUND_WIDTH = CONFIG.FLOOR_WIDTH_CELLS * CONFIG.CELL_WIDTH_PX + 8000;
+const GROUND_DEPTH = 4000;
+
+interface RoomSprite {
+  /** One sprite per texture piece (wide lobbies are cut into pieces). */
+  pieces: Sprite[];
+  /** Night emissive overlay per piece (null where a piece has no lamps). */
+  glows: (Sprite | null)[];
+  state: Tenant['state'];
+  look: RoomLook;
+  key: string;
+  /** Animated overlay: a cinema's film or a rooftop pool's ripples. */
+  film?: Sprite;
+  filmFrames?: Texture[];
+  filmMs?: number;
+}
+
+/** Milliseconds per cinema film frame / pool ripple frame. */
+const FILM_FRAME_MS = 180;
+const RIPPLE_FRAME_MS = 220;
+
+/** Night tints (multiplied into the room art) for lit and unlit rooms. */
+const LIT_WARM = 0xffd6a0;
+const LIT_HOTEL = 0xd2e2ff;
+const UNLIT = 0x262c4c;
+/** Blackout: interiors read dark even by day. */
+const BLACKOUT_LEVEL = 0.72;
+/** Lights stutter for this long (anim ms) when the power first fails. */
+const FLICKER_MS = 1600;
+
+/** A cinema shows its film while it is open with an audience in; a pool always ripples. */
+function filmShowing(tenant: Tenant, powered = true): boolean {
+  if (tenant.type === 'rooftopPool') return tenant.state === 'open';
+  return powered && tenant.state === 'open' && tenant.occupancy > 0;
+}
+
+/**
+ * Cutaway tower view.
+ *  - backdrop: skyline, street (trees, cars) and the tiled soil band (street.ts).
+ *  - shell: floor bands, slabs, outer walls and roof caps (per structure edit).
+ *  - rooms: one Graphics per tenant sharing a cached GraphicsContext per
+ *    type/state/size/variant (roomArt.ts), so identical rooms share geometry
+ *    and a tenant whose state or look (hotel guest/dirty, unhappy tenant)
+ *    changes swaps only its own context.
+ *  - transport: stair and escalator flights drawn over the rooms they cross.
+ *  - labels: floor numbers at the left edge of each floor.
+ */
 export class TowerView {
   readonly container = new Container();
-  private backdrop = new Graphics();
-  private structure = new Graphics();
+  private readonly backdrop = new Container();
+  private readonly bands = new Container();
+  private readonly shell = new Graphics();
+  private readonly rooms = new Container();
+  private readonly glows = new Container();
+  private readonly films = new Container();
+  private readonly playing = new Set<RoomSprite>();
+  private readonly transport = new Container();
+  private readonly labelLayer = new Container();
   private labels: Text[] = [];
+  private readonly sprites = new Map<number, RoomSprite>();
+  private readonly street = new StreetView(GROUND_LEFT, GROUND_WIDTH);
   private revision = -1;
   private tower: GameState['tower'] | null = null;
-  constructor() { this.container.addChild(this.backdrop, this.structure); }
-  draw(state: GameState): void {
-    if (this.tower === state.tower && this.revision === state.tower.structureRevision) return;
-    this.tower = state.tower; this.revision = state.tower.structureRevision;
-    const floors = state.tower.floors;
-    if (!floors.length) return;
-    const lobby = [...state.tenants.values()].find(t => t.type === 'lobby');
-    const width = ((lobby?.x ?? 0) + (lobby?.sizeCells ?? 0)) * CONFIG.CELL_WIDTH_PX;
-    const b = this.backdrop; b.clear();
-    // Ground level is the lobby's foot, not the basement floor.
-    const ground = 0;
-    b.rect(-6000, ground, 12000, 5000).fill(0xbcb99d);
-    b.rect(-6000, ground, 12000, 5).fill(0x809b66);
-    b.rect(-6000, ground + 5, 12000, 5).fill(0xc7c6b5);
-    b.rect(-6000, ground + 10, 12000, 17).fill(0xa9aaa0);
-    for (let x = -1200; x < 2400; x += 34) b.rect(x, ground + 18, 16, 1).fill(0xe3dfc6);
-    // Faint skyline and trees, kept behind the playable structure.
-    for (let i = 0; i < 25; i++) {
-      const x = -1000 + i * 115;
-      const h = 35 + ((i * 37) % 83);
-      b.rect(x, ground - h, 64, h).fill(0xb1c6bd);
-      b.rect(x + 5, ground - h - 4, 54, 4).fill(0xa6bdb6);
-      for (let y = ground - h + 8; y < ground - 8; y += 12) {
-        for (let col = 0; col < 5; col++) b.rect(x + 7 + col * 11, y, 5, 6).fill(0xc3d4c8);
-      }
-    }
-    for (const x of [-175, -100, -42, width + 35, width + 115, width + 220]) {
-      b.rect(x + 8, ground - 18, 3, 18).fill(0x8c8760);
-      b.circle(x + 9, ground - 24, 13).fill(0x79986b);
-      b.circle(x + 4, ground - 29, 10).fill(0x90a97a);
-    }
-    const g = this.structure; g.clear();
-    for (const floor of floors) {
-      const bounds = floorBounds(state, floor.index);
-      const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
-      const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
-      if (!width) continue;
-      const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
-      g.rect(left, y, width, h).fill(floor.index <= 0 ? 0x979d8c : 0xdce0d3);
-      for (let x = left; x < left + width; x += 12) {
-        if (floor.cells[x / 12]?.content === 'empty') {
-          g.rect(x, y + 2, 1, h - 4).fill({ color: 0xb5c1b4, alpha: 0.5 });
-          g.rect(x + 4, y + h - 6, 2, 1).fill(0xc1cbbd);
-        }
-      }
-    }
-    // Draw a whole room at once; cells are placement units, not dividing walls.
-    for (const tenant of state.tenants.values()) this.room(g, tenant, state);
-    for (const floor of floors) {
-      const bounds = floorBounds(state, floor.index);
-      const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
-      const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
-      if (!width) continue;
-      const y = floorTopY(floor.index, state.tower.lobbyHeight); const h = floorHeightPx(floor, state.tower.lobbyHeight);
-      floor.cells.forEach((cell, index) => {
-        const x = index * CONFIG.CELL_WIDTH_PX;
-        const lobbyStair = floor.index === CONFIG.LOBBY_FLOOR_INDEX &&
-          floors.find(f => f.index === CONFIG.LOBBY_FLOOR_INDEX + 1)?.cells[index]?.content === 'stair';
-        const lobbyEscalator = floor.index === 1 && state.escalators.has(`1:${index}`);
-        if (cell.content === 'stair' || cell.content === 'escalator' || lobbyStair || lobbyEscalator) {
-          const transport = lobbyStair || lobbyEscalator ? floors.find(f => f.index === 2)!.cells[index]! : cell;
-          if ((transport.transportX ?? index) !== index) return;
-          const width = (transport.transportWidth ?? 1) * CONFIG.CELL_WIDTH_PX;
-          g.rect(x, y + 1, width, h - 2).fill(0xc1c9bc);
-          for (let i = 0; i < 8; i++) g.rect(x + i * width / 8, y + h - 4 - i * (h - 6) / 8, width / 8 + 1, 2).fill(0x6c8276);
-        }
-      });
-      let segmentStart = left / CONFIG.CELL_WIDTH_PX;
-      for (let column = segmentStart; column <= (left + width) / CONFIG.CELL_WIDTH_PX; column++) {
-        const tenant = state.tenants.get(floor.cells[column]?.tenantId ?? -1);
-        const interior = tenant && floor.index < tenant.floor + facilityHeight(tenant.type) - 1;
-        if (interior || column === (left + width) / CONFIG.CELL_WIDTH_PX) {
-          if (column > segmentStart) {
-            g.rect(segmentStart * CONFIG.CELL_WIDTH_PX, y, (column - segmentStart) * CONFIG.CELL_WIDTH_PX, 2).fill(0x83958b);
-            g.rect(segmentStart * CONFIG.CELL_WIDTH_PX, y + 2, (column - segmentStart) * CONFIG.CELL_WIDTH_PX, 1).fill(0xf1f0df);
-          }
-          segmentStart = column + 1;
-        }
-      }
-      g.rect(left - 2, y, 2, h).fill(0x7e9183);
-      g.rect(left + width, y, 2, h).fill(0x7e9183);
-    }
-    const roof = floorTopY(floors[floors.length - 1]!.index, state.tower.lobbyHeight);
-    const roofBounds = floorBounds(state, floors[floors.length - 1]!.index);
-    const roofLeft = roofBounds.lo * CONFIG.CELL_WIDTH_PX;
-    const roofWidth = (roofBounds.hi - roofBounds.lo) * CONFIG.CELL_WIDTH_PX;
-    if (roofWidth) g.rect(roofLeft - 5, roof - 4, roofWidth + 10, 4).fill(0x6e847d);
-    if (roofWidth) g.rect(roofLeft - 5, roof - 5, roofWidth + 10, 1).fill(0xe6e9da);
-    for (const label of this.labels) label.destroy();
-    this.labels = [];
-    for (const floor of floors) {
-      const bounds = floorBounds(state, floor.index);
-      const left = bounds.lo * CONFIG.CELL_WIDTH_PX;
-      const width = (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX;
-      if (!width) continue;
-      const text = new Text({ text: floor.index <= 0 ? `B${1 - floor.index}` : floor.index === 1 ? 'L' : String(floor.index), style: { fontSize: 9, fill: 0x496253, fontFamily: 'Tahoma', fontWeight: 'bold' } });
-      text.position.set(left - 22, floorTopY(floor.index, state.tower.lobbyHeight) + 5); this.labels.push(text); this.container.addChild(text);
-    }
+  private lightKey = '';
+  private powered = true;
+  /** Anim time the current outage was first seen (-1 = power on). */
+  private outageSince = -1;
+
+  constructor() {
+    this.container.eventMode = 'none';
+    this.buildBackdrop();
+    this.container.addChild(this.backdrop, this.bands, this.shell, this.rooms, this.glows, this.films, this.transport, this.labelLayer);
   }
-  private room(g: Graphics, tenant: Tenant, state: GameState): void {
-    const x = tenant.x * CONFIG.CELL_WIDTH_PX, y = floorTopY(tenant.floor + facilityHeight(tenant.type) - 1, state.tower.lobbyHeight);
-    const w = tenant.sizeCells * CONFIG.CELL_WIDTH_PX;
-    const h = tenant.floor === 1 ? 20 * state.tower.lobbyHeight : 20 * facilityHeight(tenant.type);
-    if (tenant.state === 'constructing') {
-      g.rect(x + 1, y + 2, w - 2, h - 3).fill(0xd4d0b8);
-      for (let sx = x + 3; sx < x + w - 3; sx += 12) {
-        g.rect(sx, y + 3, 2, h - 5).fill(0xb29d6c);
-        g.moveTo(sx, y + h - 3).lineTo(Math.min(sx + 12, x + w - 2), y + 4).stroke({ width: 1, color: 0xaaa17e });
-      }
-      g.rect(x + 1, y + h - 4, w - 2, 3).fill(0xba9a54);
+
+  draw(state: GameState): void {
+    this.street.update();
+    if (this.tower !== state.tower || this.revision !== state.tower.structureRevision) {
+      this.tower = state.tower;
+      this.revision = state.tower.structureRevision;
+      this.rebuild(state);
+      this.lightKey = '';
+      this.applyLighting(state);
+      this.animateFilms();
       return;
     }
-    const colors: Record<string, number> = { office: 0xe3e4d7, condo: 0xe7d4ba, hotel: 0xddd1db, fastfood: 0xe9d8b9, restaurant: 0xd6dfc5, shop: 0xe7d8c0, lobby: 0xece6cd, skyLobby: 0xd9e5dc, security: 0xd0dddb, housekeeping: 0xdde0d0 };
-    g.rect(x + 1, y + 2, w - 2, h - 3).fill(colors[tenant.type] ?? 0xdce0d3);
-    g.rect(x + 1, y + h - 4, w - 2, 3).fill(tenant.type === 'office' ? 0x92aeb0 : 0xb6a789);
-    g.rect(x, y + 2, 2, h - 2).fill(0x9b9d88);
-    if (tenant.type === 'lobby' || tenant.type === 'skyLobby') {
-      for (let sx = x + 8; sx < x + w - 10; sx += 38) {
-        g.rect(sx, y + 5, 26, h - 11).fill(0xb1d3d0);
-        g.rect(sx + 1, y + 6, 10, h - 13).fill(0xcbe4de);
-        g.rect(sx + 12, y + 5, 2, h - 11).fill(0x879e92);
-        g.rect(sx - 4, y + 3, 3, h - 6).fill(0xd0c7a6);
-      }
-      for (let sx = x + 25; sx < x + w - 25; sx += 96) {
-        this.plant(g, sx, y + h - 5);
-        g.rect(sx + 10, y + h - 10, 23, 5).fill(0x8f9c76);
-        g.rect(sx + 12, y + h - 5, 2, 2).fill(0x6c735b);
-        g.rect(sx + 29, y + h - 5, 2, 2).fill(0x6c735b);
-      }
-    } else if (tenant.type === 'office' || tenant.type === 'security') {
-      for (let sx = x + 6; sx < x + w - 18; sx += 28) {
-        this.window(g, sx, y + 4, 18, 7);
-        g.rect(sx + 2, y + 13, 19, 2).fill(0x9f8866);
-        g.rect(sx + 6, y + 9, 7, 5).fill(0x526e72);
-        g.rect(sx + 7, y + 10, 5, 3).fill(0xb1d5cd);
-        g.rect(sx + 16, y + 14, 4, 3).fill(0x738b8f);
-      }
-      this.plant(g, x + w - 8, y + h - 4);
-    } else if (tenant.type === 'condo' || isHotel(tenant.type)) {
-      for (let sx = x + 5; sx < x + w - 24; sx += 34) {
-        this.window(g, sx + 2, y + 4, 13, 7);
-        g.rect(sx, y + 12, 22, 5).fill(isHotel(tenant.type) ? 0x9c85a4 : 0xb98267);
-        g.rect(sx + 1, y + 12, 6, 3).fill(0xf5eedf);
-        g.rect(sx + 24, y + 11, 5, 6).fill(0x9d8965);
-        g.rect(sx + 25, y + 7, 3, 4).fill(0xe2c88d);
-      }
-    } else if (tenant.type === 'fastfood' || tenant.type === 'restaurant') {
-      g.rect(x + 3, y + 3, w - 6, 3).fill(tenant.type === 'fastfood' ? 0xb96947 : 0x789269);
-      g.rect(x + 4, y + 11, 14, 6).fill(0xbc9c6b);
-      for (let sx = x + 23; sx < x + w - 8; sx += 18) {
-        g.rect(sx, y + 11, 11, 2).fill(0xf1e4c5);
-        g.rect(sx + 5, y + 13, 1, 4).fill(0x8b795e);
-        g.rect(sx - 2, y + 13, 3, 4).fill(0x9b7560);
-        g.rect(sx + 11, y + 13, 3, 4).fill(0x9b7560);
-      }
-    } else if (tenant.type === 'cinema') {
-      g.rect(x + 5, y + 4, w - 10, h - 10).fill(0x414e56);
-      g.rect(x + w / 4, y + 6, w / 2, h / 3).fill(0xc9d4c6);
-      for (let row = 0; row < 3; row++) for (let sx = x + 8; sx < x + w - 8; sx += 12) g.rect(sx, y + h / 2 + row * 5, 8, 4).fill(0xa46f68);
-    } else if (tenant.type === 'cathedral') {
-      g.rect(x + 4, y + 3, w - 8, h - 6).fill(0xd6c8a4);
-      for (let sx = x + 12; sx < x + w - 15; sx += 28) {
-        g.roundRect(sx, y + 10, 16, h / 2, 8).fill(0x809aab);
-        g.rect(sx + 7, y + 10, 2, h / 2).fill(0xd6b87b);
-        g.rect(sx, y + h / 3, 16, 2).fill(0xd6b87b);
-        g.rect(sx - 3, y + h - 14, 24, 6).fill(0x947d5c);
-      }
-    } else if (tenant.type === 'metro') {
-      g.rect(x + 3, y + 4, w - 6, h - 7).fill(0x596868);
-      g.roundRect(x + 8, y + h / 2, w - 16, h / 3, 5).fill(0xb5c9bd);
-      for (let sx = x + 15; sx < x + w - 20; sx += 22) g.rect(sx, y + h / 2 + 3, 14, 8).fill(0x5c8b93);
-      g.rect(x + 4, y + h - 6, w - 8, 2).fill(0xd7c490);
-    } else if (tenant.type === 'parkingSpace') {
-      g.roundRect(x + 4, y + 9, w - 8, 7, 2).fill([0x8d9da7, 0xb08068, 0x7f9981][tenant.id % 3]!);
-      g.rect(x + 12, y + 6, w - 24, 5).fill(0xbed2cb);
-      g.circle(x + 10, y + 17, 2).fill(0x52605c); g.circle(x + w - 10, y + 17, 2).fill(0x52605c);
-    } else if (tenant.type === 'parkingRamp') {
-      g.moveTo(x + 2, y + h - 3).lineTo(x + w - 2, y + 4).stroke({ width: 3, color: 0x7d8d81 });
-    } else if (tenant.type === 'partyHall') {
-      for (let sx = x + 14; sx < x + w - 12; sx += 25) {
-        g.circle(sx, y + h - 12, 7).fill(0xe7dcc7);
-        g.rect(sx - 9, y + h - 12, 3, 6).fill(0x9d7a68);
-        g.rect(sx + 7, y + h - 12, 3, 6).fill(0x9d7a68);
-      }
-      g.circle(x + w / 2, y + 8, 4).fill(0xd9bd71);
-    } else if (tenant.type === 'medical') {
-      for (let sx = x + 8; sx < x + w - 20; sx += 28) {
-        g.rect(sx, y + 11, 22, 5).fill(0xe8ecdd); g.rect(sx + 2, y + 10, 5, 3).fill(0xacc6ba);
-      }
-      g.rect(x + w - 11, y + 4, 3, 9).fill(0xad6056); g.rect(x + w - 14, y + 7, 9, 3).fill(0xad6056);
-    } else if (tenant.type === 'recycling') {
-      for (let sx = x + 8; sx < x + w - 20; sx += 28) {
-        g.rect(sx, y + 8, 20, h - 14).fill(0x7e9780); g.rect(sx - 1, y + 6, 22, 3).fill(0x536e60);
-      }
-    } else {
-      for (let sx = x + 5; sx < x + w - 10; sx += 19) {
-        g.rect(sx, y + 5, 14, 12).fill(0xb3a384);
-        for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) g.rect(sx + 2 + col * 4, y + 6 + row * 5, 3, 4).fill([0xa8b894, 0xb97f69, 0xe4cf92][col]!);
-        g.rect(sx, y + 10, 14, 1).fill(0x897c61);
+    // Between structure edits only tenant states and looks change (open ↔
+    // vacant, construction, damage, guests, housekeeping, evaluation): swap
+    // just those rooms' art.
+    for (const tenant of state.tenants.values()) {
+      const sprite = this.sprites.get(tenant.id);
+      if (!sprite || sprite.state !== tenant.state || sprite.look !== roomLook(tenant)) {
+        this.syncRoom(state, tenant);
+        this.lightKey = '';
+      } else if (sprite.film && sprite.film.visible !== filmShowing(tenant, this.powered)) {
+        sprite.film.visible = filmShowing(tenant, this.powered);
       }
     }
-    if (tenant.state === 'damaged') {
-      g.rect(x + 1, y + 2, w - 2, h - 3).fill({ color: 0x433f38, alpha: 0.75 });
-      for (let sx = x + 4; sx < x + w - 8; sx += 14) g.moveTo(sx, y + 4).lineTo(sx + 8, y + h - 4).stroke({ width: 2, color: 0xb88e4b });
-    }
-    if (tenant.state === 'vacant') g.rect(x + 2, y + 3, w - 4, h - 6).fill({ color: 0xb0b0a0, alpha: 0.5 });
+    this.applyLighting(state);
+    this.animateFilms();
+  }
 
+  /** Advance every visible cinema film and pool ripple (paused with the game clock). */
+  private animateFilms(): void {
+    if (!this.playing.size) return;
+    const now = animTime();
+    for (const room of this.playing) {
+      const film = room.film, frames = room.filmFrames;
+      if (!film?.visible || !frames) continue;
+      film.texture = frames[Math.floor(now / (room.filmMs ?? FILM_FRAME_MS)) % frames.length]!;
+    }
   }
-  private window(g: Graphics, x: number, y: number, w: number, h: number): void {
-    g.rect(x, y, w, h).fill(0xa8ced0); g.rect(x + 1, y + 1, w / 2 - 1, h - 2).fill(0xc8e1de);
-    g.rect(x + w / 2, y, 1, h).fill(0x8ca9a3);
+
+  /**
+   * Night and blackout lighting in the pixel style: instead of translucent
+   * overlay boxes, each room's art is re-tinted (warm interior when lit,
+   * deep blue-grey when dark) and lit rooms show their lamp layer at full
+   * brightness, so lamps and the pools of light under them glow. Empty
+   * floor space, the shell and the stairs darken with the unlit rooms.
+   * During a blackout without a working generator everything goes dark
+   * after a short flicker. Re-tinted only when the light bucket, the lit set
+   * or the flicker state changes.
+   */
+  private applyLighting(state: GameState): void {
+    const night = Math.round((nightAlpha(ambient.minuteOfDay) / 0.45) * 32) / 32;
+    const unpowered = towerUnpowered(state);
+    let flicker = 0;
+    if (unpowered) {
+      const now = animTime();
+      if (this.outageSince < 0) this.outageSince = now;
+      const t = (now - this.outageSince) / FLICKER_MS;
+      // Mostly on at first, failing more often until the lights stay off.
+      if (t < 1) flicker = (hash32(Math.floor(now / 70)) % 100) / 100 > t * 1.1 ? 1 : 2;
+    } else {
+      this.outageSince = -1;
+    }
+    const powered = !unpowered || flicker === 1;
+    const darkLevel = powered ? night : Math.max(night, BLACKOUT_LEVEL);
+    let hash = 0;
+    if (night > 0) {
+      for (const tenant of state.tenants.values()) hash = (Math.imul(hash, 31) + tenant.id * 2 + (isLit(tenant) ? 1 : 0)) | 0;
+    }
+    const key = `${night}|${darkLevel}|${powered ? 1 : 0}|${hash}`;
+    if (key === this.lightKey) return;
+    this.lightKey = key;
+    if (this.powered !== powered) {
+      this.powered = powered;
+      for (const tenant of state.tenants.values()) {
+        const film = this.sprites.get(tenant.id)?.film;
+        if (film) film.visible = filmShowing(tenant, powered);
+      }
+    }
+    const unlitTint = lerpRgb(0xffffff, UNLIT, darkLevel * 0.84);
+    this.bands.tint = unlitTint;
+    this.transport.tint = unlitTint;
+    this.shell.tint = lerpRgb(0xffffff, UNLIT, darkLevel * 0.6);
+    // People out in corridors and lobbies stay readable at night; only a
+    // power cut darkens them too.
+    roomLighting.open = powered ? 0xffffff : unlitTint;
+    roomLighting.rooms.clear();
+    for (const tenant of state.tenants.values()) {
+      const lit = powered && night > 0 && isLit(tenant);
+      const tint = lit
+        ? lerpRgb(0xffffff, isHotel(tenant.type) ? LIT_HOTEL : LIT_WARM, night * 0.5)
+        : unlitTint;
+      roomLighting.rooms.set(tenant.id, tint);
+      const sprite = this.sprites.get(tenant.id);
+      if (!sprite) continue;
+      for (const piece of sprite.pieces) piece.tint = tint;
+      for (const glow of sprite.glows) {
+        if (!glow) continue;
+        glow.visible = lit;
+        glow.alpha = night;
+      }
+    }
   }
-  private plant(g: Graphics, x: number, y: number): void {
-    g.rect(x, y - 3, 5, 3).fill(0xae8e66); g.rect(x + 2, y - 8, 1, 5).fill(0x758258);
-    g.circle(x + 2, y - 8, 4).fill(0x7d9a68);
+
+  private rebuild(state: GameState): void {
+    const floors = new Map<number, Floor>();
+    for (const floor of state.tower.floors) floors.set(floor.index, floor);
+    this.drawShell(state, floors);
+    const alive = new Set<number>();
+    for (const tenant of state.tenants.values()) {
+      alive.add(tenant.id);
+      this.syncRoom(state, tenant);
+    }
+    for (const [id, sprite] of this.sprites) {
+      if (alive.has(id)) continue;
+      for (const piece of sprite.pieces) piece.destroy();
+      for (const glow of sprite.glows) glow?.destroy();
+      sprite.film?.destroy();
+      this.playing.delete(sprite);
+      this.sprites.delete(id);
+    }
+    this.drawTransport(state, floors);
+    this.drawLabels(state);
   }
+
+  /** Create or update one tenant's room graphic. */
+  private syncRoom(state: GameState, tenant: Tenant): void {
+    const cell = CONFIG.CELL_WIDTH_PX, H = CONFIG.FLOOR_HEIGHT_PX;
+    const lobbyFloors = state.tower.lobbyHeight;
+    const floorsTall = tenant.floor === CONFIG.LOBBY_FLOOR_INDEX && (tenant.type === 'lobby' || facilityHeight(tenant.type) === 1)
+      ? lobbyFloors
+      : facilityHeight(tenant.type);
+    const w = tenant.sizeCells * cell;
+    const h = floorsTall * H;
+    const topFloor = tenant.floor + facilityHeight(tenant.type) - 1;
+    const x = tenant.x * cell;
+    const y = tenant.floor === CONFIG.LOBBY_FLOOR_INDEX ? floorTopY(tenant.floor, lobbyFloors) : floorTopY(topFloor, lobbyFloors);
+    const variant = roomVariant(tenant);
+    const look = roomLook(tenant);
+    const key = roomKey(tenant.type, tenant.state, w, h, variant, look);
+    let sprite = this.sprites.get(tenant.id);
+    if (!sprite) {
+      sprite = { pieces: [], glows: [], state: tenant.state, look, key: '' };
+      this.sprites.set(tenant.id, sprite);
+    }
+    const textures = roomTextures(tenant.type, tenant.state, w, h, variant, look);
+    if (sprite.key !== key) {
+      while (sprite.pieces.length > textures.length) sprite.pieces.pop()!.destroy();
+      for (let i = 0; i < textures.length; i++) {
+        const existing = sprite.pieces[i];
+        if (existing) {
+          existing.texture = textures[i]!.texture;
+        } else {
+          const piece = new Sprite(textures[i]!.texture);
+          piece.roundPixels = true;
+          sprite.pieces.push(piece);
+          this.rooms.addChild(piece);
+        }
+      }
+      for (const glow of sprite.glows) glow?.destroy();
+      sprite.glows = textures.map(piece => {
+        if (!piece.glow) return null;
+        const glow = new Sprite(piece.glow);
+        glow.roundPixels = true;
+        glow.visible = false;
+        this.glows.addChild(glow);
+        return glow;
+      });
+    }
+    const room = sprite;
+    textures.forEach((piece, i) => {
+      room.pieces[i]!.position.set(x + piece.x, y);
+      room.glows[i]?.position.set(x + piece.x, y);
+    });
+    sprite.state = tenant.state;
+    sprite.look = look;
+    sprite.key = key;
+    const overlay = tenant.type === 'cinema'
+      ? { rect: cinemaScreen(w, h), frames: filmFrames, ms: FILM_FRAME_MS }
+      : tenant.type === 'rooftopPool' && tenant.state === 'open'
+        ? { rect: poolWater(w, h, variant), frames: rippleFrames, ms: RIPPLE_FRAME_MS }
+        : null;
+    if (overlay) {
+      const r = overlay.rect;
+      sprite.filmFrames = overlay.frames(r.w, r.h);
+      sprite.filmMs = overlay.ms;
+      if (!sprite.film) {
+        sprite.film = new Sprite(sprite.filmFrames[0]!);
+        sprite.film.roundPixels = true;
+        this.films.addChild(sprite.film);
+        this.playing.add(sprite);
+      }
+      sprite.film.position.set(x + r.x, y + r.y);
+      sprite.film.visible = filmShowing(tenant, this.powered);
+    } else if (sprite.film) {
+      sprite.film.destroy();
+      sprite.film = undefined;
+      sprite.filmFrames = undefined;
+      this.playing.delete(sprite);
+    }
+  }
+
+  private buildBackdrop(): void {
+    const soil = new TilingSprite({ texture: soilTexture(), width: GROUND_WIDTH, height: GROUND_DEPTH });
+    soil.position.set(GROUND_LEFT, 0);
+    const g = new Graphics();
+    // Street level sits on y = 0 (where the lobby stands); soil lip below it.
+    g.rect(GROUND_LEFT, 0, GROUND_WIDTH, 2).fill(PALETTE.grassDark);
+    this.backdrop.addChild(this.street.container, soil, g);
+  }
+
+  private drawShell(state: GameState, floors: Map<number, Floor>): void {
+    const g = this.shell;
+    g.clear();
+    for (const band of this.bands.removeChildren()) band.destroy();
+    const cell = CONFIG.CELL_WIDTH_PX;
+    const lobbyFloors = state.tower.lobbyHeight;
+    // Open-air roof facilities leave their band out so the sky shows through.
+    const openAir = new Map<number, [number, number][]>();
+    for (const tenant of state.tenants.values()) {
+      if (!isOpenAir(tenant.type)) continue;
+      const list = openAir.get(tenant.floor) ?? [];
+      list.push([tenant.x, tenant.x + tenant.sizeCells]);
+      openAir.set(tenant.floor, list);
+    }
+    for (const floor of state.tower.floors) {
+      const b = floorBounds(state, floor.index);
+      if (b.hi <= b.lo) continue;
+      const left = b.lo * cell, width = (b.hi - b.lo) * cell;
+      const y = floorTopY(floor.index, lobbyFloors), h = floorHeightPx(floor, lobbyFloors);
+      const under = floor.index <= CONFIG.BASEMENT_FLOOR_INDEX;
+      const holes = (openAir.get(floor.index) ?? []).sort((p, q) => p[0] - q[0]);
+      // Unfurnished floor space: a pixel tile (bare wall, concrete floor,
+      // a structural column every 8 cells) aligned to the world grid.
+      for (const [lo, hi] of subtract(b.lo, b.hi, holes)) {
+        const bandLeft = lo * cell;
+        const band = new TilingSprite({ texture: emptyBandTexture(under), width: (hi - lo) * cell, height: h - 2 });
+        band.position.set(bandLeft, y);
+        band.tilePosition.set(-(((bandLeft % BAND_TILE_W) + BAND_TILE_W) % BAND_TILE_W), 0);
+        band.roundPixels = true;
+        this.bands.addChild(band);
+      }
+      // Floor slab (2 px; the ceiling rows of every room and band double it
+      // to a 4 px slab) and the outer walls.
+      g.rect(left - 2, y + h - 2, width + 4, 1).fill(PALETTE.slabLight);
+      g.rect(left - 2, y + h - 1, width + 4, 1).fill(PALETTE.slab);
+      g.rect(left - 2, y, 2, h).fill(PALETTE.shell);
+      g.rect(left + width, y, 2, h).fill(PALETTE.shell);
+      if (under) continue;
+      // Roof cap over every stretch not covered by the floor above.
+      const above = floors.get(floor.index + 1);
+      const ab = above ? floorBounds(state, above.index) : { lo: 0, hi: 0 };
+      const segments: [number, number][] = ab.hi <= ab.lo
+        ? [[b.lo, b.hi]]
+        : [[b.lo, Math.min(b.hi, ab.lo)], [Math.max(b.lo, ab.hi), b.hi]];
+      for (const [lo, hi] of segments.flatMap(([a, z]) => subtract(a, z, holes))) {
+        if (hi <= lo) continue;
+        const capLeft = lo === b.lo ? lo * cell - 3 : lo * cell;
+        const capRight = hi === b.hi ? hi * cell + 3 : hi * cell;
+        g.rect(capLeft, y - 3, capRight - capLeft, 3).fill(PALETTE.roof);
+        g.rect(capLeft, y - 3, capRight - capLeft, 1).fill(PALETTE.roofLight);
+      }
+    }
+  }
+
+  /**
+   * Stairs and escalators: one diagonal flight per link, spanning the lower
+   * floor's band and the upper floor's band (the person climbs from the lower
+   * slab and steps off where the flight crosses the upper slab). Where the
+   * other band is a furnished room the flight stays inside its own cells.
+   */
+  private drawTransport(state: GameState, floors: Map<number, Floor>): void {
+    const g = this.transport;
+    for (const child of g.removeChildren()) child.destroy();
+    const cell = CONFIG.CELL_WIDTH_PX;
+    for (const floor of state.tower.floors) {
+      floor.cells.forEach((c, index) => {
+        if (c.content !== 'stair' || (c.transportX ?? index) !== index) return;
+        const lower = stairLowerFloor(floor.index);
+        this.flight(g, state, floors, floor.index, lower, index, (c.transportWidth ?? 1) * cell, false, 'up');
+      });
+    }
+    for (const [key, dir] of state.escalators) {
+      const [lowerText, xText] = key.split(':');
+      const lower = Number(lowerText), x = Number(xText);
+      const cellFloor = lower + 1 === CONFIG.LOBBY_FLOOR_INDEX ? lower : lower + 1;
+      const width = (floors.get(cellFloor)?.cells[x]?.transportWidth ?? 1) * cell;
+      this.flight(g, state, floors, cellFloor, lower, x, width, true, dir);
+    }
+  }
+
+  private flight(
+    g: Container, state: GameState, floors: Map<number, Floor>,
+    cellFloor: number, lower: number, column: number, width: number,
+    escalator: boolean, dir: string,
+  ): void {
+    const lobbyFloors = state.tower.lobbyHeight;
+    const lowFloor = floors.get(lower), highFloor = floors.get(lower + 1);
+    if (!lowFloor || !highFloor) return;
+    const x = column * CONFIG.CELL_WIDTH_PX;
+    const lowTop = floorTopY(lower, lobbyFloors), lowH = floorHeightPx(lowFloor, lobbyFloors);
+    const highTop = floorTopY(lower + 1, lobbyFloors), highH = floorHeightPx(highFloor, lobbyFloors);
+    const otherFloor = cellFloor === lower ? highFloor : lowFloor;
+    const otherFree = otherFloor.index === CONFIG.LOBBY_FLOOR_INDEX || isTransportOrEmpty(otherFloor, column, width / CONFIG.CELL_WIDTH_PX);
+    // Reserved stairwell background on the band(s) that hold the cells.
+    for (const f of escalator ? [lowFloor, highFloor] : [cellFloor === lower ? lowFloor : highFloor]) {
+      if (f.index === CONFIG.LOBBY_FLOOR_INDEX) continue;
+      const top = floorTopY(f.index, lobbyFloors), h = floorHeightPx(f, lobbyFloors);
+      const well = new Sprite(wellTexture(width, h - 2));
+      well.position.set(x, top);
+      well.roundPixels = true;
+      g.addChild(well);
+    }
+    const span = otherFree
+      ? { top: highTop + 2, bottom: lowTop + lowH - 2 }
+      : cellFloor === lower
+        ? { top: lowTop + 2, bottom: lowTop + lowH - 2 }
+        : { top: highTop + 2, bottom: highTop + highH - 2 };
+    const rise = span.bottom - span.top;
+    if (rise <= 0 || width < 6) return;
+    // Pixel-art flight (sprites/structure.ts), cached per size and kind; its
+    // bottom row sits on the lower landing, the handrail rides 9 px above.
+    const flight = new Sprite(flightTexture(width, rise, escalator, dir));
+    flight.position.set(x, span.bottom - rise - 10);
+    flight.roundPixels = true;
+    g.addChild(flight);
+  }
+
+  private drawLabels(state: GameState): void {
+    for (const label of this.labels) label.destroy();
+    this.labels = [];
+    for (const floor of state.tower.floors) {
+      const b = floorBounds(state, floor.index);
+      if (b.hi <= b.lo) continue;
+      const name = floor.index <= 0 ? `B${1 - floor.index}` : floor.index === 1 ? '1F' : `${floor.index}F`;
+      const text = new Text({
+        text: name,
+        resolution: 4,
+        style: {
+          fontSize: 9,
+          fill: 0xffffff,
+          fontFamily: 'Tahoma, Verdana, sans-serif',
+          fontWeight: 'bold',
+          stroke: { color: floor.index <= 0 ? 0x4a3018 : 0x1d3a6a, width: 2.5 },
+        },
+      });
+      text.anchor.set(1, 0.5);
+      const y = floorTopY(floor.index, state.tower.lobbyHeight);
+      text.position.set(b.lo * CONFIG.CELL_WIDTH_PX - 5, Math.round(y + floorHeightPx(floor, state.tower.lobbyHeight) - CONFIG.FLOOR_HEIGHT_PX / 2));
+      this.labels.push(text);
+      this.labelLayer.addChild(text);
+    }
+  }
+}
+
+/** [lo, hi) minus sorted, non-overlapping holes, as the remaining runs. */
+function subtract(lo: number, hi: number, holes: [number, number][]): [number, number][] {
+  const out: [number, number][] = [];
+  let at = lo;
+  for (const [a, b] of holes) {
+    if (b <= at || a >= hi) continue;
+    if (a > at) out.push([at, a]);
+    at = Math.max(at, b);
+  }
+  if (at < hi) out.push([at, hi]);
+  return out;
+}
+
+/** True when every cell in [column, column+cells) is free floor or transport. */
+function isTransportOrEmpty(floor: Floor, column: number, cells: number): boolean {
+  for (let c = column; c < column + cells; c++) {
+    const content = floor.cells[c]?.content;
+    if (content !== 'empty' && content !== 'stair' && content !== 'escalator') return false;
+  }
+  return true;
+}
+
+/** 64x32 tileable soil: tan base with darker clods and light grains. */
+function soilTexture(): Texture {
+  if (typeof document === 'undefined') return Texture.WHITE;
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Texture.WHITE;
+  const hex = (c: number): string => `#${c.toString(16).padStart(6, '0')}`;
+  ctx.fillStyle = hex(PALETTE.soil);
+  ctx.fillRect(0, 0, 64, 32);
+  let seed = 7;
+  const rand = (): number => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let i = 0; i < 70; i++) {
+    const x = Math.floor(rand() * 64), y = Math.floor(rand() * 32);
+    ctx.fillStyle = hex(rand() < 0.6 ? PALETTE.soilDark : PALETTE.soilLight);
+    ctx.fillRect(x, y, rand() < 0.3 ? 2 : 1, 1);
+  }
+  for (let i = 0; i < 6; i++) {
+    const x = Math.floor(rand() * 60), y = Math.floor(rand() * 30);
+    ctx.fillStyle = hex(PALETTE.soilDeep);
+    ctx.fillRect(x, y, 3, 2);
+    ctx.fillStyle = hex(PALETTE.soilLight);
+    ctx.fillRect(x, y, 1, 1);
+  }
+  const texture = new Texture({ source: new CanvasSource({ resource: canvas, scaleMode: 'nearest' }) });
+  return texture;
 }

@@ -1,9 +1,19 @@
 import { expect, it } from 'vitest';
-import { cameraAnchor, initialCameraZoom } from '../../src/render/cameraLayout';
+import { cameraAnchor, initialCameraZoom, stepZoom } from '../../src/render/cameraLayout';
 
 it('keeps building scale consistent from laptop through ultrawide displays', () => {
-  for (const width of [1366, 1920, 2560, 3440, 5120]) expect(initialCameraZoom(width)).toBe(1.4);
-  expect(initialCameraZoom(620)).toBeLessThan(1.4);
+  for (const width of [1366, 1920, 2560, 3440, 5120]) expect(initialCameraZoom(width)).toBe(2);
+  expect(initialCameraZoom(620)).toBe(1);
+});
+
+it('zooms through whole-number pixel scales', () => {
+  expect(stepZoom(1, 1)).toBe(2);
+  expect(stepZoom(2, 1)).toBe(3);
+  expect(stepZoom(3, 1)).toBe(3);
+  expect(stepZoom(1, -1)).toBe(0.5);
+  expect(stepZoom(0.5, -1)).toBe(0.5);
+  expect(stepZoom(1.4, 1)).toBe(2); // legacy non-integer zoom snaps onto the ladder
+  expect(stepZoom(1.4, -1)).toBe(1);
 });
 
 it('keeps the same world point centered when viewport dimensions change', () => {

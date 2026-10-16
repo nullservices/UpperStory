@@ -1,4 +1,5 @@
 import { configureDialog } from './accessibility';
+import { placeNear } from '../windowing';
 import { CONFIG } from '../../data/config';
 import type { ElevatorGroup } from '../../sim';
 import { elevatorCapacity, SERVICE_PERIODS, type ElevatorPriority } from '../../sim/elevators';
@@ -11,6 +12,8 @@ export interface ElevatorEditorActions {
   addCar(): void;
   removeCar(carId: number): void;
   upgrade(carId: number): void;
+  /** Paid manual repair of an out-of-service car. */
+  repair(carId: number): void;
   home(carId: number, floor: number | null): void;
   priority(day: 'weekday' | 'weekend', period: number, priority: ElevatorPriority): void;
   response(day: 'weekday' | 'weekend', period: number, floors: number): void;
@@ -20,14 +23,14 @@ export interface ElevatorEditorActions {
 }
 
 const C = {
-  overlay: 'rgba(38,62,52,0.18)',
-  bg: '#eceee3',
-  panel: '#e0e6d8',
-  text: '#34463f',
-  dim: '#758170',
-  accent: '#3f6958',
-  danger: '#a34835',
-  hover: '#d1ddc8',
+  overlay: 'rgba(20,32,48,0.10)',
+  bg: '#dededa',
+  panel: '#fbfbf7',
+  text: '#1f2933',
+  dim: '#5b6470',
+  accent: '#2a64b4',
+  danger: '#b3261e',
+  hover: '#e3ecf8',
 };
 
 const ROW_REFRESH_MS = 250;
@@ -50,6 +53,8 @@ export class ElevatorEditor {
   private readonly schedules = document.createElement('details');
   private readonly stops = document.createElement('details');
   private readonly runningCost = document.createElement('p');
+  /** Live game tick, for mechanics' arrival countdowns. */
+  now: () => number = () => 0;
   private readonly rowEls = new Map<
     number,
     {
@@ -58,6 +63,7 @@ export class ElevatorEditor {
       status: HTMLSpanElement;
       speedBtn: HTMLButtonElement;
       removeBtn: HTMLButtonElement;
+      repairBtn: HTMLButtonElement;
       home: HTMLSelectElement;
     }
   >();
@@ -121,7 +127,7 @@ export class ElevatorEditor {
     document.body.appendChild(this.overlay);
   }
 
-  open(group: ElevatorGroup, actions: ElevatorEditorActions): void {
+  open(group: ElevatorGroup, actions: ElevatorEditorActions, anchor?: { x: number; y: number }): void {
     this.group = group;
     this.actions = actions;
     this.renderSchedules();
@@ -129,6 +135,7 @@ export class ElevatorEditor {
     this.clearError();
     this.overlay.style.display = 'flex';
     this.visible = true;
+    if (anchor) placeNear(this.overlay.firstElementChild as HTMLElement, anchor.x, anchor.y);
     this.refresh();
     this.timer = window.setInterval(() => this.refresh(), ROW_REFRESH_MS);
   }
@@ -177,7 +184,15 @@ export class ElevatorEditor {
       }
       row.label.textContent = `Car ${car.id} · Lv${car.speedLevel} · ${car.passengers.length}/${elevatorCapacity(group.kind)}`;
       row.label.title = `${car.passengers.length} passengers aboard; capacity ${elevatorCapacity(group.kind)}`;
-      row.status.textContent = car.state === 'moving' && car.targetFloor !== null
+      const broken = car.outOfService === true;
+      row.row.style.boxShadow = broken ? `inset 3px 0 ${C.danger}` : '';
+      row.repairBtn.hidden = !broken;
+      row.status.style.color = broken ? C.danger : C.dim;
+      row.status.textContent = broken
+        ? `Out of service at ${floorLabel(Math.round(car.y))} · ${car.repairAtTick !== undefined
+          ? `mechanics arriving in ${Math.max(1, Math.ceil((car.repairAtTick - this.now()) / 10))}s`
+          : 'no mechanics can reach it — repair it or build Maintenance'}`
+        : car.state === 'moving' && car.targetFloor !== null
         ? `${car.dir > 0 ? 'Going up' : 'Going down'} to ${floorLabel(car.targetFloor)}`
         : `${car.state === 'doors' ? (car.departureAt !== undefined && car.doorsTicksLeft <= 0 ? 'Waiting to depart' : 'Doors open') : 'Idle'} at ${floorLabel(Math.round(car.y))}`;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
@@ -210,6 +225,7 @@ export class ElevatorEditor {
     status: HTMLSpanElement;
     speedBtn: HTMLButtonElement;
     removeBtn: HTMLButtonElement;
+    repairBtn: HTMLButtonElement;
     home: HTMLSelectElement;
   } {
     const row = document.createElement('div');
@@ -225,14 +241,19 @@ export class ElevatorEditor {
     const removeBtn = this.button('Remove');
     removeBtn.style.color = C.danger;
     removeBtn.addEventListener('click', () => this.actions?.removeCar(carId));
+    const repairBtn = this.button(`Repair ($${fmt(CONFIG.ELEVATOR_REPAIR_COST_DOLLARS)})`);
+    repairBtn.style.borderColor = C.danger;
+    repairBtn.title = 'Return this car to service now';
+    repairBtn.addEventListener('click', () => this.actions?.repair(carId));
+    repairBtn.hidden = true;
 
     const home = document.createElement('select'); home.setAttribute('aria-label', `Car ${carId} home floor`);
     home.onchange = () => this.actions?.home(carId, home.value === '' ? null : Number(home.value));
     const status = document.createElement('span');
     status.style.cssText = `flex-basis:100%;color:${C.dim};font-size:11px;`;
-    row.append(label, speedBtn, removeBtn, home, status);
+    row.append(label, repairBtn, speedBtn, removeBtn, home, status);
     this.rows.appendChild(row);
-    return { row, label, status, speedBtn, removeBtn, home };
+    return { row, label, status, speedBtn, removeBtn, repairBtn, home };
   }
 
   private renderSchedules(): void {

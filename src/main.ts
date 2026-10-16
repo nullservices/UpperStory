@@ -1,19 +1,20 @@
 import { Application } from 'pixi.js';
+import { PALETTE } from './render/palette';
 import { TowerAudio } from './audio/towerAudio';
 import { installAudioPanel } from './ui/audioPanel';
 import './ui/style.css';
 import { CONFIG } from './data/config';
 import {
   createInitialState,
-  deserializeGame,
-  serializeGame,
   setupNewGame,
   tick,
   floorTopY,
+  type GameState,
 } from './sim';
 import { Controller } from './game/controller';
 import { IncidentView } from './render/incidents';
 import { TowerMap } from './ui/towerMap';
+import { Guide } from './ui/guide';
 import { CampaignPanel } from './ui/campaignPanel';
 import { Motion } from './render/motion';
 import { setupShowcaseTower } from './sim/showcaseTower';
@@ -28,19 +29,25 @@ import { StatusOverlayView } from './render/statusOverlay';
 import { TowerView } from './render/floorRenderer';
 import { Hud } from './ui/hud';
 import { ToolPalette } from './ui/toolPalette';
-import { SAVE_KEY, SettingsDialog } from './ui/dialogs/settings';
+import { SettingsDialog } from './ui/dialogs/settings';
+import { CursorTip } from './ui/cursorTip';
+import { FinanceWindow } from './ui/finance';
+import { describeSaveError, openBrowserSaves } from './persistence';
 
 async function main(): Promise<void> {
+  const host = document.getElementById('app');
+  if (!host) throw new Error('missing #app host element');
   const app = new Application();
   await app.init({
-    resizeTo: window,
+    // Size to the fixed full-viewport host; autoDensity keeps the canvas CSS
+    // size equal to the viewport on high-DPI screens (no overflow or gaps).
+    resizeTo: host,
+    autoDensity: true,
     // Matches PALETTE.skyBottom so the canvas edge doesn't flash black.
-    backgroundColor: 0xb9d5cf,
+    backgroundColor: PALETTE.skyBottom,
     antialias: false,
     resolution: Math.min(window.devicePixelRatio || 1, 2),
   });
-  const host = document.getElementById('app');
-  if (!host) throw new Error('missing #app host element');
   host.appendChild(app.canvas);
 
   // --- Sim: fresh game (empty plot with ground and basement building bands), or the
@@ -49,9 +56,13 @@ async function main(): Promise<void> {
   // `state` is reassigned by New game / Load, so the ticker closure below
   // must re-read the variable each frame (it does). ---
   let state = createInitialState(20260907);
-  if (new URLSearchParams(window.location.search).has('reference')) {
+  const params = new URLSearchParams(window.location.search);
+  // Showcase towers never overwrite the player's autosave until they start
+  // or load a tower of their own.
+  let autosaveEnabled = !params.has('reference') && !params.has('demo');
+  if (params.has('reference')) {
     setupReferenceTower(state);
-  } else if (new URLSearchParams(window.location.search).has('demo')) {
+  } else if (params.has('demo')) {
     setupShowcaseTower(state);
   } else {
     setupNewGame(state);
@@ -87,12 +98,19 @@ async function main(): Promise<void> {
   // --- UI: HUD, palette wired to the controller, tool highlight echo ---
   const hud = new Hud();
   const audio = new TowerAudio();
-  installAudioPanel(audio);
-  const campaignPanel = new CampaignPanel((floor, x) => {
+  const openSound = installAudioPanel(audio);
+  // Centre the camera on a grid cell (journal "Show location", message log).
+  const jumpTo = (floor: number, x: number): void => {
     camera.x = app.screen.width / 2 - x * CONFIG.CELL_WIDTH_PX * camera.zoom;
     camera.y = app.screen.height / 2 - floorTopY(floor, state.tower.lobbyHeight) * camera.zoom;
     camera.apply();
-  }, text => hud.toast(text));
+  };
+  hud.onJump = jumpTo;
+  const campaignPanel = new CampaignPanel(jumpTo, text => hud.toast(text));
+  const finances = new FinanceWindow();
+  const cursorTip = new CursorTip();
+  // Dev-server only: lets browser checks reach the live state.
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) Object.defineProperty(window, 'upperStory', { configurable: true, value: { get state() { return state; } } });
   const towerMap = new TowerMap((x, y) => {
     camera.x = app.screen.width / 2 - x * camera.zoom;
     camera.y = app.screen.height / 2 - y * camera.zoom;
@@ -102,40 +120,73 @@ async function main(): Promise<void> {
   const palette = new ToolPalette((tool) => controller.selectTool(tool));
   controller.onToolChange = (tool) => palette.setActive(tool);
   controller.selectTool('select');
+  const guide = new Guide();
+  guide.tutorialAllowed = autosaveEnabled; // false on ?demo / ?reference
+  guide.onSelectTool = tool => controller.selectTool(tool);
+  guide.onHighlightTool = tool => palette.highlight(tool);
+  hud.tipsEnabled = () => guide.tipsEnabled;
   hud.onCamera = action => action === 'home' ? camera.center() : camera.zoomBy(action === 'in' ? 1.2 : 1 / 1.2);
 
-  // --- Menu: new game / save / load. The dialog only calls back; the sim
-  // work happens here so the live state swap lands in one place. ---
+  // --- Saves: IndexedDB slots (gzip), legacy localStorage import, and an
+  // autosave slot. The Game window only calls back; the live state swap
+  // happens here so it lands in one place. ---
+  const { manager: saves, ready: storageReady } = openBrowserSaves();
+  let autosaving = false;
+  let lastAutosaveTick = state.tickCount;
+  const swapState = (next: GameState): void => {
+    state = next;
+    controller.setState(state);
+    camera.center();
+    autosaveEnabled = true;
+    guide.tutorialAllowed = true;
+    lastAutosaveTick = state.tickCount;
+  };
   const settings = new SettingsDialog({
     onNewGame: (seed: number, lobbyHeight: 1 | 2 | 3) => {
-      state = createInitialState(seed);
-      state.tower.lobbyHeight = lobbyHeight;
-      setupNewGame(state);
-      controller.setState(state);
-      camera.center();
+      const next = createInitialState(seed);
+      next.tower.lobbyHeight = lobbyHeight;
+      setupNewGame(next);
+      swapState(next);
+      hud.toast('New tower started.');
     },
-    onSave: () => {
-      try {
-        localStorage.setItem(SAVE_KEY, serializeGame(state));
-        return null;
-      } catch (err) {
-        return err instanceof Error ? err.message : String(err);
-      }
+    getState: () => state,
+    onLoaded: (loaded, meta) => {
+      swapState(loaded);
+      hud.toast(`Loaded “${meta.name}”.`);
     },
-    onLoad: () => {
-      try {
-        const saved = localStorage.getItem(SAVE_KEY);
-        if (saved === null) return 'No save yet';
-        state = deserializeGame(saved);
-        controller.setState(state);
-        camera.center();
-        return null;
-      } catch (err) {
-        return err instanceof Error ? err.message : String(err);
-      }
-    },
+  }, saves);
+  hud.onOpenMenu = section => settings.open(section);
+  hud.onCommand = command => {
+    if (command === 'sound') openSound();
+    else if (command === 'map') towerMap.open();
+    else if (command === 'events') campaignPanel.open();
+    else if (command === 'tips') guide.setTips(!guide.tipsEnabled);
+    else if (command === 'tutorial') guide.restartTutorial();
+    else if (command === 'finances') finances.toggle();
+    else settings.open(command);
+  };
+
+  const autosave = (reason: 'quarter' | 'leave'): void => {
+    if (!autosaveEnabled || autosaving || state.tickCount === lastAutosaveTick) return;
+    autosaving = true;
+    lastAutosaveTick = state.tickCount;
+    // serializes synchronously; compression and the write finish later.
+    saves.autosave(state)
+      .catch(err => { if (reason === 'quarter') hud.toast(`Autosave failed: ${describeSaveError(err)}`); })
+      .finally(() => { autosaving = false; });
+  };
+  window.addEventListener('pagehide', () => autosave('leave'));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') autosave('leave'); });
+  void storageReady.then(warning => {
+    if (warning) {
+      settings.setStorageWarning(warning);
+      hud.toast(warning);
+    } else if (autosaveEnabled) {
+      void saves.list().then(list => {
+        if (list.length) hud.toast(`${list.length === 1 ? 'A saved tower is' : `${list.length} saved towers are`} available — Game › Load tower (Ctrl+O).`);
+      }).catch(() => undefined);
+    }
   });
-  hud.onOpenMenu = () => settings.open();
 
   // --- Fixed-timestep sim loop (CONFIG.TICK_MS) + per-frame render.
   // The HUD owns the speed; multiplying frame deltas means 2×/4× run more
@@ -157,6 +208,7 @@ async function main(): Promise<void> {
       motion.capture(state);
       tick(state);
       audio.events(state.events);
+      if (state.events.some(event => event.type === 'QUARTER_REPORT')) autosave('quarter');
       controller.drainEvents();
       acc -= CONFIG.TICK_MS;
     }
@@ -176,11 +228,24 @@ async function main(): Promise<void> {
     );
     incidents.draw(state, app.screen.width, Math.min(app.screen.height, camera.y), acc / CONFIG.TICK_MS);
     campaignPanel.update(state);
+    guide.update(state);
     towerMap.update(state);
     hud.update(state);
     palette.update(state);
     hud.setContext(controller.tool, controller.hover, controller.hoverError, camera.zoom);
+    finances.update(state);
+    cursorTip.update(state, controller);
   });
+
+  // Window 'resize' alone misses some viewport changes (zoom, devtools,
+  // screenshot capture). Follow the host element and repaint the screen-space
+  // layers at once, so the canvas never shows an unpainted strip.
+  new ResizeObserver(() => {
+    app.resize();
+    sky.draw();
+    dayNight.draw(state);
+    app.render();
+  }).observe(host);
 }
 
 void main();

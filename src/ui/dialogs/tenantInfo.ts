@@ -1,4 +1,6 @@
 import { configureDialog } from './accessibility';
+import { placeNear } from '../windowing';
+import { TOOL_INFO } from '../toolPalette';
 import type { HousekeepingAccess } from '../../sim/housekeepingAccess';
 import { hotelCheckoutCents } from '../../sim/hotelEconomy';
 import { officeQuarterRentCents, officeRentScoreAdjustment } from '../../sim/money';
@@ -19,6 +21,7 @@ export interface TenantInfoData {
   housekeepingAccess?: HousekeepingAccess;
   lobbyUpkeepQuarter?: number;
   officeLeaseDaysRemaining?: number;
+  condoAccess?: boolean;
   noiseSources?: { type: TenantType; x: number; floor: number; floorDistance: number; gap: number; clearance: number }[];
 }
 
@@ -36,14 +39,14 @@ export interface TenantInfoActions {
 }
 
 const C = {
-  overlay: 'rgba(38,62,52,0.18)',
-  bg: '#eceee3',
-  panel: '#e0e6d8',
-  text: '#34463f',
-  dim: '#758170',
-  accent: '#3f6958',
-  danger: '#a34835',
-  hover: '#d1ddc8',
+  overlay: 'rgba(20,32,48,0.10)',
+  bg: '#dededa',
+  panel: '#fbfbf7',
+  text: '#1f2933',
+  dim: '#5b6470',
+  accent: '#2a64b4',
+  danger: '#b3261e',
+  hover: '#e3ecf8',
 };
 
 /**
@@ -121,7 +124,7 @@ export class TenantInfo {
     document.body.appendChild(this.overlay);
   }
 
-  open(tenant: Tenant, data: TenantInfoData, actions: TenantInfoActions): void {
+  open(tenant: Tenant, data: TenantInfoData, actions: TenantInfoActions, anchor?: { x: number; y: number }): void {
     this.tenant = tenant;
     this.actions = actions;
     this.armed = false;
@@ -131,6 +134,7 @@ export class TenantInfo {
     this.clearError();
     this.overlay.style.display = 'flex';
     this.visible = true;
+    if (anchor) placeNear(this.overlay.firstElementChild as HTMLElement, anchor.x, anchor.y);
   }
 
   /** Re-render from live tenant fields (e.g. right after a pricing cycle). */
@@ -194,6 +198,8 @@ export class TenantInfo {
     }
     const operatingCost = (TENANT_DATA[tenant.type] as { upkeepQuarter?: number }).upkeepQuarter;
     if (tenant.type === 'condo') {
+      rows.push(this.line('Lobby access', data.condoAccess ? 'Connected in both directions' : 'Missing a route to or from the lobby'));
+      if (!tenant.sold && !data.condoAccess) rows.push(this.line('Waiting for buyers', 'Connect this floor with public transport'));
       rows.push(this.line(tenant.sold ? 'Owner purchase price' : 'Asking price', `$${((tenant.sold ? tenant.condoSaleCents ?? 150_000_00 : condoSaleCents(tenant)) / 100).toLocaleString()}`));
       rows.push(this.line('Ownership', tenant.sold ? 'Sold · price locked' : 'Available for sale'));
       rows.push(this.line('Move-out / demolition', 'Original sale price returned at daily settlement'));
@@ -328,8 +334,9 @@ function isPricable(type: TenantType): boolean {
   return isHotel(type) || ['office', 'condo', 'fastfood', 'restaurant', 'shop', 'cinema', 'partyHall'].includes(type);
 }
 
+/** Player-facing name, matching the construction palette ("Hotel suite"). */
 function tenantTypeName(type: TenantType): string {
-  return type.charAt(0).toUpperCase() + type.slice(1);
+  return (TOOL_INFO as Partial<Record<string, { label: string }>>)[type]?.label ?? type.charAt(0).toUpperCase() + type.slice(1);
 }
 
 function floorLabel(floor: number): string {

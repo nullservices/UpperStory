@@ -5,6 +5,7 @@ import { TENANT_COLORS } from '../render/palette';
 import { floorTopY } from '../sim/tower';
 import { facilityHeight } from '../data/config';
 import type { GameState } from '../sim/state';
+import { closeButton, makeDraggable } from './windowing';
 
 export class TowerMap {
   private readonly dialog = document.createElement('dialog');
@@ -13,15 +14,15 @@ export class TowerMap {
   private top = 0;
   private bottom = 0;
   constructor(private readonly move: (worldX: number, worldY: number) => void) {
-    const button = document.createElement('button'); button.textContent = 'Map';
-    button.onclick = () => { this.draw(); this.dialog.showModal(); };
-    document.querySelector('.game-header nav')!.append(button);
-    this.dialog.className = 'campaign-window tower-map-window';
+    this.dialog.className = 'ui-dialog tower-map-window';
     this.dialog.setAttribute('aria-label', 'Tower map');
-    const title = document.createElement('h2'); title.textContent = 'Your whole tower';
-    const help = document.createElement('p'); help.textContent = 'Click the map to move the view. The gold line marks the lobby.';
+    const title = document.createElement('div'); title.className = 'window-title';
+    title.innerHTML = '<span class="title-text">Tower map</span>';
+    title.append(closeButton('Close map', () => this.dialog.close()));
+    const body = document.createElement('div'); body.className = 'window-body';
+    const help = document.createElement('p'); help.className = 'window-hint'; help.textContent = 'Click the map to move the view. The gold line marks the lobby.';
     this.canvas.width = 600; this.canvas.height = 400;
-    this.canvas.style.cssText = 'width:100%;height:auto;cursor:crosshair;background:#d1d8ca';
+    this.canvas.className = 'map-canvas';
     this.canvas.setAttribute('aria-label', 'Overview of tower rooms and elevator shafts');
     this.canvas.onclick = e => {
       const bounds = this.canvas.getBoundingClientRect();
@@ -29,8 +30,18 @@ export class TowerMap {
         this.top + (e.clientY - bounds.top) / bounds.height * (this.bottom - this.top));
       this.dialog.close();
     };
-    const close = document.createElement('button'); close.textContent = 'Close map'; close.onclick = () => this.dialog.close();
-    this.dialog.append(title, help, this.canvas, close); document.body.append(this.dialog);
+    body.append(this.canvas, help);
+    const footer = document.createElement('div'); footer.className = 'window-footer';
+    const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Close map'; close.onclick = () => this.dialog.close();
+    footer.append(close);
+    this.dialog.append(title, body, footer); document.body.append(this.dialog);
+    makeDraggable(this.dialog, title, 'offset');
+  }
+  /** View › Tower map (M). */
+  open(): void {
+    if (this.dialog.open || !this.state) return;
+    this.draw();
+    this.dialog.showModal();
   }
   update(state: GameState): void { this.state = state; }
   private draw(): void {
@@ -41,7 +52,7 @@ export class TowerMap {
     const scaleX = this.canvas.width / (CONFIG.FLOOR_WIDTH_CELLS * CONFIG.CELL_WIDTH_PX);
     const scaleY = this.canvas.height / (this.bottom - this.top);
     ctx.clearRect(0, 0, 600, 400);
-    ctx.fillStyle = '#b7c2b1';
+    ctx.fillStyle = '#9aa6b4';
     for (const floor of state.tower.floors) {
       const bounds = floorBounds(state, floor.index);
       ctx.fillRect(bounds.lo * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(floor.index, state.tower.lobbyHeight) - this.top) * scaleY, (bounds.hi - bounds.lo) * CONFIG.CELL_WIDTH_PX * scaleX, 1);
@@ -51,11 +62,11 @@ export class TowerMap {
       const height = facilityHeight(tenant.type);
       ctx.fillRect(tenant.x * CONFIG.CELL_WIDTH_PX * scaleX,
         (floorTopY(tenant.floor + height - 1, state.tower.lobbyHeight) - this.top) * scaleY,
-        tenant.sizeCells * CONFIG.CELL_WIDTH_PX * scaleX, Math.max(2, (tenant.type === 'lobby' ? state.tower.lobbyHeight : height) * 20 * scaleY));
+        tenant.sizeCells * CONFIG.CELL_WIDTH_PX * scaleX, Math.max(2, (tenant.type === 'lobby' ? state.tower.lobbyHeight : height) * CONFIG.FLOOR_HEIGHT_PX * scaleY));
     }
     ctx.fillStyle = '#425e5d';
     for (const group of state.elevatorGroups.values()) ctx.fillRect(group.x * CONFIG.CELL_WIDTH_PX * scaleX,
-      (floorTopY(group.serviceHi, state.tower.lobbyHeight) - this.top) * scaleY, shaftWidth(group) * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(group.serviceLo, state.tower.lobbyHeight) + 20 * (group.serviceLo === 1 ? state.tower.lobbyHeight : 1) - floorTopY(group.serviceHi, state.tower.lobbyHeight)) * scaleY);
+      (floorTopY(group.serviceHi, state.tower.lobbyHeight) - this.top) * scaleY, shaftWidth(group) * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(group.serviceLo, state.tower.lobbyHeight) + CONFIG.FLOOR_HEIGHT_PX * (group.serviceLo === 1 ? state.tower.lobbyHeight : 1) - floorTopY(group.serviceHi, state.tower.lobbyHeight)) * scaleY);
     const lobbyBounds = floorBounds(state, 1);
     ctx.fillStyle = '#c5a04f'; ctx.fillRect(lobbyBounds.lo * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(1, state.tower.lobbyHeight) - this.top) * scaleY, (lobbyBounds.hi - lobbyBounds.lo) * CONFIG.CELL_WIDTH_PX * scaleX, 2);
   }

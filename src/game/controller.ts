@@ -32,10 +32,11 @@ import { ElevatorEditor } from '../ui/dialogs/elevatorEditor';
 import { QuarterReport } from '../ui/dialogs/quarterReport';
 import { TenantInfo } from '../ui/dialogs/tenantInfo';
 import type { Hud } from '../ui/hud';
+import { TOOL_SHORTCUTS } from '../ui/toolPalette';
 import { BuildStroke, isRowBuildTool } from './buildStroke';
 import { repairTenant, changeMovie } from '../sim/tenants';
 import { buildElevator, elevatorBuildPlan } from './elevatorBuild';
-import { setCarHome, setElevatorPriority, setElevatorStop, setWaitingResponse, setDepartureDelay } from '../sim/elevators';
+import { repairElevatorCar, setCarHome, setElevatorPriority, setElevatorStop, setWaitingResponse, setDepartureDelay } from '../sim/elevators';
 
 /** Player-facing build/demolish tools. Tenant tools share TenantType names. */
 export type Tool =
@@ -43,6 +44,7 @@ export type Tool =
   | 'buildBasement'
   | 'hotelTwin' | 'hotelSuite' | 'partyHall' | 'cinema' | 'medical'
   | 'parkingRamp' | 'parkingSpace' | 'recycling' | 'metro' | 'cathedral'
+  | 'fireStation' | 'bank' | 'helipad' | 'rooftopPool' | 'maintenance' | 'generator'
   | 'lobby'
   | 'stairs'
   | 'office'
@@ -81,6 +83,10 @@ export class Controller {
   tool: Tool | null = null;
   hover: { floor: number; cell: number } | null = null;
   hoverError: string | null = null;
+  /** Last pointer position over the canvas (client px), null when outside it. */
+  pointer: { x: number; y: number } | null = null;
+  /** True while the primary button is held over the canvas (drags, rows). */
+  pointerDown = false;
   /** Invoked whenever the active tool changes (palette click, Escape, ...). */
   onToolChange: ((tool: Tool | null) => void) | null = null;
 
@@ -100,6 +106,7 @@ export class Controller {
   ) {
     this.tenantInfo = new TenantInfo();
     this.elevatorEditor = new ElevatorEditor();
+    this.elevatorEditor.now = () => this.state.tickCount;
     this.quarterReport = new QuarterReport();
     this.tenantInfo.onClose = () => {
       if (this.openDialog === 'tenant') this.openDialog = null;
@@ -113,9 +120,10 @@ export class Controller {
     app.stage.on('pointermove', (e: FederatedPointerEvent) => this.onPointerMove(e));
     app.canvas.addEventListener('pointerleave', () => {
       this.finishBuildStroke();
+      this.pointer = null;
       if (!this.dragStart) { this.hover = null; this.hoverError = null; }
     });
-    const cancel = (): void => { this.finishBuildStroke(); this.dragStart = null; };
+    const cancel = (): void => { this.finishBuildStroke(); this.dragStart = null; this.pointerDown = false; };
     app.canvas.addEventListener('pointercancel', cancel);
     window.addEventListener('blur', cancel);
     window.addEventListener('pointerup', (e) => { if (e.button === 0) cancel(); });
@@ -129,6 +137,20 @@ export class Controller {
   /** In-progress elevator drag, or null (read by the placement preview). */
   get drag(): ElevatorDrag | null {
     return this.dragStart;
+  }
+
+  /** In-progress row build (count and running cost for the cursor tip). */
+  get stroke(): { placed: number; spentCents: number; error: string | null } | null {
+    return this.buildStroke;
+  }
+
+  /** The elevator or room under a grid cell (what Inspect would open). */
+  entityAt(floor: number, cell: number): { kind: 'elevator'; group: ElevatorGroup } | { kind: 'tenant'; tenant: Tenant } | null {
+    const group = this.groupUnder(floor, cell)
+      ?? [...this.state.elevatorGroups.values()].find(g => floor >= g.serviceLo && floor <= g.serviceHi && cell >= g.x && cell < g.x + shaftWidth(g));
+    if (group) return { kind: 'elevator', group };
+    const tenant = getTenantAt(this.state, floor, cell);
+    return tenant ? { kind: 'tenant', tenant } : null;
   }
 
   /** Palette click / Escape: set the tool and drop any stale hover error. */
@@ -202,8 +224,7 @@ export class Controller {
   private onKeyDown(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || document.querySelector('[role="dialog"][data-open="true"], dialog[open]')) return;
     if (e.key === 'Home') { e.preventDefault(); this.camera.center(); return; }
-    const shortcuts: Record<string, Tool> = { i: 'select', f: 'buildFloor', e: 'elevator', o: 'office', c: 'condo' };
-    const shortcut = shortcuts[e.key.toLowerCase()];
+    const shortcut = (Object.keys(TOOL_SHORTCUTS) as Tool[]).find(tool => TOOL_SHORTCUTS[tool]!.toLowerCase() === e.key.toLowerCase());
     if (shortcut && !e.ctrlKey && !e.metaKey && !e.altKey) { this.selectTool(shortcut); return; }
     if (e.key !== 'Escape') return;
     if (this.openDialog) {
@@ -223,6 +244,8 @@ export class Controller {
 
   private onPointerMove(e: FederatedPointerEvent, finishing = false): void {
     const world = this.camera.screenToWorld(e.global.x, e.global.y);
+    this.pointer = { x: e.global.x, y: e.global.y };
+    this.pointerDown = (e.buttons & 1) !== 0;
     this.hover = {
       floor: this.tool === 'lobby' ? CONFIG.LOBBY_FLOOR_INDEX : floorIndexAtWorldY(world.y, this.state.tower.lobbyHeight),
       cell: cellIndexAtWorldX(world.x),
@@ -241,6 +264,7 @@ export class Controller {
   private onPointerDown(e: FederatedPointerEvent): void {
     if (e.button !== 0 || !this.tool) return;
     this.onPointerMove(e);
+    this.pointerDown = true;
     const tool = this.tool;
     const hover = this.hover;
     const state = this.state;
@@ -277,7 +301,8 @@ export class Controller {
         }
         case 'select': {
           if (!hover) break;
-          this.selectAt(hover);
+          // The canvas fills the window, so its coordinates are client coordinates.
+          this.selectAt(hover, { x: e.global.x, y: e.global.y });
           break;
         }
         case 'demolish': {
@@ -337,16 +362,14 @@ export class Controller {
   }
 
   /** 'select' click: open the info dialog for the thing under the pointer. */
-  private selectAt(hover: { floor: number; cell: number }): void {
-    const group = this.groupUnder(hover.floor, hover.cell)
-      ?? [...this.state.elevatorGroups.values()].find(g => hover.floor >= g.serviceLo && hover.floor <= g.serviceHi && hover.cell >= g.x && hover.cell < g.x + shaftWidth(g));
-    if (group) { this.openElevatorEditor(group); return; }
-    const tenant = getTenantAt(this.state, hover.floor, hover.cell);
-    if (tenant) this.openTenantInfo(tenant);
+  private selectAt(hover: { floor: number; cell: number }, anchor?: { x: number; y: number }): void {
+    const entity = this.entityAt(hover.floor, hover.cell);
+    if (entity?.kind === 'elevator') this.openElevatorEditor(entity.group, anchor);
+    else if (entity) this.openTenantInfo(entity.tenant, anchor);
   }
 
-  private openTenantInfo(tenant: Tenant): void {
-    // The sim never fills Tenant.occupancy, so count its people directly.
+  private openTenantInfo(tenant: Tenant, anchor?: { x: number; y: number }): void {
+    // Count everyone assigned here (including people away), not just those inside.
     let occupancy = 0;
     let stressSum = 0;
     for (const p of this.state.people.values()) {
@@ -361,6 +384,7 @@ export class Controller {
         avgStress: occupancy > 0 ? stressSum / occupancy : 0,
         lobbyUpkeepQuarter: lobbyUpkeepQuarter(this.state.starLevel, tenant.sizeCells),
         officeLeaseDaysRemaining: Math.max(0, (tenant.officeLeaseUntilTick ?? 0) - this.state.tickCount) / CONFIG.DAY_TICKS,
+        condoAccess: tenant.type === 'condo' ? condoHasAccess(this.state, tenant) : undefined,
         noiseSources: noiseSources(this.state, tenant).map(source => {
           const room = this.state.tenants.get(source.tenantId)!;
           return { type: room.type, x: room.x, floor: room.floor, floorDistance: source.floorDistance, gap: source.gap, clearance: source.clearance };
@@ -404,10 +428,11 @@ export class Controller {
         },
         close: () => this.tenantInfo.close(),
       },
+      anchor,
     );
   }
 
-  private openElevatorEditor(group: ElevatorGroup): void {
+  private openElevatorEditor(group: ElevatorGroup, anchor?: { x: number; y: number }): void {
     const state = this.state;
     this.openDialog = 'elevator';
     this.elevatorEditor.open(group, {
@@ -416,13 +441,14 @@ export class Controller {
         this.elevatorAction(() => removeElevatorCar(state, group.id, carId)),
       upgrade: (carId: number) =>
         this.elevatorAction(() => upgradeCarSpeed(state, group.id, carId)),
+      repair: (carId: number) => this.elevatorAction(() => repairElevatorCar(state, group.id, carId)),
       home: (carId, floor) => this.elevatorAction(() => setCarHome(state, group.id, carId, floor)),
       priority: (day, period, priority) => this.elevatorAction(() => setElevatorPriority(state, group.id, day, period, priority)),
       response: (day, period, floors) => this.elevatorAction(() => setWaitingResponse(state, group.id, day, period, floors)),
       departure: (day, period, seconds) => this.elevatorAction(() => setDepartureDelay(state, group.id, day, period, seconds)),
       stop: (floor, enabled) => this.elevatorAction(() => setElevatorStop(state, group.id, floor, enabled)),
       close: () => this.elevatorEditor.close(),
-    });
+    }, anchor);
   }
 
   /** Run a sim elevator command; surface failures in the editor's error line. */
@@ -488,3 +514,4 @@ function kindFor(
 }
 import { noiseSources } from '../sim/noise';
 import { lobbyUpkeepQuarter } from '../sim/money';
+import { condoHasAccess } from '../sim/condoEconomy';

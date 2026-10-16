@@ -15,6 +15,8 @@ export class BuildStroke {
   private previous = 0;
   readonly width: number;
   placed = 0;
+  /** Total charged for this row so far (cents). */
+  spentCents = 0;
   error: string | null = null;
 
   constructor(readonly tool: RowBuildTool, readonly floor: number, readonly anchor: number) {
@@ -30,12 +32,14 @@ export class BuildStroke {
       if (!this.visited.has(slot)) {
         this.visited.add(slot);
         const x = this.anchor + slot * this.width;
+        const before = state.money.balanceCents;
         try {
           if (this.tool === 'stairs') placeStair(state, this.floor, x);
           else if (this.tool === 'escalatorUp' || this.tool === 'escalatorDown') {
             placeEscalator(state, this.floor, x, this.tool === 'escalatorUp' ? 'up' : 'down');
           } else placeTenant(state, this.tool, this.floor, x);
           this.placed++;
+          this.spentCents += Math.max(0, before - state.money.balanceCents);
           this.error = null;
         } catch (error) {
           this.error = error instanceof Error ? error.message : String(error);

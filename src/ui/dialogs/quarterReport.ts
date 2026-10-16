@@ -14,15 +14,15 @@ export interface QuarterReportData {
 }
 
 const C = {
-  overlay: 'rgba(38,62,52,0.18)',
-  bg: '#eceee3',
-  panel: '#e0e6d8',
-  text: '#34463f',
-  dim: '#758170',
-  accent: '#3f6958',
-  danger: '#a34835',
-  hover: '#d1ddc8',
-  money: '#477a53',
+  overlay: 'rgba(20,32,48,0.10)',
+  bg: '#dededa',
+  panel: '#fbfbf7',
+  text: '#1f2933',
+  dim: '#5b6470',
+  accent: '#2a64b4',
+  danger: '#b3261e',
+  hover: '#e3ecf8',
+  money: '#2e7d32',
 };
 
 /**

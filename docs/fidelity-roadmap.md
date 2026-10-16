@@ -87,6 +87,24 @@ still an explicit comparison gap.
 
 ## Work beyond elevators
 
+Sky lobbies are restricted to floors 15, 30, 45, 60, 75 and 90, the original's
+every-15-floors rule (original manual; PC reference). Placement previews and
+commands share the check. Demo and test towers already used these floors.
+Implemented and reference-backed.
+
+Stairs now follow the original two-floor model: each placed stair links one
+pair of adjacent built floors, with no requirement for a stair beneath it.
+B1↔lobby and basement↔basement stairs are allowed; the lobby keeps its tiles,
+as with escalators. Routing chains individual links within the four-flight
+limit, walking across a landing between offset stairs; demolishing a link
+cancels only journeys over that pair. Saved stairwells above the lobby keep
+the same meaning, so no save migration was needed. The cells-on-the-farther-
+floor convention and landing walks are implementation choices.
+
+Queue patience now decreases with stress: 400 ticks at zero stress, falling
+to 350 at maximum. The previous model made stressed people more patient. The
+direction is a correction; the 12.5% range is a tuning approximation.
+
 Daily settlement now collects previously earned revenue even if a room becomes
 vacant, damaged or enters repairs before settlement. The pending revenue and
 paid-visit counters clear once, so reopening cannot collect the same earnings
@@ -106,6 +124,15 @@ Exact buyer timing, price-driven demand/satisfaction and immediate transaction
 timing remain comparison gaps. Damaged rooms retain ownership through repair;
 disaster-specific compensation is not established. Tests cover price locks,
 resale, refund amounts, demolition before/after payout and legacy saves.
+
+New unsold condos now remain vacant if residents cannot route both from and to
+the lobby. Vacant units only advance their existing buyer timer while connected;
+losing access resets it. Service-only shafts do not qualify. The inspector shows
+access and the reason buyers are waiting. Tests cover construction, reconnection,
+disabled stops and save/reload. Requiring both directions and retaining the
+daily refill timer are implementation choices; original buyer timing remains
+unverified. Existing owners are not immediately evicted by a lost connection,
+and repaired owned condos retain their prior ownership behavior.
 
 Office workers now skip weekend arrival, lunch and return-to-office schedule
 entries and resume on the next weekday. The departure entry remains available
@@ -190,15 +217,50 @@ accuracy and validation, with some missing features identified below.
 | Incidents | Fire response/damage, bomb threats, infestation, VIP visits and event probabilities | Each event tested from trigger through resolution, including saves and failed responses |
 | Progression | Rating gates, VIP approval, metro and cathedral finale | Normal new game can reach the finale; every promotion and rejection condition verified |
 | Presentation and release | Art, animation, sound, responsive controls, performance, onboarding and accessibility | Playable review at ordinary desktop sizes and sustained large-tower performance checks |
-| Original save compatibility | TDT import/export is absent | Round-trip fixtures and explicit handling of unsupported fields; track separately from gameplay parity |
+
+## Incidents and modern facilities
+
+The feature plan's Batch 1 events (security firefighting, fire spread, bomb
+search scaled by reachable security) and Batch 2 originals (fire station,
+maintenance and breakdowns, generator and blackouts, bank and loans, rooftop
+pool, helipad) are implemented with tests; see
+[simtower-fidelity.md](simtower-fidelity.md#incident-and-modern-facility-batch)
+for the rules. Original fire and bomb probabilities, timings and prices remain
+unverified approximations; the Batch 2 numbers are our own tuning.
+
+## Playthrough findings
+
+`npm run playthrough` drives a deterministic bot from an empty plot using only
+player commands; CI runs a 30-day, 3-star version. A full 150-day run on
+2026-10-15 reached 2★ on day 5, 3★ on day 22, 4★ on day 86 and 5★ on day 97.
+It exposed a finale deadlock: population fell from about 15,700 on weekdays to
+9,000–11,000 at weekend noon, so the TOWER head count and the weekend wedding
+could never hold at once. The wedding is now booked when the population and a
+connected cathedral are first met together, then held at the next weekend
+noon. Booking is our implementation choice; the original trigger is unverified.
+
+The same run recorded about 420,000 office-worker give-ups at the lobby over
+150 days, because the 40-person-per-shaft hall queue turned later arrivals away
+immediately. Overflow passengers now wait beside the full queue, accrue waiting
+stress, join as places free up and give up only when their normal patience runs
+out. The rerun reached TOWER on day 108 (previously 120) with about 138,000
+lobby give-ups, now genuine patience timeouts. Waiting beside a full queue is an
+implementation choice; the original's overflow behavior is unverified.
+
+The 150-day rerun after the incident batch (breakdowns, blackouts, fire
+spread) reached 2★ on day 5, 3★ on day 19, 4★ on day 70, 5★ on day 91 and
+TOWER on day 114. With one maintenance office on floor 2 the bot paid for 523
+manual car repairs (about 118 cars late in the run), so the breakdown mean was
+eased from 8 to 12 days per car; mechanics only reach shafts via service
+routes, so large towers need several maintenance offices.
 
 ## Order and completion policy
 
 Resolve batch 2 where reference evidence permits, while building the comparison
 scenarios needed for 3–5. Do not hold independent work behind unresolved rules.
 After transport, work through population/economy, services/incidents, progression,
-construction discrepancies and presentation. Original save compatibility is a
-separate milestone and must not silently become a prerequisite for gameplay work.
+construction discrepancies and presentation. Importing or exporting original
+TDT saves is out of scope.
 
 Do not report a percentage until there is an enumerated comparison suite. Record
 each rule as implemented, verified against a cited reference, or still approximate.

@@ -31,6 +31,55 @@ reference below. Simulation formulas and event timing remain approximations.
 For example, parking income and waste treatment use simplified daily models.
 The facilities tour at `?demo=1` begins at five stars; normal games start at one.
 
+## Incident and modern-facility batch
+
+**Original events (Batch 1, implemented; formulas approximate).**
+- Fire response: players choose free security firefighting or paid fire
+  rescue, as in the original (manual; fan guides cited in
+  [feature-plan.md](feature-plan.md)). Security needs an open office whose
+  guards can reach the floor by staff routes; one office arrives in 300 ticks
+  with a 40% chance, each extra office adds 15% (cap 90%) and shortens the
+  trip. A failed attempt leaves the fire burning and can be retried. Rescue
+  costs $50,000 and arrives in 150 ticks. Unverified: the original's
+  probabilities, timings and rescue price.
+- Fire spread: an unanswered fire tries to spread every 250 ticks, igniting
+  each touching room on its floor(s) and each room directly above with a 60%
+  chance, at most two per attempt and eight fires at once; new fires start
+  their own clocks. A response underway pauses spreading. Spreading is reported
+  for the original; its geometry and rate are our approximation.
+- Bomb search: the 500-tick sweep is divided by the number of security offices
+  whose guards can reach the floor; with none, only the ransom remains.
+  Unverified: the original's search timing.
+- Journal entries now carry the floor and column where cheap (incidents,
+  spread, breakdowns, repairs) so the journal can jump to them.
+
+**Upper Story originals (Batch 2, not in SimTower).**
+- Fire station (2★): a station within 20 floors whose firefighters can reach
+  the fire by staff routes makes rescue $20,000 and 60 ticks, and prevents
+  spread.
+- Elevator breakdowns (from 2★): each car rolls daily for a breakdown (mean
+  once per 12 days; a quarter as often when a maintenance office's mechanics can
+  reach the shaft's nearest stop). A broken car coasts to the nearest floor,
+  unloads riders (who re-plan from there), is ignored by dispatch and routing
+  (when every car in the shaft is broken), and is fixed by reachable mechanics
+  after 200 ticks or by a $10,000 manual repair.
+- Blackouts (from 2★): a 3% daily chance in clear weather, 15% in rain; lasts
+  60–120 game minutes. Cars hold position (doors finish) unless an open
+  basement generator exists; waiting stress accrues normally.
+- Bank (3★): weekday customers 09:00–17:00 pay $150 each and count toward
+  population like shop visitors; loans up to $500,000 per bank plus $200 per
+  person, at 3% interest per quarter charged at quarterly settlement (included
+  in the quarter report's expenses).
+- Rooftop pool (3★) and helipad (4★): roof only (no built floor above the
+  footprint; no floor may be built or extended over them). Residents and hotel
+  guests swim in the evenings and all weekend; condos and hotel rooms within
+  10 floors gain 8 evaluation points. VIPs fly in to a connected helipad, and a
+  helipad extends any open medical center's cover tower-wide.
+- Fire stations, maintenance offices, generators, pools and helipads are not
+  graded on occupancy. Tower events use their own seeded random stream, so
+  they never shift the main stream. Saves are version 10; version 9 saves load
+  with fresh spread clocks for active fires.
+
 ## Remaining fidelity work
 
 See the [bounded work roadmap](fidelity-roadmap.md) for elevator batch status,
@@ -67,13 +116,17 @@ This is a modern usability change, not an original-game fidelity claim.
 Comprehensive visual checks across screen sizes remain outstanding.
 
 After construction, work proceeds through elevator dispatch and controls,
-traffic and economics, service coverage and incidents, then presentation and
-original-save compatibility. Each simulation pass needs measured PC 1.0
-comparison scenarios before it can be considered equivalent.
+traffic and economics, service coverage and incidents, then presentation.
+Each simulation pass needs measured PC 1.0 comparison scenarios before it can
+be considered equivalent. Importing or exporting original TDT saves is out of
+scope.
 
 
 - Compare original PC gameplay against repeatable morning, lunch and evening
   traffic scenarios. Calibrate dispatch, journey times, patience and stress.
+  Queue patience now falls as stress rises (400 ticks unstressed, 350 at maximum
+  stress), so stressed people give up sooner instead of later. The direction
+  follows the original's stress model; the amount remains an approximation.
   Dispatch now filters occupied hall queues by the passenger's assigned shaft
   and direction, including calls collected while moving. A different shaft
   clearing the shared hall signal no longer hides waiting passengers. This fixes
@@ -175,14 +228,25 @@ comparison scenarios before it can be considered equivalent.
   saved two-cell shafts retain their dimensions, including extensions. New sky
   lobbies occupy six cells to fit express shafts; original lobby sizing rules
   still need comparison.
+  Sky lobbies can only be placed on floors 15, 30, 45, 60, 75 and 90, matching
+  the original's every-15-floors rule (original manual; PC reference).
+  Each stair or escalator links exactly two adjacent floors, and any pair of
+  built floors qualifies, including B1↔lobby and basement↔basement links. A
+  stair no longer needs another stair directly below; consecutive offset stairs
+  form a walkable chain. Stair cells sit on the floor farther from the lobby
+  (lobby tiles stay untouched), so saved upper-floor stairwells keep their
+  meaning without a save migration. Routing, placement and demolition all
+  treat one placed stair as one link; demolishing one leaves neighbors usable.
+  Walking between offset stairs and the cell-ownership convention are our own.
   Lobby height is currently selected when creating a tower, without later resizing. Stair
   and escalator trip limits are four and seven flights; their purchase costs
   are $5,000 and $20,000. Elevator shaft/car purchase and quarterly upkeep now
   use the reference's type-specific amounts. New shafts include one car;
   extensions still use our $500-per-floor rule. Speed upgrades remain custom.
 - Replace procedural artwork and compare synthesized audio with the original sound design.
-  The current renderer uses 20-pixel floor bands; the reference loader uses 24.
-- Original TDT save import/export is not implemented.
+  Floor bands are 24 pixels, matching the reference loader. Room, elevator and
+  people art is original procedural drawing in SimTower's visual language; no
+  original assets are bundled.
 
 ## Reference scenario
 

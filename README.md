@@ -26,11 +26,13 @@ Build up to 100 floors above ground and nine basement levels. Large facilities o
 | 4 stars | Metro station |
 | 5 stars | Cathedral |
 
-Population earns your second star at 300 people. Later ratings also require services: security at 1,000; a suite, favorable VIP inspection, recycling and medical care at 5,000; and an accessible metro at 10,000. Reach more than 15,000 people and connect a cathedral on floors 97–100 for the final weekend wedding.
+Population earns your second star at 300 people. Later ratings also require services: security at 1,000; a suite, favorable VIP inspection, recycling and medical care at 5,000; and an accessible metro at 10,000. Reach more than 15,000 people and connect a cathedral on floors 97–100; a wedding is then booked for the next weekend at noon, earning the final TOWER rating.
 
-Open **Events & ratings** for your next requirements, active emergencies and tower journal. Fires need rescue, bomb threats need security or a ransom payment, and cockroaches need cleaning or pest control. Unanswered emergencies can close rooms; inspect damaged facilities to repair them. VIPs must actually reach a clean, well-served suite to approve the tower.
+Open **Events & ratings** for your next requirements, active emergencies and tower journal. Fires need free but unreliable security firefighting or paid rescue, and spread to neighbouring rooms if ignored; bomb threats need security (faster with more offices) or a ransom payment; elevator cars occasionally break down and need repair; blackouts stop elevators until power returns, and cockroaches need cleaning or pest control. Unanswered emergencies can close rooms; inspect damaged facilities to repair them. VIPs must actually reach a clean, well-served suite to approve the tower.
 
 Condos sell once when completed. Offices earn rent, visitors pay for their activities, and services incur running costs. Keep cinemas fresh by changing their films from the room inspection window. Parking requires aligned basement ramps; the three-floor metro starts in B9.
+
+**Modern additions** (not in the original SimTower): fire stations (2★) send cheaper, faster rescue and stop fires spreading within 20 floors; maintenance offices (2★) keep elevator cars from breaking down and repair them; basement backup generators (3★) keep elevators running through blackouts; banks (3★) serve weekday customers and lend money at 3% interest per quarter; rooftop pools (3★) and helipads (4★) go only on a roof. Pools draw residents and guests and lift nearby condo and hotel ratings; VIPs fly in to a helipad, which also extends medical care tower-wide.
 
 ## Getting started
 
@@ -47,7 +49,7 @@ Inspect an elevator to add cars, upgrade speed or choose each car's home floor. 
 
 Use **Floors served** to turn individual stops on or off. Existing trips finish normally; new passengers use the revised stop list. Disabled stops stay disabled when you extend the shaft, while newly added floors start in service.
 
-People can travel up to four consecutive stair flights or seven escalator flights. Stairs cost $5,000 and escalators $20,000. The tower supports 64 stairs and escalators combined, 16 cinemas and party halls combined, 512 food and retail facilities combined, and 10 security offices. Facilities under construction count toward these limits; demolition frees a slot.
+Each stair or escalator links two neighbouring floors, including basements. Sky lobbies go on floors 15, 30, 45, 60, 75 and 90. People can travel up to four consecutive stair flights or seven escalator flights. Stairs cost $5,000 and escalators $20,000. The tower supports 64 stairs and escalators combined, 16 cinemas and party halls combined, 512 food and retail facilities combined, and 10 security offices. Facilities under construction count toward these limits; demolition frees a slot.
 
 | Elevator | New shaft, including first car | Additional car | Quarterly upkeep |
 | --- | --- | --- | --- |
@@ -74,6 +76,12 @@ Designed for a desktop browser with a mouse and keyboard.
 | `O` | Build an office |
 | `C` | Build a condo |
 | `Space` | Pause or resume |
+| `1` / `2` / `3` | Normal, fast or fastest speed |
+| `+` / `-` | Zoom in or out |
+| `M` | Tower map |
+| `R` | Tower report |
+| `Ctrl+S` / `Ctrl+O` | Open the Game window to save or load |
+| `F1` | Help |
 | `Home` | Center the tower |
 | `Escape` | Close a window or return to inspection |
 
@@ -83,7 +91,7 @@ Open **Sound** for master volume, elevator and weather ambience, or mute. Sound 
 
 ## Saving your tower
 
-Open **Game → Save tower** to save your progress. Saves are stored in the browser you're playing in; they don't sync between devices. Clearing site data removes them.
+Open **Game** to save to a named slot, overwrite or delete slots, and load any of them. The game also autosaves at the end of every quarter and when you leave the page. Saves are compressed and stored in the browser you're playing in; they don't sync between devices, and clearing site data removes them. A tower saved by an earlier version appears as its own slot.
 
 ## Run locally
 

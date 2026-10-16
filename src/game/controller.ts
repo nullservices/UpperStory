@@ -32,7 +32,8 @@ import { ElevatorEditor } from '../ui/dialogs/elevatorEditor';
 import { QuarterReport } from '../ui/dialogs/quarterReport';
 import { TenantInfo } from '../ui/dialogs/tenantInfo';
 import type { Hud } from '../ui/hud';
-import { TOOL_SHORTCUTS } from '../ui/toolPalette';
+import { TOOL_INFO, TOOL_SHORTCUTS } from '../ui/toolPalette';
+import { floorLabel } from '../sim/campaign';
 import { BuildStroke, isRowBuildTool } from './buildStroke';
 import { repairTenant, changeMovie } from '../sim/tenants';
 import { buildElevator, elevatorBuildPlan } from './elevatorBuild';
@@ -187,7 +188,8 @@ export class Controller {
         case 'TENANT_COMPLETED': {
           const tenant = tenants.get(event.tenantId);
           if (tenant) {
-            this.hud.toast(`${tenant.type} ready on floor ${tenant.floor}`);
+            const label = (TOOL_INFO as Partial<Record<string, { label: string }>>)[tenant.type]?.label ?? tenant.type;
+            this.hud.toast(`${label} ready on ${floorLabel(tenant.floor)}`);
           }
           break;
         }

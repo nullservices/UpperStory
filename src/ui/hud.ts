@@ -10,7 +10,7 @@ import { chromeInsets, clampWindow, closeButton, escapeHtml, makeDraggable, read
 const cash = (cents: number): string => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 /** Menu commands main.ts provides (windows owned outside the HUD). */
-export type HudCommand = 'new' | 'save' | 'load' | 'sound' | 'map' | 'events' | 'tips' | 'tutorial' | 'finances';
+export type HudCommand = 'new' | 'save' | 'load' | 'sound' | 'map' | 'events' | 'tips' | 'tutorial' | 'finances' | 'stats' | 'scenarios';
 
 type MenuItem =
   | { label: string; shortcut?: string; action: () => void; checked?: () => boolean; disabled?: () => boolean }
@@ -104,6 +104,7 @@ export class Hud {
     this.nav.append(
       this.menu('Game', [
         { label: 'New tower…', action: () => this.onOpenMenu?.('new') },
+        { label: 'Scenarios…', action: () => this.onCommand?.('scenarios') },
         { label: 'Save tower…', shortcut: 'Ctrl+S', action: () => this.onOpenMenu?.('save') },
         { label: 'Load tower…', shortcut: 'Ctrl+O', action: () => this.onOpenMenu?.('load') },
         'separator',
@@ -125,6 +126,7 @@ export class Hud {
         { label: 'Events & ratings…', shortcut: 'V', action: () => this.onCommand?.('events') },
         { label: 'Message log', shortcut: 'L', action: () => this.toggleLog(), checked: () => !this.log.hidden },
         { label: 'Finances & loans…', action: () => this.onCommand?.('finances') },
+        { label: 'Statistics…', shortcut: 'G', action: () => this.onCommand?.('stats') },
       ]),
       this.menu('Speed', SPEEDS.map(([mult, , label, key]): MenuItem => ({ label, shortcut: key, action: () => this.selectSpeed(mult), checked: () => this.speed === mult }))),
       this.menu('Help', [

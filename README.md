@@ -34,6 +34,21 @@ Condos sell once when completed. Offices earn rent, visitors pay for their activ
 
 **Modern additions** (not in the original SimTower): fire stations (2★) send cheaper, faster rescue and stop fires spreading within 20 floors; maintenance offices (2★) keep elevator cars from breaking down and repair them; basement backup generators (3★) keep elevators running through blackouts; banks (3★) serve weekday customers and lend money at 3% interest per quarter; rooftop pools (3★) and helipads (4★) go only on a roof. Pools draw residents and guests and lift nearby condo and hotel ratings; VIPs fly in to a helipad, which also extends medical care tower-wide.
 
+## Scenarios
+
+Open **Game › Scenarios…** (or **Scenarios…** under New tower in the Game window) for challenges with goals, limits and a deadline. A goals card at the top left tracks each objective live; collapse it or drag it aside. Win or lose, a results card offers **Keep playing**, **Try again** or another scenario, and your best time for each scenario is remembered in this browser. Saves keep the active scenario; towers saved before scenarios existed load as free play.
+
+| Scenario | Difficulty | Goals | Limits |
+| --- | --- | --- | --- |
+| First Tower | Easy | Earn ★★, lease 10 offices and hold $1,000,000 | 1 year |
+| Rush Hour | Medium | Two calm weekdays in a row (nobody gives up, average worker stress under 45) with 66 of 72 offices leased | 9 days, floors B1–10, no debt |
+| Grand Hotel | Medium | 100 hotel guests at once, three suites rated ★★★★, net $150,000 in a day | 2 years, no offices or condos |
+| Rebuild | Medium | Repair every fire-damaged room, bring back 1,200 people, net $400,000 in a day | 1 year, floors up to 20, no debt |
+| Skyline | Hard | Build to floor 60, express service to four sky lobbies, 1,000 people | 3 years, a 96-cell lot |
+| The Wedding | Expert | Earn ★★★★★, then more than 15,000 people and the cathedral wedding (TOWER) | 10 years |
+
+The tutorial is skipped during scenarios; each one has its own briefing.
+
 ## Getting started
 
 1. Select **Floor** and click above the lobby to build an upper floor.

@@ -15,6 +15,8 @@ import { Controller } from './game/controller';
 import { IncidentView } from './render/incidents';
 import { TowerMap } from './ui/towerMap';
 import { Guide } from './ui/guide';
+import { StatsWindow } from './ui/statsWindow';
+import { ScenarioPanel } from './ui/scenarioPanel';
 import { CampaignPanel } from './ui/campaignPanel';
 import { Motion } from './render/motion';
 import { setupShowcaseTower } from './sim/showcaseTower';
@@ -122,9 +124,11 @@ async function main(): Promise<void> {
   });
   const controller = new Controller(app, camera, state, hud);
   const palette = new ToolPalette((tool) => controller.selectTool(tool));
-  controller.onToolChange = (tool) => palette.setActive(tool);
+  controller.onToolChange = (tool) => { palette.setActive(tool); audio.toolChanged(); };
   palette.onLocked = (tool, star) => hud.toast(`${TOOL_INFO[tool].label} unlocks at ${'★'.repeat(star)}. Tower › Events & ratings (V) lists what the next rating needs.`, 'hint');
   controller.selectTool('select');
+  const statsWindow = new StatsWindow();
+  const scenarioPanel = new ScenarioPanel();
   const guide = new Guide();
   guide.tutorialAllowed = autosaveEnabled; // false on ?demo / ?reference
   guide.onSelectTool = tool => controller.selectTool(tool);
@@ -143,7 +147,8 @@ async function main(): Promise<void> {
     controller.setState(state);
     camera.center();
     autosaveEnabled = true;
-    guide.tutorialAllowed = true;
+    // Scenarios come with their own briefing; the first-tower tutorial stays out.
+    guide.tutorialAllowed = !next.scenario;
     lastAutosaveTick = state.tickCount;
   };
   const settings = new SettingsDialog({
@@ -159,7 +164,12 @@ async function main(): Promise<void> {
       swapState(loaded);
       hud.toast(`Loaded “${meta.name}”.`);
     },
+    onOpenScenarios: () => scenarioPanel.open(),
   }, saves);
+  scenarioPanel.onStart = next => {
+    swapState(next);
+    hud.toast('Scenario started. Goals are in the card at the top left; pause any time to plan.');
+  };
   hud.onOpenMenu = section => settings.open(section);
   hud.onCommand = command => {
     if (command === 'sound') openSound();
@@ -173,6 +183,8 @@ async function main(): Promise<void> {
       else hud.toast('The tutorial runs on your own towers: start one from Game › New tower.', 'hint');
     }
     else if (command === 'finances') finances.toggle();
+    else if (command === 'stats') statsWindow.open();
+    else if (command === 'scenarios') scenarioPanel.open();
     else settings.open(command);
   };
 
@@ -241,6 +253,8 @@ async function main(): Promise<void> {
     );
     incidents.draw(state, app.screen.width, Math.min(app.screen.height, camera.y), acc / CONFIG.TICK_MS);
     campaignPanel.update(state);
+    statsWindow.update(state);
+    scenarioPanel.update(state);
     guide.update(state);
     towerMap.update(state);
     hud.update(state);

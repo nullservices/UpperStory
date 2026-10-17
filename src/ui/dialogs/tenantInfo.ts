@@ -3,12 +3,13 @@ import { placeNear } from '../windowing';
 import { TOOL_INFO } from '../toolPalette';
 import type { HousekeepingAccess } from '../../sim/housekeepingAccess';
 import { hotelCheckoutCents } from '../../sim/hotelEconomy';
-import { officeQuarterRentCents, officeRentScoreAdjustment } from '../../sim/money';
+import { apartmentQuarterRentCents, officeQuarterRentCents, officeRentScoreAdjustment } from '../../sim/money';
 import { condoSaleCents } from '../../sim/condoEconomy';
 import { commercialOpeningMinute } from '../../sim/commercialPopulation';
 import { formatTimeOfDay } from '../../sim/time';
 import { CONFIG, TENANT_DATA, isHotel } from '../../data/config';
 import type { Tenant, TenantType } from '../../sim';
+import { voicesFromFacts, type Voice } from '../../sim/complaints';
 
 /** Snapshot data the controller computed from live sim state at open time. */
 export interface TenantInfoData {
@@ -25,6 +26,8 @@ export interface TenantInfoData {
   officeLeaseDaysRemaining?: number;
   condoAccess?: boolean;
   noiseSources?: { type: TenantType; x: number; floor: number; floorDistance: number; gap: number; clearance: number }[];
+  /** Tenant voices from live state (`tenantVoices`); derived from the fields above when absent. */
+  voices?: Voice[];
 }
 
 /**
@@ -190,6 +193,10 @@ export class TenantInfo {
       const pricing = CONFIG.PRICING_LEVELS[tenant.pricing]!.label;
       rows.push(this.line('Pricing', pricing.charAt(0).toUpperCase() + pricing.slice(1)));
     }
+    if (tenant.type === 'apartment') {
+      rows.push(this.line('Rent / quarter', `${cash(apartmentQuarterRentCents(tenant))}`));
+      rows.push(this.line('Collection', tenant.state === 'open' ? 'Collected daily while occupied' : 'No rent until tenants move in'));
+    }
     if (tenant.type === 'office') {
       rows.push(this.line('Rent / quarter', `${cash(officeQuarterRentCents(tenant))}`));
       rows.push(this.line('Collection', tenant.state === 'open' ? 'Collected daily while occupied' : 'No rent until occupied'));
@@ -259,6 +266,8 @@ export class TenantInfo {
       rows.push(this.line('Population update', `${formatTimeOfDay(opening)} · preceding patron count`));
     }
     this.body.replaceChildren(...rows);
+    const voices = data.voices ?? voicesFromData(tenant, data);
+    if (voices.length) this.body.prepend(voiceSection(voices));
     // Room actions share one right-aligned row under the details.
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:4px';
@@ -329,6 +338,32 @@ export class TenantInfo {
   }
 }
 
+/** Rebuild voice facts from the dialog snapshot when the controller sent none. */
+function voicesFromData(tenant: Tenant, data: TenantInfoData): Voice[] {
+  const noise = [...(data.noiseSources ?? [])].sort((a, b) => a.floorDistance - b.floorDistance || a.gap - b.gap)[0] ?? null;
+  return voicesFromFacts(tenant, {
+    avgStress: data.avgStress, noise, access: data.condoAccess, housekeeping: data.housekeepingAccess,
+  });
+}
+
+/** "What tenants say": speech-bubble lines above the numeric rows. */
+function voiceSection(voices: Voice[]): HTMLDivElement {
+  const box = document.createElement('div');
+  box.className = 'tenant-voices';
+  const head = document.createElement('div');
+  head.className = 'tenant-voices-head';
+  head.textContent = 'What tenants say';
+  box.append(head);
+  for (const voice of voices) {
+    const line = document.createElement('div');
+    line.className = `tenant-voice voice-${voice.tone}`;
+    line.dataset.cause = voice.cause;
+    line.textContent = `“${voice.text}”`;
+    box.append(line);
+  }
+  return box;
+}
+
 /** Whole dollars in the same format as the info bar ("$12,345"). */
 function cash(cents: number): string {
   return dollars(cents / 100);
@@ -348,7 +383,8 @@ function stars(grade: number): string {
 
 /** Rooms with player-adjustable rent or commercial prices. */
 function isPricable(type: TenantType): boolean {
-  return isHotel(type) || ['office', 'condo', 'fastfood', 'restaurant', 'shop', 'cinema', 'partyHall'].includes(type);
+  return isHotel(type) || ['office', 'condo', 'apartment', 'fastfood', 'restaurant', 'shop', 'cinema', 'partyHall',
+    'gym', 'supermarket', 'bar', 'conference', 'observationDeck'].includes(type);
 }
 
 /** Player-facing name, matching the construction palette ("Hotel suite"). */

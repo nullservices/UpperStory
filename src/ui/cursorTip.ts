@@ -1,7 +1,9 @@
 import type { ElevatorDrag, Tool } from '../game/controller';
 import { placementCostDollars } from '../game/placementCost';
 import type { ElevatorGroup, GameState, Tenant } from '../sim';
+import type { Voice } from '../sim/complaints';
 import { queueLength } from '../sim/queues';
+import { tenantVoices } from '../sim/complaints';
 import { carOutOfService } from './simCompat';
 import { TOOL_INFO } from './toolPalette';
 import { escapeHtml } from './windowing';
@@ -26,7 +28,8 @@ const HOVER_DELAY_MS = 450;
 const dollars = (n: number): string => `$${Math.round(n).toLocaleString('en-US')}`;
 export const floorName = (floor: number): string => (floor <= 0 ? `B${1 - floor}` : `Floor ${floor}`);
 
-const GRADED = new Set<Tenant['type']>(['office', 'condo', 'hotel', 'hotelTwin', 'hotelSuite', 'fastfood', 'restaurant', 'shop']);
+const GRADED = new Set<Tenant['type']>(['office', 'condo', 'apartment', 'hotel', 'hotelTwin', 'hotelSuite', 'fastfood', 'restaurant', 'shop',
+  'gym', 'supermarket', 'bar', 'conference', 'observationDeck']);
 const HOTELS = new Set<Tenant['type']>(['hotel', 'hotelTwin', 'hotelSuite']);
 
 /** Compact tooltip markup for a room or elevator under the Inspect cursor. */
@@ -55,7 +58,17 @@ export function describeEntity(state: GameState, entity: HoverEntity): string {
     if (t.capacity > 0 && t.type !== 'lobby') lines.push(`<span>${t.occupancy} / ${t.capacity} inside</span>`);
     if (HOTELS.has(t.type)) lines.push(`<span class="${t.cleanliness < 50 ? 'tip-warn' : ''}">Clean ${Math.round(t.cleanliness)}%</span>`);
   }
+  const voice = topVoice(state, t);
+  if (voice) lines.push(`<span class="tip-voice voice-${voice.tone}">“${escapeHtml(voice.text)}”</span>`);
   return lines.join('');
+}
+
+/** The room's most important voice, cached briefly: the tip repaints every frame. */
+let voiceCache: { state: GameState | null; key: string; voice: Voice | null } = { state: null, key: '', voice: null };
+function topVoice(state: GameState, tenant: Tenant): Voice | null {
+  const key = `${tenant.id}:${tenant.state}:${tenant.pricing}:${Math.floor(state.tickCount / 50)}`;
+  if (voiceCache.state !== state || voiceCache.key !== key) voiceCache = { state, key, voice: tenantVoices(state, tenant)[0] ?? null };
+  return voiceCache.voice;
 }
 
 /**

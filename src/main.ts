@@ -126,6 +126,7 @@ async function main(): Promise<void> {
   const palette = new ToolPalette((tool) => controller.selectTool(tool));
   controller.onToolChange = (tool) => { palette.setActive(tool); audio.toolChanged(); };
   palette.onLocked = (tool, star) => hud.toast(`${TOOL_INFO[tool].label} unlocks at ${'★'.repeat(star)}. Tower › Events & ratings (V) lists what the next rating needs.`, 'hint');
+  palette.onBanned = tool => hud.toast(`${TOOL_INFO[tool].label} isn't allowed in this scenario. Open the goals card for its rules.`, 'hint');
   controller.selectTool('select');
   const statsWindow = new StatsWindow();
   const scenarioPanel = new ScenarioPanel();

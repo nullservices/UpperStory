@@ -94,6 +94,15 @@ const GROUPS: Array<[string, Tool[]]> = [
 
 const dollars = (n: number): string => `$${n.toLocaleString('en-US')}`;
 
+/** True while the active (unfinished) scenario forbids this tool. */
+export function scenarioBans(state: GameState, tool: Tool): boolean {
+  const rules = state.scenario && !state.scenario.outcome ? state.scenario.rules : undefined;
+  if (!rules) return false;
+  const kind = tool === 'elevator' ? 'standard' : tool === 'serviceElevator' ? 'service' : tool === 'expressElevator' ? 'express' : null;
+  if (kind) return rules.bannedElevators?.includes(kind) ?? false;
+  return (rules.banned as readonly string[] | undefined)?.includes(tool) ?? false;
+}
+
 /** Star rating a tool needs before it can be used. */
 export function toolUnlockStar(tool: Tool): number {
   const data = tool in TENANT_DATA ? TENANT_DATA[tool as keyof typeof TENANT_DATA] : null;
@@ -147,6 +156,8 @@ export class ToolPalette {
   private lastStateKey = '';
   /** A locked tool was clicked (or activated by keyboard): explain why. */
   onLocked: ((tool: Tool, star: number) => void) | null = null;
+  /** A tool the active scenario forbids was clicked. */
+  onBanned: ((tool: Tool) => void) | null = null;
   private state: GameState | null = null;
   private prefs = readUiPref<PalettePrefs>('palette', { x: null, y: null, collapsed: false });
 
@@ -187,7 +198,11 @@ export class ToolPalette {
         // Locked tools stay focusable (aria-disabled) so keyboard and mouse
         // users can still read when they unlock.
         button.onclick = () => {
-          if (button.getAttribute('aria-disabled') === 'true') { this.onLocked?.(tool, toolUnlockStar(tool)); return; }
+          if (button.getAttribute('aria-disabled') === 'true') {
+            if (this.state && scenarioBans(this.state, tool)) this.onBanned?.(tool);
+            else this.onLocked?.(tool, toolUnlockStar(tool));
+            return;
+          }
           this.setActive(tool); this.onSelect(tool);
         };
         attachTooltip(button, () => this.tooltip(tool));
@@ -227,16 +242,17 @@ export class ToolPalette {
 
   update(state: GameState): void {
     this.state = state;
-    const key = `${state.starLevel}:${topFloorIndex(state.tower)}:${state.tower.floors[0]?.index}:${state.money.balanceCents}`;
+    const key = `${state.starLevel}:${topFloorIndex(state.tower)}:${state.tower.floors[0]?.index}:${state.money.balanceCents}:${state.scenario?.id ?? ''}:${state.scenario?.outcome ? 1 : 0}`;
     if (key === this.lastStateKey) return;
     this.lastStateKey = key;
     for (const [tool, button] of this.buttons) {
       const required = toolUnlockStar(tool);
-      const locked = required > state.starLevel;
+      const banned = scenarioBans(state, tool);
+      const locked = banned || required > state.starLevel;
       const cost = toolCostDollars(state, tool);
       if (locked) button.setAttribute('aria-disabled', 'true'); else button.removeAttribute('aria-disabled');
       const badge = button.querySelector('small')!;
-      const badgeText = locked ? `${required}★` : '';
+      const badgeText = banned ? '✕' : locked ? `${required}★` : '';
       if (badge.textContent !== badgeText) badge.textContent = badgeText;
       button.classList.toggle('locked', locked);
       button.classList.toggle('unaffordable', !locked && cost !== null && cost * 100 > state.money.balanceCents);
@@ -251,11 +267,12 @@ export class ToolPalette {
     const required = toolUnlockStar(tool);
     const cost = state ? toolCostDollars(state, tool) : null;
     const price = costLine(tool, cost);
-    const locked = state ? required > state.starLevel : false;
+    const banned = state ? scenarioBans(state, tool) : false;
+    const locked = banned || (state ? required > state.starLevel : false);
     const short = cost !== null && state !== null && cost * 100 > state.money.balanceCents;
     return `<b>${escapeHtml(info.label)}</b>`
       + (price ? `<span class="tip-cost${short && !locked ? ' tip-warn' : ''}">${escapeHtml(price)}${short && !locked ? ' · not enough funds' : ''}</span>` : '')
-      + `<span class="tip-unlock${locked ? ' tip-warn' : ''}">${locked ? `Locked · unlocks at ${stars(required)}` : required > 1 ? `Unlocked at ${stars(required)}` : 'Available from the start'}</span>`
+      + `<span class="tip-unlock${locked ? ' tip-warn' : ''}">${banned ? 'Not allowed in this scenario' : locked ? `Locked · unlocks at ${stars(required)}` : required > 1 ? `Unlocked at ${stars(required)}` : 'Available from the start'}</span>`
       + `<p>${escapeHtml(info.hint)}${isRowBuildTool(tool) ? ' Hold and drag to build a row.' : ''}</p>`;
   }
 

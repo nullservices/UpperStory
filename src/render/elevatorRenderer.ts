@@ -11,8 +11,10 @@ import {
 } from '../sim';
 import { advanceAnimClock } from './animClock';
 import { carOutOfService, towerUnpowered } from './simCompat';
+import { roomLighting } from './roomLighting';
 import { hash32 } from './sprites/pixmap';
 import type { Motion } from './motion';
+import { RowBuckets, visibleWorldBand } from './rowBuckets';
 import { ELEVATOR_COLORS } from './palette';
 import { DOOR_STEPS, brokenCarTexture, carTexture, machineRoom, shaftSegment, type LandingKind } from './sprites/elevator';
 
@@ -31,7 +33,7 @@ const CAR_H = CONFIG.FLOOR_HEIGHT_PX - CAR_TOP_INSET - CAR_BOTTOM_INSET;
  */
 export class ElevatorView {
   readonly container = new Container();
-  private readonly shafts = new Container();
+  private readonly shafts = new RowBuckets();
   private readonly carLayer = new Container();
   private readonly cables = new Graphics();
   private readonly lamps = new Graphics();
@@ -39,25 +41,37 @@ export class ElevatorView {
   private signature = '';
   private anim = 0;
   private tower: GameState['tower'] | null = null;
+  /** Blackout without backup power this frame (car lamps go dark). */
+  private unpowered = false;
+  /** World rows on screen this frame (null = draw everything). */
+  private band: { top: number; bottom: number } | null = null;
 
   constructor() {
     this.container.eventMode = 'none';
-    this.container.addChild(this.shafts, this.cables, this.carLayer, this.lamps);
+    this.container.addChild(this.shafts.root, this.cables, this.carLayer, this.lamps);
   }
 
   draw(state: GameState, alpha = 1, motion?: Motion): void {
     this.anim = advanceAnimClock(state, alpha);
     // Blackout without a generator: cars sit dark (the sim holds them).
-    this.carLayer.tint = towerUnpowered(state) ? 0x50566e : 0xffffff;
+    this.unpowered = towerUnpowered(state);
+    this.carLayer.tint = this.unpowered ? 0x50566e : 0xffffff;
     // Stop toggles do not always bump the structure revision; fold them in.
     let signature = String(state.tower.structureRevision);
     for (const group of state.elevatorGroups.values()) signature += `|${group.id}:${group.stops.length}:${group.disabledStops?.length ?? 0}`;
     if (this.tower !== state.tower || this.signature !== signature) {
       this.tower = state.tower;
       this.signature = signature;
-      for (const child of this.shafts.removeChildren()) child.destroy();
+      this.shafts.clear();
       for (const group of state.elevatorGroups.values()) this.drawShaft(state, group);
     }
+    // Shafts darken with the unlit structure at night (cars keep their lit cabins).
+    this.shafts.root.tint = roomLighting.structure;
+    this.cables.tint = roomLighting.structure;
+    const band = visibleWorldBand(this.container, CONFIG.FLOOR_HEIGHT_PX);
+    if (band) this.shafts.cull(band.top, band.bottom);
+    else this.shafts.showAll();
+    this.band = band;
     this.cables.clear();
     this.lamps.clear();
     let used = 0;
@@ -79,12 +93,12 @@ export class ElevatorView {
       const segment = new Sprite(shaftSegment(group.kind, w, h, landing, CAR_H));
       segment.position.set(x, floorTopY(f, lh));
       segment.roundPixels = true;
-      this.shafts.addChild(segment);
+      this.shafts.add(segment, segment.y, h);
     }
     const cap = new Sprite(machineRoom(group.kind, w));
     cap.position.set(x - 1, floorTopY(group.serviceHi, lh) - 5);
     cap.roundPixels = true;
-    this.shafts.addChild(cap);
+    this.shafts.add(cap, cap.y, 5);
   }
 
   private drawCars(state: GameState, group: ElevatorGroup, alpha: number, used: number, motion?: Motion): number {
@@ -126,24 +140,18 @@ export class ElevatorView {
         }
         continue;
       }
-      // Direction lamp on the car header.
-      const ax = left + cw - 6, ay = top - 3;
-      if (car.dir === 1) this.lamps.poly([ax, ay + 3, ax + 2, ay, ax + 4, ay + 3]).fill(ELEVATOR_COLORS.arrowUp);
-      else if (car.dir === -1) this.lamps.poly([ax, ay, ax + 2, ay + 3, ax + 4, ay]).fill(ELEVATOR_COLORS.arrowDown);
+      // Direction lamp on the car header: a stepped pixel arrow (5x3).
+      if (!this.unpowered && (car.dir === 1 || car.dir === -1)) {
+        const ax = left + cw - 6, ay = top - 3;
+        const color = car.dir === 1 ? ELEVATOR_COLORS.arrowUp : ELEVATOR_COLORS.arrowDown;
+        for (let row = 0; row < 3; row++) {
+          const half = car.dir === 1 ? row : 2 - row;
+          this.lamps.rect(ax + 2 - half, ay + row, half * 2 + 1, 1).fill(color);
+        }
+      }
     }
-
-    // Call lamps beside the shaft for each pending direction on a serviced
-    // floor (up near the band top, down below it).
-    for (let f = group.serviceLo; f <= group.serviceHi; f++) {
-      const call = state.floorCalls.get(f);
-      if (!call || (!call.up && !call.down)) continue;
-      if (!getFloor(state.tower, f)) continue;
-      const bandTop = carWorldY(f, lh);
-      const lx = x - 5;
-      this.lamps.rect(lx - 1, bandTop + 5, 6, 11).fill(0x2a2a30);
-      if (call.up) this.lamps.poly([lx, bandTop + 9, lx + 2, bandTop + 6, lx + 4, bandTop + 9]).fill(ELEVATOR_COLORS.callLight);
-      if (call.down) this.lamps.poly([lx, bandTop + 12, lx + 2, bandTop + 15, lx + 4, bandTop + 12]).fill(ELEVATOR_COLORS.callLight);
-    }
+    // Hall calls show on the landing queue badges (worldUx.ts), beside the
+    // shaft whose landing the callers actually wait at.
     return used;
   }
 

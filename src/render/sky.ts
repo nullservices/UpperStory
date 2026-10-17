@@ -38,6 +38,9 @@ export class SkyView {
   private readonly clouds: Sprite[] = [];
   private readonly moonHalo = new Sprite();
   private readonly moon = new Sprite();
+  /** Seasonal flyover posed by the incident view (ambient.flyer), in front of clouds and moon. */
+  private readonly flyer = new Sprite();
+  private readonly sparkles = new Graphics();
   private key = '';
   constructor(private app: Application) {
     this.graphics.eventMode = 'none';
@@ -58,6 +61,9 @@ export class SkyView {
       this.clouds.push(cloud);
       this.cloudLayer.addChild(cloud);
     }
+    this.flyer.roundPixels = true;
+    this.flyer.visible = false;
+    this.cloudLayer.addChild(this.sparkles, this.flyer);
     app.stage.addChildAt(this.graphics, 0);
     app.stage.addChildAt(this.cloudLayer, 1);
   }
@@ -67,8 +73,13 @@ export class SkyView {
     const minute = ambient.minuteOfDay;
     const night = Math.round((nightAlpha(minute) / 0.45) * 32) / 32;
     this.placeMoon(night);
+    this.placeFlyer();
     const glow = Math.round(twilight(minute) * 32) / 32;
-    const key = `${width}:${height}:${night}:${glow}`;
+    // The gradient runs from the top of the screen down to the street line,
+    // so the warm dawn/dusk glow sits on the real horizon (not behind the
+    // soil); quantized so panning redraws it only every few pixels.
+    const horizon = Math.round(Math.min(height * 1.6, Math.max(height * 0.45, ambient.horizonY ?? height)) / 8) * 8;
+    const key = `${width}:${height}:${night}:${glow}:${horizon}`;
     if (key === this.key) return;
     this.key = key;
     const g = this.graphics; g.clear();
@@ -79,7 +90,8 @@ export class SkyView {
       const dark = lerpRgb(PALETTE.nightSkyTop, PALETTE.nightSkyBottom, t);
       let color = lerpRgb(day, dark, night);
       if (glow > 0) color = lerpRgb(color, PALETTE.duskGlow, glow * 0.75 * t * t);
-      g.rect(0, Math.floor((i * height) / bands), width, Math.ceil(height / bands) + 1).fill(color);
+      g.rect(0, Math.floor((i * horizon) / bands), width, Math.ceil(horizon / bands) + 1).fill(color);
+      if (i === bands - 1 && horizon < height) g.rect(0, horizon, width, height - horizon).fill(color);
     }
     if (night > 0.4) {
       const alpha = Math.min(1, (night - 0.4) / 0.6);
@@ -109,6 +121,23 @@ export class SkyView {
     // Paler by day, bright with a soft halo at night.
     this.moonHalo.alpha = 0.1 + 0.2 * night;
     this.moon.alpha = 0.5 + 0.5 * night;
+  }
+
+  /** Draw the seasonal flyer where the incident view posed it (or hide it). */
+  private placeFlyer(): void {
+    const f = ambient.flyer;
+    const g = this.sparkles;
+    g.clear();
+    this.flyer.visible = f.visible && f.texture !== null;
+    if (!this.flyer.visible) return;
+    this.flyer.texture = f.texture!;
+    this.flyer.position.set(f.x, f.y);
+    this.flyer.width = f.w;
+    this.flyer.height = f.h;
+    for (let i = 0; i < f.sparkleCount; i++) {
+      const [x, y, color, alpha] = f.sparkles[i]!;
+      g.rect(x, y, 2, 2).fill({ color, alpha });
+    }
   }
 
   /** Place the clouds: their layout fractions plus a wrapped drift. */

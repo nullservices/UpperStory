@@ -1,5 +1,5 @@
 import { Application, Container, type FederatedPointerEvent } from 'pixi.js';
-import { CHROME_INSETS, cameraAnchor, chromeLeft, initialCameraZoom, stepZoom } from './cameraLayout';
+import { CHROME_INSETS, cameraAnchor, chromeLeft, deviceZoom, initialCameraZoom, stepZoom } from './cameraLayout';
 
 /**
  * Camera over the tower world. World coordinates are pixels at zoom 1
@@ -16,6 +16,8 @@ export class Camera {
   x = 0;
   y = 0;
   zoom = 1;
+  /** Ladder level (0.5/1/2/3); `zoom` is this snapped to whole device pixels. */
+  private level = 1;
   private wheelDelta = 0;
 
   private dragging = false;
@@ -45,7 +47,8 @@ export class Camera {
    */
   center(): void {
     const { width, height } = this.app.screen;
-    this.zoom = initialCameraZoom(width);
+    this.level = initialCameraZoom(width);
+    this.zoom = deviceZoom(this.level, this.dpr);
     this.x = chromeLeft(width) + 40; // room for the floor labels left of the tower
     this.y = CHROME_INSETS.top + (height - CHROME_INSETS.top - CHROME_INSETS.bottom) * 0.82;
     this.apply();
@@ -54,7 +57,8 @@ export class Camera {
   zoomBy(factor: number): void {
     const { x: cx, y: cy } = cameraAnchor(this.app.screen.width, this.app.screen.height);
     const world = this.screenToWorld(cx, cy);
-    this.zoom = stepZoom(this.zoom, factor - 1);
+    this.level = stepZoom(this.level, factor - 1);
+    this.zoom = deviceZoom(this.level, this.dpr);
     this.x = cx - world.x * this.zoom;
     this.y = cy - world.y * this.zoom;
     this.apply();
@@ -62,8 +66,14 @@ export class Camera {
 
   apply(): void {
     // Whole screen pixels keep sprite edges crisp.
-    this.view.position.set(Math.round(this.x), Math.round(this.y));
+    const dpr = this.dpr;
+    this.view.position.set(Math.round(this.x * dpr) / dpr, Math.round(this.y * dpr) / dpr);
     this.view.scale.set(this.zoom);
+  }
+
+  /** Device pixels per CSS pixel the renderer actually draws at. */
+  private get dpr(): number {
+    return this.app.renderer.resolution || 1;
   }
 
   screenToWorld(sx: number, sy: number): { x: number; y: number } {
@@ -106,9 +116,11 @@ export class Camera {
     // Trackpads send many small deltas: step one level per notch's worth.
     this.wheelDelta += e.deltaMode === 0 ? e.deltaY : e.deltaY * 100;
     if (Math.abs(this.wheelDelta) < 100) return;
-    const newZoom = stepZoom(this.zoom, -Math.sign(this.wheelDelta));
+    const newLevel = stepZoom(this.level, -Math.sign(this.wheelDelta));
     this.wheelDelta = 0;
-    if (newZoom === this.zoom) return;
+    if (newLevel === this.level) return;
+    this.level = newLevel;
+    const newZoom = deviceZoom(newLevel, this.dpr);
 
     // Zoom around the cursor: keep the world point under it stationary.
     const rect = this.app.canvas.getBoundingClientRect();

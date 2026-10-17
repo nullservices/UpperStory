@@ -22,8 +22,8 @@ import { WorldUxView } from './worldUx';
  *
  * The world layer also carries the world-space UX readouts (money pops and
  * landing queue badges, worldUx.ts); the screen-space weather layer carries
- * rain and the seasonal flyovers (Santa at the year's end, a witch on
- * 31 October).
+ * rain; the seasonal flyovers (Santa at the year's end, a witch on
+ * 31 October) are posed here and drawn by the sky view behind the tower.
  */
 
 /** Sprite budget for all fires together (flames + smoke) per frame. */
@@ -174,8 +174,10 @@ export class IncidentView {
     }
     const who = FORCED_FLYOVER === 'santa' || FORCED_FLYOVER === 'witch' ? FORCED_FLYOVER : this.flyer;
     ambient.moon = null;
+    const flyer = ambient.flyer;
+    flyer.visible = false;
+    flyer.sparkleCount = 0;
     if (!who) return;
-    const sky = this.weather;
     const pass = Math.floor(anim / FLYOVER_PERIOD_MS);
     // Below the HUD toolbars (about 75 CSS px), high in the sky band.
     const skyBase = 100 + Math.max(0, Math.min(height, 500) - 300) * 0.1;
@@ -199,22 +201,26 @@ export class IncidentView {
       : skyBase + (hash32(pass) % 70);
     const y = Math.round(base + Math.sin(t * Math.PI * 4) * 6);
     const frame = art.frames[Math.floor(anim / 160) % art.frames.length]!;
+    // The sky view draws the flyer (behind the tower) from this pose.
+    flyer.visible = true;
+    flyer.texture = frame;
+    flyer.x = x; flyer.y = y; flyer.w = w; flyer.h = h;
+    const spark = (sx: number, sy: number, color: number, alpha: number): void => {
+      let dot = flyer.sparkles[flyer.sparkleCount];
+      if (!dot) { dot = [0, 0, 0, 0]; flyer.sparkles.push(dot); }
+      dot[0] = Math.round(sx); dot[1] = Math.round(sy); dot[2] = color; dot[3] = alpha;
+      flyer.sparkleCount++;
+    };
     if (witch) {
       // Sparkles shed by the broom bristles, trailing behind her.
       for (let k = 1; k < 9; k++) {
         if (((Math.floor(anim / 110) + k) % 3) === 0) continue;
-        const sx = x + scale * 2 - k * 7, sy = y + h * 0.78 + Math.sin(t * 24 + k * 1.7) * 4;
-        sky.rect(Math.round(sx), Math.round(sy), 2, 2).fill({ color: k % 2 ? 0xffc84a : 0xb8ff7a, alpha: 1 - k / 9 });
+        spark(x + scale * 2 - k * 7, y + h * 0.78 + Math.sin(t * 24 + k * 1.7) * 4, k % 2 ? 0xffc84a : 0xb8ff7a, 1 - k / 9);
       }
-    }
-    // texture() inherits the current fill alpha; reset it to opaque first.
-    sky.setFillStyle({ color: 0xffffff, alpha: 1 });
-    sky.texture(frame, 0xffffff, x, y, w, h);
-    if (who === 'santa') {
+    } else {
       // A trail of twinkling sparkles behind the sleigh.
       for (let k = 1; k < 8; k++) {
-        const sx = x - k * 9, sy = y + h * 0.55 + Math.sin(t * 20 + k) * 3;
-        if (((Math.floor(anim / 120) + k) & 1) === 0) this.weather.rect(Math.round(sx), Math.round(sy), 2, 2).fill({ color: 0xfff4bc, alpha: 1 - k / 8 });
+        if (((Math.floor(anim / 120) + k) & 1) === 0) spark(x - k * 9, y + h * 0.55 + Math.sin(t * 20 + k) * 3, 0xfff4bc, 1 - k / 8);
       }
     }
   }

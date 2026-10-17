@@ -92,16 +92,15 @@ export class PlacementPreview {
         g.rect(x, y, cell * 8, h).fill(
           ok ? { color: GREEN, alpha: GREEN_ALPHA } : { color: RED, alpha: RED_ALPHA },
         );
-        // Direction glyph, tinted with the rect's validity.
+        // Direction glyph, tinted with the rect's validity: a stepped pixel
+        // arrow (7x4) like the rest of the pixel art, not a smooth triangle.
         const cx = x + cell * 4;
-        const cy = y + h / 2;
-        const half = 3;
-        const tipY = tool === 'escalatorUp' ? cy - half : cy + half;
-        const baseY = tool === 'escalatorUp' ? cy + half : cy - half;
-        g.poly([cx, tipY, cx - half, baseY, cx + half, baseY]).fill({
-          color: ok ? GREEN : RED,
-          alpha: 1,
-        });
+        const cy = Math.round(y + h / 2);
+        const up = tool === 'escalatorUp';
+        for (let row = 0; row < 4; row++) {
+          const half = up ? row : 3 - row;
+          g.rect(cx - half - 1, cy - 2 + row, half * 2 + 1, 1).fill({ color: ok ? GREEN : RED, alpha: 1 });
+        }
         break;
       }
       default: {

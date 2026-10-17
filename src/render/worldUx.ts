@@ -3,7 +3,7 @@ import { CONFIG, TENANT_DATA } from '../data/config';
 import { floorTopY, type GameState } from '../sim';
 import { animTime } from './animClock';
 import { shaftWidth } from '../sim/elevators';
-import { badgeSide, landingQueues } from './landingQueues';
+import { badgeSide, builtSpan, landingQueues } from './landingQueues';
 import { GLYPH_ADVANCE, glyphAtlas } from './sprites/pixelFont';
 
 /**
@@ -25,6 +25,10 @@ const MAX_POPS = 28;
 const POP_THROTTLE_MS = 2600;
 const QUEUE_WARN = 15;
 const QUEUE_ALERT = 30;
+/** Hall-call arrow colour on the queue badges. */
+const CALL_LAMP = 0xffb030;
+/** Badge width of one hall-call arrow (5 px plus a gap). */
+const ARROW_ADVANCE = 6;
 
 interface Pop {
   x: number;
@@ -173,15 +177,20 @@ export class WorldUxView {
           ? [0xf0c020, 0x26262a, 0x7a5a08]
           : [0x2c3448, 0xffffff, 0x10141e];
       // Beside the shaft over the queue (never on the landing door/header),
-      // in the band's top strip above the queued people's heads.
-      const w = (text.length * GLYPH_ADVANCE + 1) * scale;
+      // in the band's top strip above the queued people's heads. Hall-call
+      // lamps lead the count: an up arrow when people wait to go up, down
+      // when they wait to go down.
+      const arrows = (q.up > 0 ? 1 : 0) + (q.down > 0 ? 1 : 0);
+      const w = (arrows * ARROW_ADVANCE + text.length * GLYPH_ADVANCE + 1) * scale;
       const h = 7 * scale;
       const gap = 2;
       const span = (side: -1 | 1): [number, number] => side === -1
         ? [q.left - gap - w - scale, q.left - gap]
         : [q.right + gap, q.right + gap + w + scale];
+      const built = builtSpan(state, q.floor);
       const side = badgeSide(q, s => {
         const [a, b] = span(s);
+        if (a < built.lo * cell || b > built.hi * cell) return true;
         for (const g of state.elevatorGroups.values()) {
           if (q.floor < g.serviceLo || q.floor > g.serviceHi) continue;
           const gl = g.x * cell, gr = (g.x + shaftWidth(g)) * cell;
@@ -194,9 +203,20 @@ export class WorldUxView {
       this.backs.rect(x0 - scale, y0 - scale, w + 2 * scale, h + 2 * scale).fill(edge);
       this.backs.rect(x0, y0, w, h).fill(bg);
       this.backs.rect(x0, y0, w, scale).fill({ color: 0xffffff, alpha: 0.25 });
+      let ax = x0 + scale;
+      for (const dir of [1, -1] as const) {
+        if (dir === 1 ? q.up <= 0 : q.down <= 0) continue;
+        // 5x3 stepped arrow, vertically centred on the glyph row.
+        const lamp = q.count >= QUEUE_WARN ? fg : CALL_LAMP;
+        for (let row = 0; row < 3; row++) {
+          const half = dir === 1 ? row : 2 - row;
+          this.backs.rect(ax + (2 - half) * scale, y0 + (2 + row) * scale, (half * 2 + 1) * scale, scale).fill(lamp);
+        }
+        ax += ARROW_ADVANCE * scale;
+      }
       for (let i = 0; i < text.length; i++) {
         const tex = atlas.frames.get(text[i]!);
-        if (tex) this.glyph(tex, x0 + scale + i * GLYPH_ADVANCE * scale, y0 + scale, scale, fg, 1);
+        if (tex) this.glyph(tex, ax + i * GLYPH_ADVANCE * scale, y0 + scale, scale, fg, 1);
       }
     }
   }

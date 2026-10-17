@@ -9,4 +9,6 @@ export const roomLighting = {
   rooms: new Map<number, number>(),
   /** Tint for people out in the open (corridors, lobbies, shafts): white unless the power is out. */
   open: 0xffffff,
+  /** Tint for unlit structure (empty floor, stairwells, elevator shafts) after dark or in a blackout. */
+  structure: 0xffffff,
 };

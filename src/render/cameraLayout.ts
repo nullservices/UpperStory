@@ -22,6 +22,17 @@ export function stepZoom(zoom: number, dir: number): number {
   return [...ZOOM_LEVELS].reverse().find(level => level < zoom - 1e-6) ?? ZOOM_LEVELS[0];
 }
 
+/**
+ * Zoom actually applied for a ladder level on a display with `dpr` device
+ * pixels per CSS pixel. Rounding to whole device pixels per world pixel keeps
+ * pixel art even on 125%/150% scaled screens; overview levels below one device
+ * pixel per world pixel stay as they are.
+ */
+export function deviceZoom(level: number, dpr: number): number {
+  const devicePixels = level * dpr;
+  return devicePixels < 1 ? level : Math.round(devicePixels) / dpr;
+}
+
 /** Desktop windows open at 2×, like a magnified SimTower; small windows at 1×. */
 export function initialCameraZoom(width: number): number {
   return width >= 1280 ? 2 : 1;

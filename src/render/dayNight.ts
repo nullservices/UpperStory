@@ -87,6 +87,7 @@ export class DayNightView {
   draw(state: GameState): void {
     const minute = PREVIEW_MINUTE ?? state.calendar.minuteOfDay;
     ambient.minuteOfDay = minute;
+    ambient.horizonY = this.camera.y;
     this.drawTint(minute);
   }
 

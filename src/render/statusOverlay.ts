@@ -5,8 +5,9 @@ import { floorHeightPx, floorTopY, getFloor, type GameState, type Tenant } from 
 /**
  * Selectable status overlays (M3): one translucent wash per open tenant —
  * red by mean day-stress, a grade heat color (red → amber → green), or a
- * white brightness by occupancy/capacity. World-space, redrawn every frame.
- * The HUD owns the mode ('none' hides everything).
+ * white brightness by occupancy/capacity. World-space; the washes only
+ * change with the simulation, so they are rebuilt once per sim tick (or on a
+ * mode switch), not every frame. The HUD owns the mode ('none' hides everything).
  */
 
 export type StatusMode = 'none' | 'stress' | 'grade' | 'population';
@@ -22,6 +23,12 @@ const POP_FULL_ALPHA = 0.55;
 export class StatusOverlayView {
   readonly container = new Container();
   private readonly graphics = new Graphics();
+  private drawnTick = -1;
+  private drawnMode: StatusMode = 'none';
+  private drawnState: GameState | null = null;
+  /** Per-tenant day-stress sum and head count (stress mode scratch). */
+  private readonly stressSum = new Map<number, number>();
+  private readonly stressCount = new Map<number, number>();
 
   constructor() {
     this.container.eventMode = 'none';
@@ -29,9 +36,14 @@ export class StatusOverlayView {
   }
 
   draw(state: GameState, mode: StatusMode): void {
+    if (mode === this.drawnMode && state === this.drawnState && state.tickCount + state.tower.structureRevision * 1e9 === this.drawnTick) return;
+    this.drawnMode = mode;
+    this.drawnState = state;
+    this.drawnTick = state.tickCount + state.tower.structureRevision * 1e9;
     const g = this.graphics;
     g.clear();
     if (mode === 'none') return;
+    if (mode === 'stress') this.tallyStress(state);
     const cell = CONFIG.CELL_WIDTH_PX;
     for (const tenant of state.tenants.values()) {
       // The lobby is the tower's public ground floor, not a status-reporting
@@ -47,6 +59,17 @@ export class StatusOverlayView {
     }
   }
 
+  /** One pass over the crowd: day-stress totals per home tenant. */
+  private tallyStress(state: GameState): void {
+    const sum = this.stressSum, count = this.stressCount;
+    sum.clear(); count.clear();
+    for (const p of state.people.values()) {
+      if (p.tenantId < 0) continue;
+      sum.set(p.tenantId, (sum.get(p.tenantId) ?? 0) + p.dayStress);
+      count.set(p.tenantId, (count.get(p.tenantId) ?? 0) + 1);
+    }
+  }
+
   /** Wash color + alpha for one tenant in the given mode (null = nothing). */
   private styleFor(
     state: GameState,
@@ -55,14 +78,9 @@ export class StatusOverlayView {
   ): { color: number; alpha: number } | null {
     switch (mode) {
       case 'stress': {
-        let sum = 0;
-        let count = 0;
-        for (const p of state.people.values()) {
-          if (p.tenantId !== tenant.id) continue;
-          sum += p.dayStress;
-          count++;
-        }
+        const count = this.stressCount.get(tenant.id) ?? 0;
         if (count === 0) return null;
+        const sum = this.stressSum.get(tenant.id) ?? 0;
         return {
           color: STRESS_RED,
           alpha: Math.min(sum / count / STRESS_FULL_AT_STRESS, STRESS_MAX_ALPHA),

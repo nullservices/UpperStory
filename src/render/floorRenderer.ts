@@ -13,6 +13,7 @@ import { filmFrames, rippleFrames } from './sprites/effects';
 import { hash32 } from './sprites/pixmap';
 import { BAND_TILE_W, emptyBandTexture, flightTexture, wellTexture } from './sprites/structure';
 import { StreetView } from './street';
+import { RowBuckets, visibleWorldBand } from './rowBuckets';
 
 /** World extent of the backdrop (ground band) around the tower. */
 const GROUND_LEFT = -4000;
@@ -66,17 +67,20 @@ function filmShowing(tenant: Tenant, powered = true): boolean {
 export class TowerView {
   readonly container = new Container();
   private readonly backdrop = new Container();
-  private readonly bands = new Container();
+  private readonly bands = new RowBuckets();
   private readonly shell = new Graphics();
-  private readonly rooms = new Container();
-  private readonly glows = new Container();
-  private readonly films = new Container();
+  private readonly rooms = new RowBuckets();
+  private readonly glows = new RowBuckets();
+  private readonly films = new RowBuckets();
   private readonly playing = new Set<RoomSprite>();
-  private readonly transport = new Container();
-  private readonly labelLayer = new Container();
+  private readonly transport = new RowBuckets();
+  private readonly labelLayer = new RowBuckets();
   private labels: Text[] = [];
+  private labelScale = 1;
   private readonly sprites = new Map<number, RoomSprite>();
   private readonly street = new StreetView(GROUND_LEFT, GROUND_WIDTH);
+  /** Soil band and its grass lip (night-tinted with the street). */
+  private readonly ground: Container[] = [];
   private revision = -1;
   private tower: GameState['tower'] | null = null;
   private lightKey = '';
@@ -87,7 +91,7 @@ export class TowerView {
   constructor() {
     this.container.eventMode = 'none';
     this.buildBackdrop();
-    this.container.addChild(this.backdrop, this.bands, this.shell, this.rooms, this.glows, this.films, this.transport, this.labelLayer);
+    this.container.addChild(this.backdrop, this.bands.root, this.shell, this.rooms.root, this.glows.root, this.films.root, this.transport.root, this.labelLayer.root);
   }
 
   draw(state: GameState): void {
@@ -99,6 +103,7 @@ export class TowerView {
       this.lightKey = '';
       this.applyLighting(state);
       this.animateFilms();
+      this.cull();
       return;
     }
     // Between structure edits only tenant states and looks change (open ↔
@@ -115,6 +120,23 @@ export class TowerView {
     }
     this.applyLighting(state);
     this.animateFilms();
+    this.cull();
+  }
+
+  /** Render only the rows of rooms, bands, flights and labels on screen. */
+  private cull(): void {
+    // Floor numbers keep a readable screen size in the 50% overview.
+    const zoom = this.container.parent?.scale.y ?? 1;
+    const labelScale = zoom > 0 && zoom < 1 ? 1 / zoom : 1;
+    if (labelScale !== this.labelScale) {
+      this.labelScale = labelScale;
+      for (const label of this.labels) label.scale.set(labelScale);
+    }
+    const band = visibleWorldBand(this.container, CONFIG.FLOOR_HEIGHT_PX);
+    for (const layer of [this.bands, this.rooms, this.glows, this.films, this.transport, this.labelLayer]) {
+      if (band) layer.cull(band.top, band.bottom);
+      else layer.showAll();
+    }
   }
 
   /** Advance every visible cinema film and pool ripple (paused with the game clock). */
@@ -168,8 +190,12 @@ export class TowerView {
       }
     }
     const unlitTint = lerpRgb(0xffffff, UNLIT, darkLevel * 0.84);
-    this.bands.tint = unlitTint;
-    this.transport.tint = unlitTint;
+    this.bands.root.tint = unlitTint;
+    this.transport.root.tint = unlitTint;
+    roomLighting.structure = unlitTint;
+    // The soil band outside follows the night like the street (moonlit, not black).
+    const groundTint = lerpRgb(0xffffff, UNLIT, night * 0.55);
+    for (const ground of this.ground) ground.tint = groundTint;
     this.shell.tint = lerpRgb(0xffffff, UNLIT, darkLevel * 0.6);
     // People out in corridors and lobbies stay readable at night; only a
     // power cut darkens them too.
@@ -244,7 +270,6 @@ export class TowerView {
           const piece = new Sprite(textures[i]!.texture);
           piece.roundPixels = true;
           sprite.pieces.push(piece);
-          this.rooms.addChild(piece);
         }
       }
       for (const glow of sprite.glows) glow?.destroy();
@@ -253,14 +278,19 @@ export class TowerView {
         const glow = new Sprite(piece.glow);
         glow.roundPixels = true;
         glow.visible = false;
-        this.glows.addChild(glow);
         return glow;
       });
     }
     const room = sprite;
     textures.forEach((piece, i) => {
-      room.pieces[i]!.position.set(x + piece.x, y);
-      room.glows[i]?.position.set(x + piece.x, y);
+      const sprite = room.pieces[i]!;
+      sprite.position.set(x + piece.x, y);
+      this.rooms.add(sprite, y, h);
+      const glow = room.glows[i];
+      if (glow) {
+        glow.position.set(x + piece.x, y);
+        this.glows.add(glow, y, h);
+      }
     });
     sprite.state = tenant.state;
     sprite.look = look;
@@ -277,10 +307,10 @@ export class TowerView {
       if (!sprite.film) {
         sprite.film = new Sprite(sprite.filmFrames[0]!);
         sprite.film.roundPixels = true;
-        this.films.addChild(sprite.film);
         this.playing.add(sprite);
       }
       sprite.film.position.set(x + r.x, y + r.y);
+      this.films.add(sprite.film, y, h);
       sprite.film.visible = filmShowing(tenant, this.powered);
     } else if (sprite.film) {
       sprite.film.destroy();
@@ -297,12 +327,13 @@ export class TowerView {
     // Street level sits on y = 0 (where the lobby stands); soil lip below it.
     g.rect(GROUND_LEFT, 0, GROUND_WIDTH, 2).fill(PALETTE.grassDark);
     this.backdrop.addChild(this.street.container, soil, g);
+    this.ground.push(soil, g);
   }
 
   private drawShell(state: GameState, floors: Map<number, Floor>): void {
     const g = this.shell;
     g.clear();
-    for (const band of this.bands.removeChildren()) band.destroy();
+    this.bands.clear();
     const cell = CONFIG.CELL_WIDTH_PX;
     const lobbyFloors = state.tower.lobbyHeight;
     // Open-air roof facilities leave their band out so the sky shows through.
@@ -328,7 +359,7 @@ export class TowerView {
         band.position.set(bandLeft, y);
         band.tilePosition.set(-(((bandLeft % BAND_TILE_W) + BAND_TILE_W) % BAND_TILE_W), 0);
         band.roundPixels = true;
-        this.bands.addChild(band);
+        this.bands.add(band, y, h);
       }
       // Floor slab (2 px; the ceiling rows of every room and band double it
       // to a 4 px slab) and the outer walls.
@@ -361,7 +392,7 @@ export class TowerView {
    */
   private drawTransport(state: GameState, floors: Map<number, Floor>): void {
     const g = this.transport;
-    for (const child of g.removeChildren()) child.destroy();
+    g.clear();
     const cell = CONFIG.CELL_WIDTH_PX;
     for (const floor of state.tower.floors) {
       floor.cells.forEach((c, index) => {
@@ -380,7 +411,7 @@ export class TowerView {
   }
 
   private flight(
-    g: Container, state: GameState, floors: Map<number, Floor>,
+    g: RowBuckets, state: GameState, floors: Map<number, Floor>,
     cellFloor: number, lower: number, column: number, width: number,
     escalator: boolean, dir: string,
   ): void {
@@ -399,7 +430,7 @@ export class TowerView {
       const well = new Sprite(wellTexture(width, h - 2));
       well.position.set(x, top);
       well.roundPixels = true;
-      g.addChild(well);
+      g.add(well, top, h);
     }
     const span = otherFree
       ? { top: highTop + 2, bottom: lowTop + lowH - 2 }
@@ -413,11 +444,11 @@ export class TowerView {
     const flight = new Sprite(flightTexture(width, rise, escalator, dir));
     flight.position.set(x, span.bottom - rise - 10);
     flight.roundPixels = true;
-    g.addChild(flight);
+    g.add(flight, flight.y, rise + 10);
   }
 
   private drawLabels(state: GameState): void {
-    for (const label of this.labels) label.destroy();
+    this.labelLayer.clear();
     this.labels = [];
     for (const floor of state.tower.floors) {
       const b = floorBounds(state, floor.index);
@@ -435,10 +466,11 @@ export class TowerView {
         },
       });
       text.anchor.set(1, 0.5);
+      text.scale.set(this.labelScale);
       const y = floorTopY(floor.index, state.tower.lobbyHeight);
       text.position.set(b.lo * CONFIG.CELL_WIDTH_PX - 5, Math.round(y + floorHeightPx(floor, state.tower.lobbyHeight) - CONFIG.FLOOR_HEIGHT_PX / 2));
       this.labels.push(text);
-      this.labelLayer.addChild(text);
+      this.labelLayer.add(text, text.y - 8, 16);
     }
   }
 }

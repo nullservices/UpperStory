@@ -12,7 +12,7 @@ import {
 } from '../sim';
 import { shaftWidth } from '../sim/elevators';
 import { advanceAnimClock } from './animClock';
-import { landingKey, landingQueues } from './landingQueues';
+import { builtSpan, landingKey, landingQueues } from './landingQueues';
 import { roomLighting } from './roomLighting';
 import { carOutOfService } from './simCompat';
 import type { Camera } from './camera';
@@ -38,6 +38,8 @@ const QUEUE_PITCH = 5;
 const WALK_FRAME_MS = 120;
 /** Queue length before it folds into a second, staggered row. */
 const QUEUE_ROW = 18;
+/** A landing side with fewer free places than this sends its queue to the other side. */
+const MIN_QUEUE_SLOTS = 4;
 
 /** Live viewport size in CSS px (camera.screenToWorld is CSS-px based). */
 export interface ViewportSize {
@@ -78,11 +80,14 @@ export class PeopleView {
   /** Pool prefix written as visible on the last draw; the rest is alpha-0. */
   private written = 0;
   /** Per-frame scratch, reused to avoid allocations with large crowds. */
-  private readonly riders = new Map<number, { x: number; y: number }>();
+  private readonly riderX = new Map<number, number>();
+  private readonly riderY = new Map<number, number>();
   /** Riders inside a car whose doors are shut (hidden behind them). */
   private readonly enclosed = new Set<number>();
   private readonly queues = new Map<number, number>();
   private readonly groups: ElevatorGroup[] = [];
+  /** Per-frame cache: queue places free on a landing side (key*2 + 0/1). */
+  private readonly slots = new Map<number, number>();
 
   constructor(
     private readonly camera: Camera | null = null,
@@ -96,8 +101,8 @@ export class PeopleView {
     const H = CONFIG.FLOOR_HEIGHT_PX;
     const cell = CONFIG.CELL_WIDTH_PX;
 
-    const riders = this.riders;
-    riders.clear();
+    const riderX = this.riderX, riderY = this.riderY;
+    riderX.clear(); riderY.clear();
     const enclosed = this.enclosed;
     enclosed.clear();
     const groups = this.groups;
@@ -117,15 +122,14 @@ export class PeopleView {
         }
         car.passengers.forEach((id, index) => {
           const row = Math.floor(index / perRow) % 3;
-          riders.set(id, {
-            x: group.x * cell + 3 + (index % perRow) * 4 + (row === 1 ? 2 : 0),
-            y: feet - FIGURE_H - row,
-          });
+          riderX.set(id, group.x * cell + 3 + (index % perRow) * 4 + (row === 1 ? 2 : 0));
+          riderY.set(id, feet - FIGURE_H - row);
         });
       }
     }
     const queues = this.queues;
     queues.clear();
+    this.slots.clear();
     landingQueues.clear();
     const lh = state.tower.lobbyHeight;
 
@@ -134,8 +138,19 @@ export class PeopleView {
     const anim = advanceAnimClock(state, alpha);
     const walkStep = Math.floor(anim / WALK_FRAME_MS);
     const frames = this.atlas.frames;
+    // Vertical cull window: people standing on a floor whose band is off
+    // screen are skipped before any layout work (most of a big tower's crowd).
+    const cullTop = rect ? rect.top - FIGURE_H : 0;
+    const cullBottom = rect ? rect.bottom + FIGURE_H : 0;
+    const lobby = CONFIG.LOBBY_FLOOR_INDEX;
     for (const person of state.people.values()) {
-      if (person.state === 'offscreen') continue;
+      const st = person.state;
+      if (st === 'offscreen') continue;
+      if (rect && st !== 'riding' && st !== 'onStairs' && st !== 'onEscalator') {
+        const f = Math.round(person.pos.floor);
+        const top = floorTopY(f, lh);
+        if (top > cullBottom || top + (f === lobby ? H * lh : H) < cullTop) continue;
+      }
       let px = (motion?.personX(state, person, alpha) ?? person.pos.x) * cell;
       let py = personY(state, person);
       let pose = -1;
@@ -144,8 +159,8 @@ export class PeopleView {
       let tint = roomLighting.open;
       if (person.state === 'riding') {
         if (enclosed.has(person.id)) continue;
-        const rider = riders.get(person.id);
-        if (rider) { px = rider.x; py = rider.y; }
+        const rx = riderX.get(person.id);
+        if (rx !== undefined) { px = rx; py = riderY.get(person.id)!; }
       } else if (person.state === 'waiting') {
         // Line up beside the shaft instead of stacking on one spot. SimTower
         // convention: people going up queue to the LEFT of the shaft, people
@@ -156,28 +171,41 @@ export class PeopleView {
           const left = group.x * cell;
           const right = (group.x + shaftWidth(group)) * cell;
           const leg = person.route?.[person.legIndex];
-          const before = leg?.mode === 'elevator' ? leg.dir === 1 : px + FIGURE_W / 2 < (left + right) / 2;
-          const key = -(landingKey(group.id, floor) * 2 + (before ? 1 : 2));
-          const k = queues.get(key) ?? 0;
-          queues.set(key, k + 1);
-          const row = Math.floor(k / QUEUE_ROW) % 2;
-          const slot = k % QUEUE_ROW;
-          px = before
-            ? left - FIGURE_W - 2 - slot * QUEUE_PITCH - row * 2
-            : right + 2 + slot * QUEUE_PITCH + row * 2;
-          py -= row;
+          const goingUp = leg?.mode === 'elevator' ? leg.dir === 1 : px + FIGURE_W / 2 < (left + right) / 2;
+          // Never line up inside a neighbouring shaft: use the free side.
+          let before = goingUp;
+          let slots = this.sideSlots(state, group, floor, before ? -1 : 1);
+          if (slots < MIN_QUEUE_SLOTS) {
+            const other = this.sideSlots(state, group, floor, before ? 1 : -1);
+            if (other > slots) { before = !before; slots = other; }
+          }
           const lk = landingKey(group.id, floor);
           const landing = landingQueues.get(lk);
           if (landing) {
             landing.count++;
-            if (before) landing.up++; else landing.down++;
+            if (goingUp) landing.up++; else landing.down++;
+            if (!before) landing.east++;
           } else {
-            landingQueues.set(lk, { left, right, floor, y: floorTopY(floor, lh), count: 1, up: before ? 1 : 0, down: before ? 0 : 1 });
+            landingQueues.set(lk, { left, right, floor, y: floorTopY(floor, lh), count: 1, up: goingUp ? 1 : 0, down: goingUp ? 0 : 1, east: before ? 0 : 1 });
           }
+          const key = -(lk * 2 + (before ? 1 : 2));
+          const k = queues.get(key) ?? 0;
+          queues.set(key, k + 1);
+          // Two staggered rows fill the free floor beside the shaft; the rest
+          // of a long queue stands hidden behind them (counted on the badge,
+          // never drawn into a neighbouring shaft or off the tower's edge).
+          if (k >= slots * 2) continue;
+          const row = Math.floor(k / slots);
+          const slot = k % slots;
+          px = before
+            ? left - FIGURE_W - 2 - slot * QUEUE_PITCH - row * 2
+            : right + 2 + slot * QUEUE_PITCH + row * 2;
+          py -= row;
         } else {
           const key = floor * 100000 + Math.round(px);
           const k = queues.get(key) ?? 0;
           queues.set(key, k + 1);
+          if (k >= QUEUE_ROW * 2) continue;
           const row = Math.floor(k / QUEUE_ROW) % 2;
           const slot = k % QUEUE_ROW;
           px += slot * QUEUE_PITCH + row * 2;
@@ -217,6 +245,31 @@ export class PeopleView {
     // Hide the tail that was visible last frame but is gone/culled now.
     for (let i = visible; i < this.written; i++) this.pool[i]!.alpha = 0;
     this.written = visible;
+  }
+
+  /**
+   * Queue places that fit on `side` of `group`'s landing before the edge of
+   * the built floor or another shaft serving `floor` (cached per frame).
+   */
+  private sideSlots(state: GameState, group: ElevatorGroup, floor: number, side: -1 | 1): number {
+    const key = landingKey(group.id, floor) * 2 + (side === 1 ? 1 : 0);
+    let slots = this.slots.get(key);
+    if (slots === undefined) {
+      const cell = CONFIG.CELL_WIDTH_PX;
+      const bounds = builtSpan(state, floor);
+      // Free run of floor from the shaft edge outward, up to a full queue row.
+      const edge = side === -1 ? group.x * cell : (group.x + shaftWidth(group)) * cell;
+      let room = Math.max(0, side === -1 ? edge - bounds.lo * cell : bounds.hi * cell - edge);
+      for (const other of this.groups) {
+        if (other === group || floor < other.serviceLo || floor > other.serviceHi) continue;
+        const gl = other.x * cell, gr = (other.x + shaftWidth(other)) * cell;
+        const gap = side === -1 ? edge - gr : gl - edge;
+        if (gap >= 0 && gap < room) room = gap;
+      }
+      slots = Math.min(QUEUE_ROW, Math.max(0, Math.floor((room - FIGURE_W - 4) / QUEUE_PITCH) + 1));
+      this.slots.set(key, slots);
+    }
+    return slots;
   }
 
   /** Particle at `index`, growing the pool (never beyond MAX_PEOPLE). */

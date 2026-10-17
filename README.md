@@ -34,6 +34,15 @@ Condos sell once when completed. Offices earn rent, visitors pay for their activ
 
 **Modern additions** (not in the original SimTower): fire stations (2★) send cheaper, faster rescue and stop fires spreading within 20 floors; maintenance offices (2★) keep elevator cars from breaking down and repair them; basement backup generators (3★) keep elevators running through blackouts; banks (3★) serve weekday customers and lend money at 3% interest per quarter; rooftop pools (3★) and helipads (4★) go only on a roof. Pools draw residents and guests and lift nearby condo and hotel ratings; VIPs fly in to a helipad, which also extends medical care tower-wide.
 
+**Off-peak facilities** (also Upper Story originals) bring traffic at other hours, so elevators matter all day:
+
+- **Apartments** (1★): three residents like a condo, but rented instead of sold. They pay quarterly rent (set like office rent) while tenants are happy, and go vacant and refill like condos.
+- **Gyms** (2★): residents and office workers work out before work (07:00–08:45) and after it (18:00–21:00); residents also go at weekends. Each visit pays a fee.
+- **Supermarkets** (2★): residents, hotel guests and neighbours shop from 10:00 to 20:00. Shoppers from outside count toward the population.
+- **Bars** (3★): busy from 19:00 to 01:00 with outside crowds, residents and guests. Bars are as noisy as fast food, so keep them away from homes, hotels and offices.
+- **Conference centres** (3★): most weekdays host an event. Delegates arrive between 08:30 and 10:00 and leave around 16:30, paying per head. Event days also send extra guests to hotels within 15 floors.
+- **Observation decks** (4★, roof only, one per tower): tourists visit from 10:00 to 22:00, more at weekends. Tickets cost more the higher the deck sits.
+
 ## Scenarios
 
 Open **Game › Scenarios…** (or **Scenarios…** under New tower in the Game window) for challenges with goals, limits and a deadline. A goals card at the top left tracks each objective live; collapse it or drag it aside. Win or lose, a results card offers **Keep playing**, **Try again** or another scenario, and your best time for each scenario is remembered in this browser. Saves keep the active scenario; towers saved before scenarios existed load as free play.

@@ -74,7 +74,7 @@ export function roomLook(tenant: Tenant): RoomLook {
     if (tenant.cleanliness < CONFIG.DIRTY_HOTEL_THRESHOLD) return 'dirty';
     return tenant.occupancy > 0 ? 'guest' : '';
   }
-  if ((tenant.type === 'office' || tenant.type === 'condo') && tenant.grade <= 1) return 'unhappy';
+  if ((tenant.type === 'office' || tenant.type === 'condo' || tenant.type === 'apartment') && tenant.grade <= 1) return 'unhappy';
   return '';
 }
 

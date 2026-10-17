@@ -40,10 +40,11 @@ export function noisePenalty(state: GameState, tenant: Tenant, index?: NoiseInde
   return 0;
 }
 
-const COMMERCIAL: readonly string[] = ['fastfood', 'restaurant', 'shop', 'cinema'];
+/** Noisy neighbours; the bar (Upper Story original) is as loud as fast food. */
+const COMMERCIAL: readonly string[] = ['fastfood', 'restaurant', 'shop', 'cinema', 'bar'];
 
 function noiseFrom(tenant: Tenant, source: Tenant): NoiseSource | null {
-  const residential = tenant.type === 'condo' || isHotel(tenant.type);
+  const residential = tenant.type === 'condo' || tenant.type === 'apartment' || isHotel(tenant.type);
   if (tenant.type !== 'office' && !residential) return null;
   const commercial = COMMERCIAL.includes(source.type);
   if ((!commercial && !(residential && source.type === 'office')) ||

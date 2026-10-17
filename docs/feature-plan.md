@@ -40,6 +40,32 @@ Extra sim APIs beyond the contracts: `responseQuote(state, id, action)`,
 `floorLabel(floor)`; `QUARTER_REPORT` events carry `interest` when charged and
 `state.money.lastQuarterInterestCents` records the last charge.
 
+## Second wave: off-peak facilities (Upper Story originals, not in SimTower)
+
+Traffic at different hours, so elevator planning matters beyond the morning,
+lunch and evening rushes. Sim logic lives in `src/sim/leisure.ts` (one check
+every `LEISURE_CHECK_TICKS`; at most one pass over people per check, never a
+people x tenants scan); tunables are the `GYM_*`, `SUPERMARKET_*`, `BAR_*`,
+`CONFERENCE_*`, `DECK_*` and `APARTMENT_*` entries in `CONFIG`. Costs: apartment
+$60k, gym $150k, supermarket $200k, bar $120k, conference centre $300k,
+observation deck $600k; fees are tuned for a 30-70 day payback at typical use
+(shops pay back in about 20 days but draw no off-peak traffic).
+
+| Facility | Placement | Hours and visitors | Income |
+| --- | --- | --- | --- |
+| Apartment | Any floor; 1★ | Three residents on the condo schedule | $8,000 rent per quarter (pricing tiers like offices), paid daily while occupied; vacates and refills like condos |
+| Gym | Any floor; 2★ | Weekdays 07:00–08:45 (residents, office workers before work) and 18:00–21:00 (residents; 20% of workers stop on the way home and leave from the gym); weekends 09:00–21:00 | $80 per visit |
+| Supermarket | Any floor; 2★ | 10:00–20:00: residents, hotel guests, outside shoppers | $50 per visit; outside shoppers count toward population |
+| Bar | Any floor; 3★ | 19:00–01:00 (last entry 00:30): outside crowds, residents, hotel guests; a noise source like fast food | $60 per visit; outsiders count toward population |
+| Conference centre | Any floor; 3★ | Weekdays, 70% chance of an event of 50–100% capacity; delegates arrive 08:30–10:00, leave ~16:30; event days add about 0.15 overnight guests per delegate to hotels within 15 floors (16:00–20:00) | $200 per delegate |
+| Observation deck | Roof only, one per tower; 4★ | Tourists 10:00–22:00, 1.5x at weekends, halved in rain | $40 x (1 + floor/50) per ticket |
+
+Venues grade on a full day's visits against a target (gym 30, supermarket 40,
+bar 30, conference 48, deck 60), not on 15:00 occupancy; conference centres
+keep their grade over weekends. Persisted additions are optional tenant
+fields (`lastDayVisits`, `conferenceDay`, `conferenceDelegates`), so the save
+version stays 12.
+
 ## Batch 3: UI/UX
 
 Labelled selected-tool readout; "Show guide (tutorial & tips)"; cursor-side

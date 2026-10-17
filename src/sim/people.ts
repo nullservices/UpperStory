@@ -9,6 +9,7 @@ import { pickupRoute, type RouteLeg } from './routing';
 import { getFloor } from './tower';
 import type { GameState } from './state';
 import { patienceTicks } from './stress';
+import { divertWorkerToGym, leisureFeeCents, stepLeisure } from './leisure';
 import type { Tenant } from './tenants';
 
 /**
@@ -111,6 +112,7 @@ function kindForTenant(type: keyof typeof TENANT_DATA): PersonKind | null {
     case 'office':
       return 'officeWorker';
     case 'condo':
+    case 'apartment':
       return 'resident';
     case 'security':
       return 'guard';
@@ -218,7 +220,7 @@ function weightedPick(state: GameState, tenants: Tenant[]): Tenant {
  */
 /** Spawn an external visitor on a trip to a suitable tenant (or do nothing). */
 const patronCache = new WeakMap<GameState, { tick: number; counts: Map<number, number> }>();
-function capacityCounts(state: GameState): Map<number, number> {
+export function capacityCounts(state: GameState): Map<number, number> {
   const cached = patronCache.get(state);
   if (cached?.tick === state.tickCount) return cached.counts;
   const counts = new Map<number, number>();
@@ -231,7 +233,8 @@ function capacityCounts(state: GameState): Map<number, number> {
   patronCache.set(state, { tick: state.tickCount, counts });
   return counts;
 }
-function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant, origin?: { floor: number; x: number }): number | undefined {
+/** `stay` overrides a preferred shopper's visit length (default: a bank visit). */
+export function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant, origin?: { floor: number; x: number }, stay?: number): number | undefined {
   if (state.people.size >= CONFIG.MAX_PEOPLE) return;
   const counts = capacityCounts(state);
   const open = (type: string): Tenant[] =>
@@ -252,7 +255,7 @@ function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Tenant, or
     // Bank customers: a visit to one particular branch.
     if ((counts.get(preferred.id) ?? 0) >= preferred.capacity) return;
     target = preferred;
-    activityTicks = CONFIG.BANK_VISIT_TICKS;
+    activityTicks = stay ?? CONFIG.BANK_VISIT_TICKS;
   } else if (kind === 'shopper') {
     const shops = [...open('shop'), ...(state.calendar.minuteOfDay >= 720 ? open('cinema') : []), ...(state.calendar.minuteOfDay >= 1080 ? open('partyHall') : [])];
     if (shops.length === 0) return;
@@ -376,6 +379,14 @@ function scheduleCheck(state: GameState, p: Person): ScheduleAction | null {
 function chargePatron(state: GameState, p: Person): void {
   const tenant = state.tenants.get(p.activityTenantId);
   if (!tenant) return;
+  const fee = leisureFeeCents(tenant);
+  if (fee !== null) {
+    // Leisure venues: every paying visit counts; outsiders also feed population.
+    tenant.visitsToday = (tenant.visitsToday ?? 0) + 1;
+    if (p.kind === 'shopper' || p.kind === 'diner') tenant.paidExternalVisits = (tenant.paidExternalVisits ?? 0) + 1;
+    tenant.dailyRevenue += fee;
+    return;
+  }
   if (recordCommercialVisit(tenant, p.kind === 'officeWorker', operatingDay(state))) return;
   const pricing = CONFIG.PRICING_LEVELS[tenant.pricing]!;
   const base =
@@ -390,6 +401,15 @@ function chargePatron(state: GameState, p: Person): void {
 }
 
 // --- Trip management ---
+
+/** Send someone already in the tower to a venue for `ticks` (they pay on arrival). */
+export function sendToActivity(state: GameState, p: Person, venue: Tenant, ticks: number): void {
+  p.destination = tenantCenter(state, venue.id);
+  p.endState = 'inTenant';
+  p.activityTicksLeft = ticks;
+  p.activityTenantId = venue.id;
+  beginTrip(state, p);
+}
 
 /** Re-plan the rest of a journey from where the person now stands. */
 export function resumeTrip(state: GameState, p: Person): void {
@@ -537,14 +557,15 @@ function officeRosterRank(state: GameState, p: Person): number {
 }
 
 function applyAction(state: GameState, p: Person, action: ScheduleAction): void {
-  // A schedule call ends any pool visit in progress.
-  if ((p.kind === 'resident' || p.kind === 'hotelGuest') && p.activityTenantId >= 0) {
+  // A schedule call ends any pool, gym or other leisure visit in progress.
+  if ((p.kind === 'resident' || p.kind === 'hotelGuest' || p.kind === 'officeWorker') && p.activityTenantId >= 0) {
     p.activityTenantId = -1;
     p.activityTicksLeft = 0;
   }
   switch (action) {
     case 'gotoOffice': {
-      p.pos = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
+      // Workers already inside (an early gym session) walk on from there.
+      if (p.state !== 'inTenant') p.pos = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
       p.destination = tenantCenter(state, p.tenantId);
       p.endState = 'inTenant';
       beginTrip(state, p);
@@ -559,6 +580,7 @@ function applyAction(state: GameState, p: Person, action: ScheduleAction): void 
     case 'goHome': {
       if (p.kind === 'officeWorker') {
         if (p.state === 'offscreen') return; // already out
+        if (divertWorkerToGym(state, p)) return; // an after-work session first
         p.destination = { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };
         p.endState = 'offscreen';
       } else if (p.kind === 'guard' || p.kind === 'housekeeper') {
@@ -741,6 +763,7 @@ export function stepPeople(state: GameState): void {
   officeRanks = null; // rosters only change outside this step
   spawnExternalVisitors(state);
   stepPoolVisits(state);
+  stepLeisure(state);
   stepHotels(state); // reads last step's occupancy before it is recounted
   for (const tenant of state.tenants.values()) tenant.occupancy = 0;
   // Guests inside each hotel (cleaners must wait for an empty room). Built on
@@ -794,7 +817,9 @@ export function stepPeople(state: GameState): void {
           if (p.activityTicksLeft === 0) {
             // Workers return to work, residents and guests to their rooms
             // (after a pool visit); external customers leave the tower.
-            const returnsHome = p.kind === 'officeWorker' || p.kind === 'resident' || p.kind === 'hotelGuest';
+            // Workers who stopped at the gym after work leave from there.
+            const returnsHome = (p.kind === 'officeWorker' && state.calendar.minuteOfDay < CONFIG.GYM_EVENING_START_MIN) ||
+              p.kind === 'resident' || p.kind === 'hotelGuest';
             p.destination = returnsHome
               ? tenantCenter(state, p.tenantId)
               : { floor: CONFIG.LOBBY_FLOOR_INDEX, x: 0 };

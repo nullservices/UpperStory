@@ -2,6 +2,7 @@ import { CONFIG, TENANT_DATA, type TenantTypeData } from '../data/config';
 import { pushEvent } from './core/events';
 import type { GameState } from './state';
 import type { Tenant } from './tenants';
+import { isLeisureVenue, reportsVisitorPopulation } from './leisure';
 
 /**
  * Money is stored in integer cents (deterministic, no float drift) and
@@ -56,6 +57,11 @@ export function officeQuarterRentCents(tenant: Tenant): number {
   return Math.round(10_000_00 * CONFIG.PRICING_LEVELS[tenant.pricing].revenueMult);
 }
 
+/** Apartment rent per quarter at the tenant's pricing tier (Upper Story original). */
+export function apartmentQuarterRentCents(tenant: Tenant): number {
+  return Math.round(CONFIG.APARTMENT_QUARTER_RENT_DOLLARS * 100 * CONFIG.PRICING_LEVELS[tenant.pricing].revenueMult);
+}
+
 /** Provisional satisfaction response, not a recovered SimTower formula. */
 export function officeRentScoreAdjustment(tenant: Tenant): number {
   return [20, 10, 0, -20][tenant.pricing]!;
@@ -77,11 +83,19 @@ export function stepDailySettlement(state: GameState, settledDay = state.calenda
     // depends on the room's operating state at settlement.
     income += tenant.dailyRevenue;
     tenant.dailyRevenue = 0;
+    if (isLeisureVenue(tenant.type)) {
+      // The day's visits grade the venue; outsiders count toward population.
+      tenant.lastDayVisits = tenant.visitsToday ?? 0;
+      tenant.visitsToday = 0;
+      if (reportsVisitorPopulation(tenant.type)) tenant.reportedPopulation = Math.min(tenant.capacity, tenant.paidExternalVisits ?? 0);
+    }
     tenant.paidExternalVisits = 0;
     tenant.paidOfficeVisits = 0;
     if (tenant.state !== 'open') continue;
     if (tenant.type === 'office') {
       income += quarterlyShare(officeQuarterRentCents(tenant), settledDay);
+    } else if (tenant.type === 'apartment') {
+      income += quarterlyShare(apartmentQuarterRentCents(tenant), settledDay);
     } else if (tenant.type === 'condo') {
       income += Math.round(
         CONFIG.CONDO_RENT_DAILY_DOLLARS * 100 * rentMultiplier(tenant.grade),

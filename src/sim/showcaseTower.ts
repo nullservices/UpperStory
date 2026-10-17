@@ -39,6 +39,15 @@ export function setupShowcaseTower(state: GameState): void {
   for (const x of [90, 94, 98, 102, 106]) placeTenant(state, 'parkingSpace', 0, x);
   placeTenant(state, 'recycling', -1, 60);
   placeTenant(state, 'metro', -8, 30);
+  // The second wave of Upper Story venues, wherever the tour tower has room.
+  for (const type of ['apartment', 'gym', 'supermarket', 'bar', 'conference', 'observationDeck'] as const) {
+    let placed = false;
+    for (let f = 15; f >= 2 && !placed; f--) {
+      for (let x = 0; x < CONFIG.FLOOR_WIDTH_CELLS; x++) {
+        if (placementError(state, type, f, x) === null) { placeTenant(state, type, f, x); placed = true; break; }
+      }
+    }
+  }
   // Mechanics keep the tour's elevators running over a long visit.
   for (let x = 24; x < CONFIG.FLOOR_WIDTH_CELLS; x++) {
     if (placementError(state, 'maintenance', 12, x) === null) { placeTenant(state, 'maintenance', 12, x); break; }

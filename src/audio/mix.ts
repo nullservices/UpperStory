@@ -190,7 +190,8 @@ export const mealTimes = (h: number): number => 0.45 + 0.55 * Math.max(
 
 // ---------------------------------------------------------------- ambience
 
-const COMMERCIAL = new Set(['fastfood', 'restaurant', 'shop', 'cinema', 'partyHall', 'bank', 'rooftopPool']);
+const COMMERCIAL = new Set(['fastfood', 'restaurant', 'shop', 'cinema', 'partyHall', 'bank', 'rooftopPool',
+  'gym', 'supermarket', 'bar', 'conference', 'observationDeck']);
 const DINING = new Set(['fastfood', 'restaurant', 'partyHall']);
 
 export interface Site { x: number; y: number }

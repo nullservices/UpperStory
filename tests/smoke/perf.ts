@@ -30,6 +30,14 @@ for (let lo = 1, bank = 0; lo < 100; lo = lo === 1 ? 15 : lo + 15, bank++) {
 for (let f = 2; f <= 100; f++) {
   for (let x = 50; x < 320; x += 9) placeTenant(state, 'office', f, x);
 }
+// Second-wave venues and rental homes, so their off-peak trips are measured too.
+const VENUES = ['gym', 'bar', 'supermarket', 'apartment', 'conference'] as const;
+for (let f = 2; f < 100; f++) {
+  const type = VENUES[f % VENUES.length]!;
+  placeTenant(state, type, f, 322);
+  if (type === 'apartment') placeTenant(state, type, f, 340);
+}
+placeTenant(state, 'observationDeck', 100, 322);
 
 // Construction completes (offices take 1,300 ticks), then a full busy day.
 const t0 = performance.now();

@@ -5,6 +5,7 @@ import { removeTenantPeople, spawnTenantPeople } from './people';
 import type { GameState } from './state';
 import { noiseIndex, noisePenalty } from './noise';
 import { officeRentScoreAdjustment } from './money';
+import { isLeisureVenue } from './leisure';
 import { sellCondo, repurchaseCondo, condoHasAccess } from './condoEconomy';
 import { floorLabel, tenantTypeLabel } from './campaign';
 
@@ -56,12 +57,17 @@ export function stepEvaluation(state: GameState): void {
     if (tenant.capacity <= 0 || isUngradedService(tenant.type)) continue;
     // Weekend absence is expected, not a failed commute. Retain the last
     // workday grade and dissatisfaction streak; vacant units still refill.
-    if ((tenant.type === 'office' || tenant.type === 'bank') && tenant.state === 'open' && isWeekend(state)) continue;
+    if ((tenant.type === 'office' || tenant.type === 'bank' || tenant.type === 'conference') && tenant.state === 'open' && isWeekend(state)) continue;
+    // Venues are busy at their own hours: grade a full day's visits, once one has traded.
+    const venue = isLeisureVenue(tenant.type);
+    if (venue && tenant.lastDayVisits === undefined && !tenant.visitsToday) continue;
+    const home = tenant.type === 'condo' || tenant.type === 'apartment';
 
     // Condos grade on stress (residents are home most of the day); offices
     // grade on actual presence at the 15:00 evaluation.
     const roster = stressByTenant.get(tenant.id);
-    const ratio = tenant.type === 'condo' ? 1
+    const ratio = home ? 1
+      : venue ? Math.min(1, Math.max(tenant.lastDayVisits ?? 0, tenant.visitsToday ?? 0) / CONFIG.VENUE_TARGET_VISITS[tenant.type as keyof typeof CONFIG.VENUE_TARGET_VISITS])
       : tenant.type === 'office' ? Math.min(1, (tenant.occupancy + (roster?.enRoute ?? 0)) / tenant.capacity)
         : tenant.occupancy / tenant.capacity;
     const avgStress = roster ? roster.sum / roster.count : 0;
@@ -69,22 +75,22 @@ export function stepEvaluation(state: GameState): void {
     let score = 100 * ratio - avgStress * 0.6;
     tenant.noisePenalty = noisePenalty(state, tenant, noise);
     score -= tenant.noisePenalty;
-    if (tenant.type === 'office') {
+    if (tenant.type === 'office' || tenant.type === 'apartment') {
       tenant.rentScoreAdjustment = officeRentScoreAdjustment(tenant);
       score += tenant.rentScoreAdjustment;
     }
     if (isHotel(tenant.type)) score -= (100 - tenant.cleanliness) * 0.5;
     if (hasSecurity) score += 5;
     if (medevac || medicalFloors.some(floor => Math.abs(floor - tenant.floor) <= 20)) score += 5;
-    if ((tenant.type === 'condo' || isHotel(tenant.type)) && poolFloors.some(floor => Math.abs(floor - tenant.floor) <= CONFIG.POOL_REACH_FLOORS)) score += CONFIG.POOL_EVAL_BONUS;
+    if ((home || isHotel(tenant.type)) && poolFloors.some(floor => Math.abs(floor - tenant.floor) <= CONFIG.POOL_REACH_FLOORS)) score += CONFIG.POOL_EVAL_BONUS;
     score -= Math.max(0, state.campaign.waste - 30) * 0.3;
     tenant.evalScore = Math.min(Math.max(Math.round(score), 0), 100);
     tenant.grade = gradeFromScore(tenant.evalScore);
 
-    if (tenant.type === 'office' || tenant.type === 'condo') {
+    if (tenant.type === 'office' || home) {
       // Vacant units refill on a timer (an empty unit can't grade itself up).
       if (tenant.state === 'vacant') {
-        if (tenant.type === 'condo' && !condoHasAccess(state, tenant)) {
+        if (home && !condoHasAccess(state, tenant)) {
           tenant.daysGood = 0;
           continue;
         }

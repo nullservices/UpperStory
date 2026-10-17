@@ -41,6 +41,12 @@ export const TOOL_INFO: Record<Tool, { label: string; hint: string; icon: string
   rooftopPool: { label: 'Rooftop pool', hint: '30 cells, on the roof. Residents and hotel guests swim here; nearby homes and rooms rate higher. Operating cost: $25,000 per quarter.', icon: 'pool' },
   maintenance: { label: 'Maintenance', hint: '12 cells. Mechanics service elevator cars so they break down less. Operating cost: $15,000 per quarter.', icon: 'wrench' },
   generator: { label: 'Generator', hint: '16 cells, basement. Keeps elevators and lights running in a blackout. Operating cost: $20,000 per quarter.', icon: 'generator' },
+  apartment: { label: 'Apartment', hint: '16 cells · 3 residents. Rented, not sold: pays rent every quarter while tenants are happy, and goes vacant if they are not. Set the rent like an office.', icon: 'apartment' },
+  gym: { label: 'Gym', hint: '20 cells · 30 members. Residents and office workers work out before work (07:00–08:45) and after it (18:00–21:00); residents all day at weekends. Paid per visit.', icon: 'gym' },
+  supermarket: { label: 'Supermarket', hint: '30 cells · 40 shoppers. Residents, hotel guests and neighbours shop 10:00–20:00. Paid per visit; shoppers from outside add to the population.', icon: 'supermarket' },
+  bar: { label: 'Bar', hint: '16 cells · 30 seats. Busy 19:00–01:00 with outside crowds, residents and hotel guests. Noisy: keep it away from homes, hotels and offices.', icon: 'bar' },
+  conference: { label: 'Conference centre', hint: '32 cells · 80 delegates. Most weekdays bring an event: delegates arrive 08:30–10:00 and leave around 16:30. Event days send extra guests to hotels within 15 floors.', icon: 'conference' },
+  observationDeck: { label: 'Observation deck', hint: '40 cells, on the roof; one per tower. Tourists visit 10:00–22:00 (more at weekends); tickets cost more the higher it sits. Plan elevators to the top.', icon: 'deck' },
 };
 
 
@@ -80,6 +86,12 @@ export function toolIcon(kind: string): string {
     pool: '<path fill="#79bccb" d="M3 14h34v13H3z"/><path d="M5 19q4-3 8 0t8 0 8 0 8 0" stroke="#e8f6f6" stroke-width="2" fill="none"/><path d="M26 3v13m7-13v13M26 7h7m-7 4h7" stroke="#8a9a98" stroke-width="2"/>',
     helipad: '<circle cx="20" cy="15" r="13" fill="#5c6b6d"/><circle cx="20" cy="15" r="10" fill="none" stroke="#e7d38f" stroke-width="1.5"/><path d="M15 9v12m10-12v12M15 15h10" stroke="#fff" stroke-width="3"/>',
     housekeeping: '<path stroke="#867250" stroke-width="3" d="m26 3-12 18"/><path fill="#bea464" d="m9 15 11 6-5 8-13-5z"/>',
+    apartment: '<path fill="#b98a5a" d="M4 9h32v19H4z"/><path fill="#8f6340" d="m2 10 18-8 18 8z"/><path fill="#cfe2e6" d="M8 13h7v6H8zm17 0h7v6h-7z"/><path fill="#5a3e2a" d="M17 18h6v10h-6z"/><circle cx="21.5" cy="23" r="0.9" fill="#e7c55a"/>',
+    gym: '<path stroke="#5c6a6c" stroke-width="3" d="M9 15h22"/><path fill="#3d4a4c" d="M5 8h4v14H5zm26 0h4v14h-4z"/><path fill="#d0603a" d="M10 10h3v10h-3zm17 0h3v10h-3z"/>',
+    supermarket: '<path fill="none" stroke="#5f7472" stroke-width="2.5" d="M3 5h5l4 15h19l3-11H10"/><path fill="#9cc59a" d="M12 10h20l-2 8H14z"/><path fill="#d98a5a" d="M15 7h5v5h-5zm7-1h5v6h-5z"/><circle cx="14" cy="25" r="2.5" fill="#46544d"/><circle cx="28" cy="25" r="2.5" fill="#46544d"/>',
+    bar: '<path fill="#e6eef0" fill-opacity=".6" stroke="#6c7f7a" stroke-width="2" d="M7 4h16l-8 11z"/><path fill="#c26a8a" d="M10 6h10l-5 7z"/><path stroke="#6c7f7a" stroke-width="2" d="M15 15v10m-5 2h10"/><path fill="#e7c55a" d="M25 10h8v16h-8z"/><path fill="#f4f1e4" d="M25 8h8v4h-8z"/><path fill="none" stroke="#b89a4a" stroke-width="2" d="M33 14h3v8h-3"/>',
+    conference: '<path fill="#f4f1e4" stroke="#6c7f7a" stroke-width="2" d="M5 3h30v15H5z"/><path fill="#5a8ab0" d="M9 13h4v3H9zm6-3h4v6h-4zm6-3h4v9h-4z"/><path stroke="#6c7f7a" stroke-width="2" d="M20 18v4"/><circle cx="9" cy="25" r="3" fill="#8a6a4a"/><circle cx="20" cy="25" r="3" fill="#8a6a4a"/><circle cx="31" cy="25" r="3" fill="#8a6a4a"/>',
+    deck: '<path fill="#9ccbe0" d="M2 2h36v18H2z"/><path fill="#c9d6da" d="M2 20h36v3H2z"/><path fill="#6c7f7a" d="M2 23h36v5H2z"/><path stroke="#8a929c" stroke-width="1.5" d="M2 15h36M6 15v5m8-5v5m8-5v5m8-5v5"/><path fill="#3a5a7a" d="M24 6h6v4h-6z"/><path stroke="#3a5a7a" stroke-width="2" d="M27 10v10"/><circle cx="10" cy="7" r="3" fill="#f2d27a"/>',
   };
   return `<svg viewBox="0 0 40 30" aria-hidden="true">${shapes[kind] ?? shapes.elevator}${kind === 'express' ? '<path d="m33 18 3-5-3 1 3-5" stroke="#a58145" fill="none" stroke-width="2"/>' : kind === 'service' ? '<path d="M3 11h4v9H3z" fill="#a18a64"/>' : ''}</svg>`;
 }
@@ -88,7 +100,7 @@ export function toolIcon(kind: string): string {
 const GROUPS: Array<[string, Tool[]]> = [
   ['Tools', ['select', 'buildFloor', 'buildBasement', 'lobby', 'demolish']],
   ['Transport', ['elevator', 'stairs', 'escalatorUp', 'escalatorDown', 'serviceElevator', 'expressElevator', 'helipad']],
-  ['Rooms', ['office', 'condo', 'fastfood', 'hotel', 'hotelTwin', 'hotelSuite', 'restaurant', 'shop', 'bank', 'partyHall', 'cinema', 'rooftopPool']],
+  ['Rooms', ['office', 'condo', 'apartment', 'fastfood', 'hotel', 'hotelTwin', 'hotelSuite', 'restaurant', 'shop', 'supermarket', 'bank', 'bar', 'gym', 'conference', 'partyHall', 'cinema', 'rooftopPool', 'observationDeck']],
   ['Services', ['security', 'fireStation', 'housekeeping', 'maintenance', 'medical', 'skyLobby', 'parkingRamp', 'parkingSpace', 'recycling', 'generator', 'metro', 'cathedral']],
 ];
 

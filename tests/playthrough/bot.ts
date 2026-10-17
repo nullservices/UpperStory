@@ -49,7 +49,7 @@ import {
 } from '../../src/sim/tower';
 
 const W = CONFIG.FLOOR_WIDTH_CELLS;
-const COMMERCIAL_TYPES: readonly TenantType[] = ['fastfood', 'shop', 'restaurant'];
+const COMMERCIAL_TYPES: readonly TenantType[] = ['fastfood', 'shop', 'restaurant', 'gym', 'supermarket', 'bar'];
 const LOBBY = CONFIG.LOBBY_FLOOR_INDEX;
 const SKY_FLOORS: readonly number[] = (CONFIG as { SKY_LOBBY_FLOORS?: readonly number[] }).SKY_LOBBY_FLOORS ?? [15, 30, 45, 60, 75, 90];
 const ZONE = 15;
@@ -248,7 +248,9 @@ export class PlaythroughBot {
     const role = this.roleOf(floor);
     if (role === 'commercial') {
       const stars = this.state.starLevel;
-      const mix: TenantType[] = stars >= 3 ? ['fastfood', 'shop', 'restaurant'] : ['fastfood'];
+      // Off-peak venues (gym, supermarket, bar) spread traffic across the day.
+      const mix: TenantType[] = stars >= 3 ? ['fastfood', 'shop', 'restaurant', 'supermarket', 'fastfood', 'bar', 'gym']
+        : stars >= 2 ? ['fastfood', 'fastfood', 'gym'] : ['fastfood'];
       run(floor === 2 ? Math.max(start, COMMERCIAL_X0) : start, mix);
     } else if (role === 'hotel') {
       // VIP inspections (the only reason hotels matter for ratings) start at

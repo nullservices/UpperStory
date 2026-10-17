@@ -70,6 +70,7 @@ export const TENANT_COLORS: Record<TenantType, number> = {
   hotelTwin: 0x5aa060, hotelSuite: 0xb58a3a, partyHall: 0xe07fa0, cinema: 0xb3262f,
   medical: 0xd8403a, parkingRamp: 0x8f8f8a, parkingSpace: 0x7a7a76, recycling: 0x3d7a3a, metro: 0x2f5fb3, cathedral: 0xc9b07a,
   fireStation: 0xc8281e, bank: 0x2a5a8a, helipad: 0x5a5e66, rooftopPool: 0x3aa8d8, maintenance: 0xd09a2a, generator: 0x6a6a3a,
+  apartment: 0xb98a5a, gym: 0xd0603a, supermarket: 0x4a9a4a, bar: 0x6a2a5a, conference: 0x3a5a8a, observationDeck: 0x5aa0d0,
 };
 
 /**

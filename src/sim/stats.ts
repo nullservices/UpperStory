@@ -135,10 +135,12 @@ export function createStats(day = 1): StatsState {
 export function tradeOf(type: TenantType): 'office' | 'condo' | 'hotel' | 'food' | 'retail' | 'leisure' | 'services' | null {
   if (type === 'lobby' || type === 'skyLobby') return null;
   if (type === 'office' || type === 'condo') return type;
+  if (type === 'apartment') return 'condo';
   if (isHotel(type)) return 'hotel';
   if (type === 'fastfood' || type === 'restaurant') return 'food';
-  if (type === 'shop') return 'retail';
-  if (type === 'cinema' || type === 'partyHall' || type === 'rooftopPool') return 'leisure';
+  if (type === 'bar') return 'food';
+  if (type === 'shop' || type === 'supermarket') return 'retail';
+  if (type === 'cinema' || type === 'partyHall' || type === 'rooftopPool' || type === 'gym' || type === 'conference' || type === 'observationDeck') return 'leisure';
   return 'services';
 }
 

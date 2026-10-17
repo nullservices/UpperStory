@@ -253,6 +253,58 @@ export const CONFIG = {
   POOL_REACH_FLOORS: 10,
   POOL_EVAL_BONUS: 8,
 
+  // --- Second-wave facilities (Upper Story originals; approx — tune) ---
+  /** Leisure trips and venue arrivals are decided every this many ticks. */
+  LEISURE_CHECK_TICKS: 10,
+  /** Average-tier apartment rent per quarter (pricing tiers scale it like offices). */
+  APARTMENT_QUARTER_RENT_DOLLARS: 8_000,
+  /** Gym: weekday mornings before work, evenings after it, weekends all day. */
+  GYM_MORNING_START_MIN: 420,
+  GYM_MORNING_END_MIN: 525,
+  GYM_EVENING_START_MIN: 1080,
+  GYM_EVENING_END_MIN: 1260,
+  GYM_WEEKEND_START_MIN: 540,
+  GYM_VISIT_TICKS: 120,
+  GYM_FEE_DOLLARS: 80,
+  /** Members sent per open gym per check (before the pricing volume multiplier). */
+  GYM_MEMBERS_PER_CHECK: 2,
+  /** Share of office workers who stop at a gym on their way home. */
+  GYM_WORKER_EVENING_CHANCE: 0.2,
+  /** Supermarket: daytime and early-evening grocery trips. */
+  SUPERMARKET_OPEN_MIN: 600,
+  SUPERMARKET_CLOSE_MIN: 1200,
+  SUPERMARKET_VISIT_TICKS: 80,
+  SUPERMARKET_FEE_DOLLARS: 50,
+  SUPERMARKET_SHOPPERS_PER_CHECK: 1,
+  /** Neighbourhood shoppers from outside, per in-game minute. */
+  SUPERMARKET_EXTERNAL_PER_MIN: 0.05,
+  /** Bar: 19:00 to 01:00 (last entry 00:30). */
+  BAR_OPEN_MIN: 1140,
+  BAR_LAST_ENTRY_MIN: 1470,
+  BAR_VISIT_TICKS: 150,
+  BAR_FEE_DOLLARS: 60,
+  BAR_GUESTS_PER_CHECK: 1,
+  BAR_EXTERNAL_PER_MIN: 0.15,
+  /** Conference centre: weekday events; delegates arrive 08:30-10:00, leave ~16:30. */
+  CONFERENCE_EVENT_CHANCE: 0.7,
+  CONFERENCE_ARRIVE_MIN: 510,
+  CONFERENCE_ARRIVE_END_MIN: 600,
+  CONFERENCE_LEAVE_MIN: 990,
+  CONFERENCE_DELEGATE_DOLLARS: 200,
+  /** Event days bring extra overnight guests to hotels within reach (16:00-20:00). */
+  CONFERENCE_HOTEL_GUESTS_PER_DELEGATE: 0.15,
+  CONFERENCE_HOTEL_REACH_FLOORS: 15,
+  CONFERENCE_HOTEL_START_MIN: 960,
+  CONFERENCE_HOTEL_END_MIN: 1200,
+  /** Observation deck: tourists 10:00-22:00; the ticket rises with height. */
+  DECK_OPEN_MIN: 600,
+  DECK_LAST_ENTRY_MIN: 1320,
+  DECK_VISIT_TICKS: 90,
+  DECK_TICKET_DOLLARS: 40,
+  DECK_TOURISTS_PER_MIN: 0.25,
+  /** Daily visits at which a venue grades as fully used. */
+  VENUE_TARGET_VISITS: { gym: 30, supermarket: 40, bar: 30, conference: 48, observationDeck: 60 },
+
   // --- Render (tunable but render-side) ---
   /** World-pixel width of one placement cell at zoom 1. */
   CELL_WIDTH_PX: 12,
@@ -382,6 +434,19 @@ export const TENANT_DATA = {
   maintenance: { sizeCells: 12, costDollars: 80_000, constructionTicks: 900, unlockedAtStar: 2, capacity: 3, limit: 10, upkeepQuarter: 15_000 },
   /** Basement only. Keeps elevators and lights running through blackouts. */
   generator: { sizeCells: 16, costDollars: 200_000, constructionTicks: 1200, unlockedAtStar: 3, capacity: 0, basementOnly: true, limit: 4, upkeepQuarter: 20_000 },
+  // --- Second wave of Upper Story originals: traffic at different hours ---
+  /** Rental homes: residents like condos, but quarterly rent instead of a sale. */
+  apartment: { sizeCells: 16, costDollars: 60_000, constructionTicks: 800, unlockedAtStar: 1, capacity: 3 },
+  /** Early-morning and evening workouts for residents and office workers. */
+  gym: { sizeCells: 20, costDollars: 150_000, constructionTicks: 1400, unlockedAtStar: 2, capacity: 30 },
+  /** Daytime and evening grocery trips from residents and hotel guests. */
+  supermarket: { sizeCells: 30, costDollars: 200_000, constructionTicks: 1800, unlockedAtStar: 2, capacity: 40 },
+  /** Evening and late-night crowds; noisy. */
+  bar: { sizeCells: 16, costDollars: 120_000, constructionTicks: 1200, unlockedAtStar: 3, capacity: 30 },
+  /** Weekday meetings and events; busy days bring hotel guests too. */
+  conference: { sizeCells: 32, costDollars: 300_000, constructionTicks: 2200, unlockedAtStar: 3, capacity: 80 },
+  /** Roof only. Tourists pay more the higher it sits. */
+  observationDeck: { sizeCells: 40, costDollars: 600_000, constructionTicks: 2600, unlockedAtStar: 4, capacity: 60, limit: 1 },
 
 } as const satisfies Record<string, TenantTypeData>;
 
@@ -414,12 +479,12 @@ export const KINSOKU_FORBIDDEN: Partial<
 
 /** Facilities that occupy a roof: nothing may be built above them. */
 export function isRoofOnly(type: string): boolean {
-  return type === 'rooftopPool' || type === 'helipad';
+  return type === 'rooftopPool' || type === 'helipad' || type === 'observationDeck';
 }
 
 /** Staffless service facilities: evaluation does not grade them on occupancy. */
 export function isUngradedService(type: string): boolean {
-  return type === 'fireStation' || type === 'maintenance' || type === 'generator' || isRoofOnly(type);
+  return type === 'fireStation' || type === 'maintenance' || type === 'generator' || (isRoofOnly(type) && type !== 'observationDeck');
 }
 
 /** Hotel IDs share guest, housekeeping and evaluation behavior. */

@@ -49,9 +49,11 @@ export function styleCount(type: TenantType): number {
     case 'office': case 'condo': case 'shop': case 'fastfood':
     case 'hotel': case 'hotelTwin': case 'hotelSuite': return STYLE_COUNT;
     case 'bank': case 'rooftopPool': case 'restaurant': case 'cinema': case 'partyHall':
-    case 'medical': case 'security': case 'housekeeping': case 'lobby': case 'skyLobby': return 4;
+    case 'medical': case 'security': case 'housekeeping': case 'lobby': case 'skyLobby':
+    case 'gym': case 'supermarket': case 'bar': case 'conference': return 4;
+    case 'apartment': return 6;
     case 'parkingRamp': case 'recycling': return 3;
-    case 'fireStation': case 'maintenance': case 'helipad': return 3;
+    case 'fireStation': case 'maintenance': case 'helipad': case 'observationDeck': return 3;
     case 'generator': return 2;
     default: return 1;
   }
@@ -69,7 +71,8 @@ export function variantCount(type: TenantType): number {
     case 'hotel': case 'hotelTwin': case 'hotelSuite': case 'fastfood': case 'restaurant': return 3;
     case 'parkingSpace': return 6;
     case 'fireStation': case 'maintenance': case 'bank': case 'rooftopPool': case 'helipad':
-    case 'partyHall': case 'medical': case 'security': case 'housekeeping': case 'parkingRamp': case 'recycling': return 2;
+    case 'partyHall': case 'medical': case 'security': case 'housekeeping': case 'parkingRamp': case 'recycling':
+    case 'apartment': case 'gym': case 'supermarket': case 'bar': case 'conference': case 'observationDeck': return 2;
     default: return 1;
   }
 }
@@ -114,6 +117,12 @@ export function paintRoom(type: TenantType, state: TenantState, w: number, h: nu
     case 'bank': bank(r); break;
     case 'rooftopPool': rooftopPool(r); break;
     case 'helipad': helipad(r); break;
+    case 'apartment': apartment(r); break;
+    case 'gym': gym(r); break;
+    case 'supermarket': supermarket(r); break;
+    case 'bar': bar(r); break;
+    case 'conference': conference(r); break;
+    case 'observationDeck': observationDeck(r); break;
     default: shell(r, { wall: 0xe8e2d2, floor: 0x9a8e78 });
   }
   if (state === 'vacant' && !isOpenAir(type)) {
@@ -1342,7 +1351,7 @@ function cathedral(r: R): void {
 
 /** Roof facilities drawn open to the sky (no ceiling; transparent above the deck). */
 export function isOpenAir(type: TenantType): boolean {
-  return type === 'rooftopPool' || type === 'helipad';
+  return type === 'rooftopPool' || type === 'helipad' || type === 'observationDeck';
 }
 
 /** Mirror a PixMap left-right in place (whole-room layout flips). */
@@ -1914,5 +1923,542 @@ function helipad(r: R): void {
   for (let k = 0; k < 12; k++) {
     const hgt = 4 - Math.floor(k / 4);
     pm.vline(mx + dir * (k + 1), 2 + Math.floor(k / 5), hgt, (k >> 2) % 2 ? 0xf4f4f4 : 0xf07018);
+  }
+}
+
+// --- Second-wave facilities (Upper Story originals) -------------------------------
+
+/** Exposed brick across part of the back wall. */
+function brickWall(r: R, x0: number, x1: number, brick: number): void {
+  const { pm, wallBottom } = r;
+  pm.rect(x0, 3, x1 - x0, wallBottom - 3, brick);
+  const mortar = tint(brick, 0.32);
+  for (let y = 5, i = 0; y < wallBottom; y += 3, i++) {
+    pm.hline(x0, y, x1 - x0, mortar);
+    for (let x = x0 + (i % 2 ? 2 : 5); x < x1; x += 6) pm.vline(x, y - 2, 2, mortar);
+  }
+  pm.sparse(x0, 3, x1 - x0, wallBottom - 3, shade(brick, 0.14), 1);
+  pm.hline(x0, 3, x1 - x0, shade(brick, 0.35));
+}
+
+/** Back-wall window onto the sky, optionally with curtains. */
+function wallWindow(r: R, x: number, wd: number, frame: number, curtain?: number): void {
+  const { pm } = r;
+  pm.rect(x, 5, wd, 9, frame);
+  pm.rect(x + 1, 6, wd - 2, 7, 0x9fd0f0);
+  pm.dither(x + 1, 6, wd - 2, 3, 0xc4e4f8);
+  pm.vline(x + (wd >> 1), 6, 7, frame);
+  if (curtain !== undefined) {
+    pm.rect(x - 2, 4, 3, 11, curtain);
+    pm.rect(x + wd - 1, 4, 3, 11, curtain);
+    pm.vline(x - 1, 4, 11, shade(curtain, 0.25));
+    pm.vline(x + wd, 4, 11, shade(curtain, 0.25));
+  }
+}
+
+/** Front door of a rental flat, with a brass number plate beside it. */
+function flatDoor(r: R, x: number, paint: number, n: number): void {
+  const { pm, base: b } = r;
+  pm.rect(x, 4, 10, b - 4, shade(paint, 0.35));
+  pm.rect(x + 1, 5, 8, b - 5, paint);
+  pm.rect(x + 2, 7, 6, 4, shade(paint, 0.12));
+  pm.rect(x + 2, 13, 6, b - 15, shade(paint, 0.12));
+  pm.set(x + 7, 12, 0xd0a028);
+  pm.set(x + 4, 6, 0x16161a); // peephole
+  pm.rect(x + 11, 6, 5, 7, 0xd0a028);
+  paintText(pm, String(n % 10), x + 12, 7, 0x45280f);
+}
+
+function radiator(r: R, x: number): void {
+  const { pm, base: b } = r;
+  pm.rect(x, b - 7, 11, 6, 0xd8d8d0);
+  for (let k = 1; k < 11; k += 2) pm.vline(x + k, b - 7, 6, 0xb0b0a8);
+  pm.hline(x, b - 7, 11, 0xf0f0e8);
+  pm.set(x + 1, b - 1, 0x6c6c74);
+  pm.set(x + 9, b - 1, 0x6c6c74);
+}
+
+/** Galley kitchen: counter with sink and hob, a spice shelf, fridge at one end. */
+function kitchenette(r: R, x: number, len: number, cab: number, fridgeRight: boolean): void {
+  const { pm, base: b } = r;
+  const cx = fridgeRight ? x : x + 10;
+  pm.rect(cx, b - 7, len, 7, cab);
+  pm.hline(cx, b - 8, len, 0x6c6c74);
+  for (let k = cx + 1; k < cx + len - 4; k += 6) { pm.rect(k, b - 6, 5, 5, shade(cab, 0.15)); pm.set(k + 2, b - 4, 0x45280f); }
+  pm.rect(cx + 3, b - 9, 6, 1, 0xb8c0c8); // sink
+  pm.vline(cx + 5, b - 12, 3, 0x9c9ca4);
+  pm.set(cx + 6, b - 12, 0x9c9ca4);
+  pm.stand(F.STOVE, cx + len - 10, b);
+  pm.hline(cx, 8, len, shade(cab, 0.3));
+  for (let k = cx + 1; k < cx + len - 2; k += 4) pm.rect(k, 6, 2, 2, [0xc83030, 0xe2d2a8, 0x3464bc, 0x44a03a][(k >> 2) % 4]!);
+  pm.stand(F.FRIDGE, fridgeRight ? cx + len + 1 : x, b);
+}
+
+/** Folding clothes airer with the week's washing. */
+function dryingRack(r: R, x: number, seed: number): void {
+  const { pm, base: b } = r;
+  pm.line(x, b - 1, x + 6, b - 9, 0x9c9ca4);
+  pm.line(x + 12, b - 1, x + 6, b - 9, 0x9c9ca4);
+  pm.hline(x + 1, b - 8, 11, 0xcfd0d4);
+  for (let k = 0; k < 4; k++) pm.rect(x + 1 + k * 3, b - 7, 2, 3 + (hash32(seed + k) % 2), BOOK_COLORS[hash32(seed * 7 + k) % BOOK_COLORS.length]!);
+}
+
+function apartment(r: R): void {
+  const { pm, w, base: b, v } = r;
+  const S = sty(r, [
+    { wall: 0xe8dcc6, brick: 0xa85a3c, floor: 0x9a6a38, style: 'wood', walls: 'plain', acc: 0x3f6fb0, door: 0x2a5a8a },
+    { wall: 0xdfe6cf, brick: 0, floor: 0x7a8a6a, style: 'carpet', walls: 'paper', acc: 0xc0503a, door: 0x8a5a2c },
+    { wall: 0xd8e0ec, brick: 0, floor: 0xb8bcc4, style: 'tile', walls: 'stripe', acc: 0xc9952f, door: 0x3a3a42 },
+    { wall: 0xf0d8d0, brick: 0x8a4a34, floor: 0x7a4a2a, style: 'parquet', walls: 'plain', acc: 0x2a8a8a, door: 0x24582a },
+    { wall: 0xe6dccc, brick: 0, floor: 0x86685a, style: 'carpet', walls: 'wainscot', acc: 0x7a4fb0, door: 0xa83030 },
+    { wall: 0xe8e0f0, brick: 0, floor: 0xa06a38, style: 'wood', walls: 'block', acc: 0x4f9a5a, door: 0x6a6a72 },
+  ] as const);
+  shell(r, { wall: S.wall, floor: S.floor, style: S.style, wallStyle: S.walls });
+  const cab = pick(r, [0xe0d4b4, 0xd8dde2, 0xc8b8a0, 0xe8e8e0] as const, 3);
+  const acc2 = pick(r, ACCENTS.filter(c => c !== S.acc), 4);
+  const n = 1 + (hash32(r.s * 31 + v) % 9);
+  if (v === 0) {
+    // Studio: entry door, bed under the window, table for two, galley kitchen.
+    if (S.brick) brickWall(r, 20, 100, S.brick);
+    flatDoor(r, 3, S.door, n);
+    wallWindow(r, 44, 20, 0x8a8270, acc2);
+    bed(r, 22, 22, S.acc, 0x6b4426);
+    radiator(r, 50);
+    nightstand(r, 64);
+    pm.stand(F.CAFE_TABLE, 84, b, { inks: accent(0xa86c36) });
+    pm.stand(F.STOOL, 79, b, { inks: accent(S.acc) });
+    pm.stand(F.STOOL, 94, b, { inks: accent(S.acc) });
+    pm.blit(F.PENDANT, 86, 2);
+    dryingRack(r, 103, r.s);
+    kitchenette(r, w - 66, 50, cab, true);
+  } else {
+    // One-bed: kitchen first, a sofa and TV by the window, a desk, then the door.
+    kitchenette(r, 4, 44, cab, false);
+    if (S.brick) brickWall(r, 62, 120, S.brick);
+    wallWindow(r, 76, 22, 0x8a8270, acc2);
+    pm.stand(F.SOFA, 64, b, { inks: accent(S.acc) });
+    pm.stand(F.TV, 100, b);
+    plant(r, 113);
+    desk(r, 124, 20, 0xa86c36);
+    pm.stand(F.TABLE_LAMP, 125, b - 6);
+    pm.hline(133, b - 7, 6, 0x3a3a42); // laptop
+    pm.set(134, b - 8, 0x68acdc);
+    pm.stand(F.OFFICE_CHAIR, 144, b, { inks: accent(acc2), flip: true });
+    pm.blit(F.SMALL_PICTURE, 128, 5);
+    flatDoor(r, w - 20, S.door, n);
+  }
+}
+
+// Gym equipment, side-on.
+function treadmill(pm: PixMap, x: number, b: number, c: number): void {
+  pm.hline(x, b - 3, 16, 0x3a3a42);
+  pm.hline(x, b - 2, 16, 0x26262a);
+  pm.set(x + 1, b - 1, 0x6c6c74);
+  pm.set(x + 14, b - 1, 0x6c6c74);
+  pm.vline(x + 15, b - 12, 9, 0x9c9ca4);
+  pm.hline(x + 9, b - 9, 6, 0x9c9ca4);
+  pm.rect(x + 13, b - 14, 5, 3, c);
+  pm.set(x + 14, b - 13, 0x8cd05c);
+  pm.set(x + 16, b - 13, 0xffdc58);
+}
+
+function exerciseBike(pm: PixMap, x: number, b: number, c: number): void {
+  pm.hline(x, b - 1, 12, 0x3a3a42);
+  pm.disc(x + 3, b - 4, 2, 0x3a3a42);
+  pm.set(x + 3, b - 4, 0x9c9ca4);
+  pm.line(x + 3, b - 4, x + 6, b - 9, c);
+  pm.line(x + 6, b - 4, x + 10, b - 10, c);
+  pm.vline(x + 6, b - 4, 3, c);
+  pm.hline(x + 4, b - 10, 4, 0x16161a);
+  pm.hline(x + 9, b - 11, 3, 0x16161a);
+}
+
+function weightRack(pm: PixMap, x: number, b: number, wd: number): void {
+  for (const y of [b - 9, b - 4]) {
+    pm.hline(x, y, wd, 0x6c6c74);
+    for (let k = x + 1; k + 3 < x + wd; k += 4) {
+      const big = ((k - x) >> 2) % 2;
+      pm.vline(k, y - 2 - big, 2 + big, 0x26262a);
+      pm.hline(k, y - 1, 3, 0x9c9ca4);
+      pm.vline(k + 2, y - 2 - big, 2 + big, 0x26262a);
+    }
+  }
+  pm.vline(x, b - 9, 9, 0x6c6c74);
+  pm.vline(x + wd - 1, b - 9, 9, 0x6c6c74);
+}
+
+function benchPress(pm: PixMap, x: number, b: number, c: number): void {
+  pm.rect(x + 2, b - 5, 11, 2, c);
+  pm.hline(x + 2, b - 5, 11, tint(c, 0.3));
+  pm.vline(x + 4, b - 3, 3, 0x6c6c74);
+  pm.vline(x + 11, b - 3, 3, 0x6c6c74);
+  pm.vline(x + 1, b - 12, 12, 0x9c9ca4);
+  pm.vline(x + 13, b - 12, 12, 0x9c9ca4);
+  pm.hline(x - 3, b - 12, 21, 0xcfd0d4);
+  pm.rect(x - 3, b - 14, 2, 5, 0x26262a);
+  pm.rect(x + 16, b - 14, 2, 5, 0x26262a);
+}
+
+function punchBag(pm: PixMap, x: number, c: number): void {
+  pm.vline(x + 2, 2, 3, 0x9c9ca4);
+  pm.rect(x, 5, 5, 11, c);
+  pm.vline(x, 5, 11, tint(c, 0.3));
+  pm.vline(x + 4, 5, 11, shade(c, 0.3));
+  pm.hline(x, 7, 5, shade(c, 0.4));
+  pm.hline(x, 14, 5, shade(c, 0.4));
+}
+
+/** Mirrored wall panel with diagonal highlights. */
+function mirrorPanel(pm: PixMap, x: number, wd: number, top: number, bottom: number): void {
+  pm.rect(x, top, wd, bottom - top, 0xcfe2ec);
+  pm.hline(x, top, wd, 0x9c9ca4);
+  pm.hline(x, bottom, wd, 0x9c9ca4);
+  for (let k = x + 4; k < x + wd - 4; k += 14) pm.line(k, bottom - 1, k + 4, top + 1, 0xf0f8fc);
+}
+
+function gym(r: R): void {
+  const { pm, w, base: b, v, wallBottom } = r;
+  const S = sty(r, [
+    { wall: 0xe8e8e2, floor: 0x3a3a42, style: 'concrete', stripe: 0xd0603a, kit: 0xc83030, name: 'FIT' },
+    { wall: 0xdfe7da, floor: 0xb88a50, style: 'wood', stripe: 0x2a8a8a, kit: 0x3464bc, name: 'PEAK' },
+    { wall: 0x4a5260, floor: 0x2f4f7a, style: 'concrete', stripe: 0xf0c020, kit: 0xf0c020, name: 'IRON' },
+    { wall: 0xf0e6e0, floor: 0x5a5a62, style: 'tile', stripe: 0x7a4fb0, kit: 0xd06a9a, name: 'FLEX' },
+  ] as const);
+  shell(r, { wall: S.wall, floor: S.floor, style: S.style });
+  pm.rect(2, wallBottom - 3, w - 4, 2, S.stripe);
+  for (let x = 20; x < w - 20; x += 60) if (v !== 0 || x < 110 || x > 160) pm.blit(F.CEILING_LIGHT, x, 2);
+  plate(pm, v === 0 ? 122 : w - textWidth(S.name) - 52, v === 0 ? 2 : 4, S.name, S.stripe, 0xffffff, tint(S.stripe, 0.4));
+  if (v === 0) {
+    mirrorPanel(pm, 6, 106, 4, wallBottom - 4);
+    for (let k = 0; k < 4; k++) treadmill(pm, 8 + k * 24, b, S.kit);
+    weightRack(pm, 118, b, 30);
+    benchPress(pm, 160, b, S.kit);
+    for (let k = 0; k < 3; k++) pm.stand(F.LOCKER, w - 26 + k * 6, b);
+  } else {
+    for (let k = 0; k < 3; k++) pm.stand(F.LOCKER, 4 + k * 6, b);
+    mirrorPanel(pm, 26, 96, 4, wallBottom - 4);
+    for (let k = 0; k < 6; k++) exerciseBike(pm, 26 + k * 15, b, S.kit);
+    punchBag(pm, 126, S.kit);
+    // Mats and a pair of exercise balls.
+    for (let k = 0; k < 3; k++) pm.hline(140 + k * 14, b - 1, 12, [S.kit, S.stripe, 0x44a03a][k]!);
+    pm.disc(186, b - 4, 3, S.stripe);
+    pm.disc(194, b - 3, 2, S.kit);
+    weightRack(pm, w - 34, b, 26);
+  }
+  pm.blit(F.CLOCK, v === 0 ? 196 : 104, 4);
+}
+
+const PRODUCT_COLORS = [0xc83030, 0xe07020, 0xffdc58, 0x44a03a, 0x3464bc, 0xe2d2a8, 0xd06a9a, 0xf4f4f4, 0x5c2c88, 0x8cd05c];
+
+/** Shelving gondola stacked with packets. */
+function gondola(pm: PixMap, x: number, wd: number, b: number, seed: number): void {
+  pm.rect(x, b - 15, wd, 15, 0xc8ccd2);
+  pm.vline(x, b - 15, 15, 0x9c9ca4);
+  pm.vline(x + wd - 1, b - 15, 15, 0x9c9ca4);
+  for (const y of [b - 14, b - 10, b - 6]) {
+    pm.hline(x + 1, y + 3, wd - 2, 0x8a8e96);
+    // Facings of packets: runs of one product, two pixels wide.
+    for (let k = x + 2; k + 2 < x + wd - 1; k += 3) {
+      const hv = hash32(seed + Math.floor(k / 9) * 13 + y * 7);
+      const tall = (hv >> 5) % 2;
+      pm.rect(k, y + 1 - tall, 2, 2 + tall, PRODUCT_COLORS[(hv >> 9) % PRODUCT_COLORS.length]!);
+    }
+  }
+  pm.hline(x, b - 15, wd, 0xe8ecf0);
+  pm.rect(x + 1, b - 2, wd - 2, 2, 0x6c6c74);
+}
+
+/** Upright chiller with glass doors. */
+function chiller(pm: PixMap, x: number, wd: number, b: number, seed: number): void {
+  pm.rect(x, b - 16, wd, 16, 0xe8ecf0);
+  pm.hline(x + 1, b - 15, wd - 2, 0xeef6ff);
+  pm.rect(x + 1, b - 13, wd - 2, 11, 0xbcd8e8);
+  for (const y of [b - 12, b - 8, b - 4]) {
+    for (let k = x + 2; k < x + wd - 2; k += 2) pm.vline(k, y, 2, PRODUCT_COLORS[hash32(seed + k + y * 3) % PRODUCT_COLORS.length]!);
+    pm.hline(x + 1, y + 2, wd - 2, 0x9cb8c8);
+  }
+  for (let k = x; k < x + wd; k += 10) pm.vline(k, b - 13, 11, 0x9c9ca4);
+  pm.dither(x + 1, b - 13, wd - 2, 2, 0xe0f0f8);
+  pm.rect(x, b - 2, wd, 2, 0x6c6c74);
+}
+
+/** Tilted crates of fruit and vegetables. */
+function produce(pm: PixMap, x: number, wd: number, b: number, seed: number): void {
+  pm.rect(x, b - 6, wd, 6, 0x8a5a2c);
+  for (let k = x; k < x + wd; k += 12) pm.vline(k, b - 6, 6, 0x5a3818);
+  for (let k = x + 1; k < x + wd - 1; k++) {
+    const crate = Math.floor((k - x) / 12);
+    const c = [0xc83030, 0xe07020, 0x44a03a, 0xffdc58, 0x8cd05c, 0x5c2c88][hash32(seed + crate) % 6]!;
+    pm.vline(k, b - 9, 3, (k + crate) % 3 === 0 ? shade(c, 0.25) : c);
+    if (k % 2) pm.set(k, b - 10, tint(c, 0.25));
+  }
+}
+
+function checkout(pm: PixMap, x: number, b: number, lane: number, c: number): void {
+  pm.rect(x, b - 7, 20, 7, 0xb8bcc4);
+  pm.hline(x, b - 8, 20, 0x26262a);
+  pm.hline(x, b - 7, 20, 0x6c6c74);
+  pm.stand(F.REGISTER, x + 13, b - 8);
+  pm.vline(x + 2, 8, b - 16, 0x9c9ca4);
+  pm.rect(x, 7, 5, 7, c);
+  paintText(pm, String(lane % 10), x + 1, 8, 0xffffff);
+}
+
+function cart(pm: PixMap, x: number, b: number): void {
+  pm.rect(x, b - 8, 9, 5, 0xcfd0d4);
+  pm.rect(x + 1, b - 7, 7, 3, 0x9c9ca4);
+  for (let k = x + 2; k < x + 8; k += 2) pm.vline(k, b - 7, 3, 0xcfd0d4);
+  pm.line(x + 9, b - 8, x + 11, b - 10, 0x9c9ca4);
+  pm.hline(x + 1, b - 3, 8, 0x9c9ca4);
+  pm.set(x + 1, b - 1, 0x26262a);
+  pm.set(x + 7, b - 1, 0x26262a);
+}
+
+function supermarket(r: R): void {
+  const { pm, w, base: b, v } = r;
+  const S = sty(r, [
+    { wall: 0xf4f0e6, floor: 0xe0d8d0, band: 0x3f9a58, name: 'FRESH' },
+    { wall: 0xe8eef4, floor: 0xd8dcdc, band: 0xc0503a, name: 'MARKET' },
+    { wall: 0xf4ecd8, floor: 0xc8b8a0, band: 0x2f6fb0, name: 'MINI MART' },
+    { wall: 0xeef2e4, floor: 0xe8e4dc, band: 0xd08a20, name: 'FARM' },
+  ] as const);
+  shell(r, { wall: S.wall, floor: S.floor, style: 'check', floor2: shade(S.floor, 0.12) });
+  // Fluorescent tubes and the shop's colour band along the top of the wall.
+  for (let x = 12; x < w - 12; x += 34) pm.hline(x, 2, 14, 0xeef6ff);
+  pm.rect(2, 4, w - 4, 2, S.band);
+  if (v === 0) {
+    produce(pm, 4, 72, b, r.s);
+    for (let x = 86; x + 40 <= w - 96; x += 46) gondola(pm, x, 40, b, x * 7 + r.s);
+    checkout(pm, w - 90, b, 1, S.band);
+    checkout(pm, w - 62, b, 2, S.band);
+    for (let k = 0; k < 3; k++) cart(pm, w - 32 + k * 4, b);
+  } else {
+    checkout(pm, 6, b, 1, S.band);
+    checkout(pm, 34, b, 2, S.band);
+    cart(pm, 60, b);
+    for (let x = 76; x + 40 <= w - 110; x += 46) gondola(pm, x, 40, b, x * 5 + r.s);
+    chiller(pm, w - 106, 60, b, r.s);
+    produce(pm, w - 42, 38, b, r.s + 9);
+  }
+  const sx = v === 0 ? 10 : w - textWidth(S.name) - 16;
+  plate(pm, sx, 3, S.name, S.band, 0xffffff, tint(S.band, 0.4));
+}
+
+/** Back bar: mirror and bottle shelves, with a counter and stools in front. */
+function backBar(r: R, x: number, wd: number, wood: number, stool: number, seed: number): void {
+  const { pm, base: b } = r;
+  pm.rect(x, 4, wd, 10, shade(wood, 0.45));
+  pm.rect(x + 2, 5, wd - 4, 8, 0x8aa0b0);
+  pm.dither(x + 2, 5, wd - 4, 8, 0x6a8090);
+  for (const y of [8, 12]) {
+    pm.hline(x + 1, y + 1, wd - 2, wood);
+    for (let k = x + 3; k < x + wd - 3; k += 2) {
+      const hv = hash32(seed + k * 11 + y);
+      if (hv % 5 === 0) continue;
+      const c = [0x2a6a3a, 0x8a4a22, 0xe2d2a8, 0x7c1820, 0x68acdc, 0xd0a028][hv % 6]!;
+      pm.vline(k, y - 2, 3, c);
+      pm.set(k, y - 3, shade(c, 0.4));
+    }
+  }
+  pm.rect(x, b - 8, wd, 8, wood);
+  pm.hline(x - 1, b - 9, wd + 2, tint(wood, 0.35));
+  pm.hline(x, b - 7, wd, shade(wood, 0.25));
+  for (let k = x + 4; k < x + wd - 4; k += 8) pm.vline(k, b - 6, 5, shade(wood, 0.2));
+  pm.rect(x + 6, b - 11, 2, 2, 0xcfd0d4); // beer tap
+  pm.vline(x + 7, b - 13, 2, 0xd0a028);
+  for (let k = x + 4; k + 4 < x + wd; k += 11) pm.stand(F.STOOL, k, b, { inks: accent(stool) });
+  for (let k = x + 8; k < x + wd - 4; k += 22) pm.blit(F.PENDANT, k, 2);
+}
+
+function poolTable(pm: PixMap, x: number, b: number, felt: number): void {
+  pm.rect(x, b - 8, 30, 3, 0x6b4426);
+  pm.hline(x + 1, b - 8, 28, felt);
+  pm.hline(x, b - 9, 30, 0x8a5a2c);
+  pm.rect(x + 2, b - 5, 2, 5, 0x5a3818);
+  pm.rect(x + 26, b - 5, 2, 5, 0x5a3818);
+  for (const [dx, c] of [[8, 0xffffff], [16, 0xc83030], [19, 0xffdc58], [22, 0x16161a]] as const) pm.set(x + dx, b - 10, c);
+  pm.line(x + 30, b - 14, x + 18, b - 10, 0xd09a58);
+}
+
+function jukebox(pm: PixMap, x: number, b: number, c: number): void {
+  pm.rect(x, b - 15, 10, 15, shade(c, 0.3));
+  pm.rect(x + 1, b - 14, 8, 4, 0xffd75a);
+  pm.rect(x + 2, b - 9, 6, 5, 0x16161a);
+  for (let k = 0; k < 3; k++) pm.hline(x + 2, b - 8 + k * 2, 6, [0xc83030, 0x68acdc, 0x8cd05c][k]!);
+  pm.hline(x, b - 15, 10, tint(c, 0.3));
+}
+
+function bar(r: R): void {
+  const { pm, w, base: b, v } = r;
+  const S = sty(r, [
+    { wall: 0x4a3030, walls: 'panel', floor: 0x5a3818, wood: 0x8a5a2c, neon: 0xff5aa8, booth: 0x7c1820 },
+    { wall: 0x6a3a2a, walls: 'block', floor: 0x3a3a42, wood: 0x6b4426, neon: 0x5ad8ff, booth: 0x24582a },
+    { wall: 0x24403a, walls: 'wainscot', floor: 0x6a4a2a, wood: 0xa86c36, neon: 0xffd75a, booth: 0x5c2c88 },
+    { wall: 0x26304a, walls: 'stripe', floor: 0x4a3a30, wood: 0x7a4a22, neon: 0xff8030, booth: 0xa83030 },
+  ] as const);
+  shell(r, { wall: S.wall, floor: S.floor, style: 'parquet', wallStyle: S.walls, lower: shade(S.wall, 0.25) });
+  const neon = (x: number): void => {
+    pm.rect(x - 2, 5, textWidth('BAR') + 4, 7, shade(S.wall, 0.4));
+    paintText(pm, 'BAR', x, 6, S.neon);
+    pm.hline(x - 1, 12, textWidth('BAR') + 2, shade(S.neon, 0.5));
+  };
+  if (v === 0) {
+    backBar(r, 6, 110, S.wood, S.booth, r.s);
+    // Booth seating around a small table.
+    const bx = w - 66;
+    pm.rect(bx, b - 11, 4, 11, S.booth);
+    pm.rect(bx + 4, b - 5, 10, 2, S.booth);
+    pm.stand(F.CAFE_TABLE, bx + 16, b, { inks: accent(S.wood) });
+    pm.rect(bx + 29, b - 5, 10, 2, S.booth);
+    pm.rect(bx + 39, b - 11, 4, 11, S.booth);
+    pm.blit(F.PENDANT, bx + 18, 2);
+    neon(bx + 16);
+    plant(r, w - 14);
+  } else {
+    jukebox(pm, 6, b, S.booth);
+    poolTable(pm, 22, b, pick(r, [0x2a7a3a, 0x2a4a8a, 0x8a2a2a] as const, 7));
+    pm.blit(F.PENDANT, 34, 2);
+    // Dartboard.
+    pm.disc(70, 9, 3, 0x16161a);
+    pm.disc(70, 9, 2, 0xc83030);
+    pm.set(70, 9, 0x44a03a);
+    neon(56 - 10);
+    backBar(r, 80, w - 88, S.wood, S.booth, r.s + 3);
+  }
+}
+
+/** Projection screen showing a chart. */
+function projectionScreen(pm: PixMap, x: number, wd: number, acc: number): void {
+  pm.hline(x - 1, 3, wd + 2, 0x3a3a42);
+  pm.rect(x, 4, wd, 10, 0xf4f4f4);
+  pm.rect(x, 13, wd, 1, 0xcfd0d4);
+  for (let k = 0; k < 5; k++) pm.vline(x + 4 + k * 5, 12 - k, k + 1, k % 2 ? acc : shade(acc, 0.3));
+  pm.line(x + 3, 10, x + wd - 4, 5, 0xc83030);
+}
+
+function lectern(pm: PixMap, x: number, b: number, wood: number): void {
+  pm.rect(x, b - 9, 7, 9, wood);
+  pm.hline(x - 1, b - 10, 9, tint(wood, 0.3));
+  pm.vline(x + 6, b - 9, 9, shade(wood, 0.3));
+  pm.vline(x + 5, b - 13, 3, 0x3a3a42); // microphone
+  pm.set(x + 4, b - 13, 0x16161a);
+}
+
+function conference(r: R): void {
+  const { pm, w, base: b, v } = r;
+  const S = sty(r, [
+    { wall: 0xdfe2e6, walls: 'panel', lower: 0x8a6a4a, floor: 0x5a2a3a, acc: 0x3f6fb0, seat: 0x3a3a62 },
+    { wall: 0xe8e2cc, walls: 'wainscot', lower: 0x6b4426, floor: 0x2a4a6a, acc: 0xc9952f, seat: 0x7c1820 },
+    { wall: 0xd8dde8, walls: 'plain', lower: 0x9aa3ad, floor: 0x4a5a3a, acc: 0x2a8a8a, seat: 0x24282c },
+    { wall: 0xefe4d2, walls: 'stripe', lower: 0x8a5a2c, floor: 0x6a4a6a, acc: 0xc0503a, seat: 0x2a5a4a },
+  ] as const);
+  shell(r, { wall: S.wall, floor: S.floor, style: 'carpet', wallStyle: S.walls, lower: S.lower });
+  const fancy = r.s % 2 === 1;
+  for (let x = 100; x < w - 20; x += 64) pm.blit(fancy ? F.CHANDELIER : F.CEILING_LIGHT, x, 2);
+  if (v === 0) {
+    // Lecture layout: stage, screen and lectern at the left; rows of seats.
+    pm.rect(2, b - 3, 80, 3, shade(S.lower, 0.1));
+    pm.hline(2, b - 3, 80, tint(S.lower, 0.3));
+    projectionScreen(pm, 16, 40, S.acc);
+    lectern(pm, 64, b - 3, S.lower);
+    pm.stand(F.TALL_PLANT, 4, b - 3);
+    for (let x = 92; x + 6 < w - 22; x += 9) pm.stand(F.DINING_CHAIR_L, x, b, { inks: accent(S.seat) });
+    plate(pm, w - 40, 5, 'EXPO', S.acc, 0xffffff, tint(S.acc, 0.4));
+    pm.stand(F.WATER_COOLER, w - 14, b);
+  } else {
+    // Meeting layout: registration desk, two long tables, flip chart and screen.
+    pm.rect(6, b - 7, 26, 7, S.acc);
+    pm.hline(6, b - 8, 26, tint(S.acc, 0.4));
+    pm.rect(9, b - 10, 4, 2, 0xf4f4f4); // name badges
+    pm.rect(15, b - 10, 4, 2, 0xf4f4f4);
+    plate(pm, 8, 5, 'HALL', S.acc, 0xffffff, tint(S.acc, 0.4));
+    const len = Math.floor((w - 150) / 2);
+    for (const tx of [44, 54 + len]) {
+      for (let x = tx; x + 6 < tx + len; x += 12) pm.stand(F.OFFICE_CHAIR, x, b, { inks: accent(S.seat) });
+      pm.rect(tx + 2, b - 7, len, 2, 0xf4f4f4);
+      pm.rect(tx + 2, b - 5, len, 2, 0xe2e2dc);
+      pm.vline(tx + 4, b - 3, 3, 0x6c6c74);
+      pm.vline(tx + len - 1, b - 3, 3, 0x6c6c74);
+      for (let x = tx + 8; x < tx + len - 4; x += 16) { pm.vline(x, b - 10, 3, 0xbce2f8); pm.set(x + 3, b - 8, 0xf4f4f4); }
+    }
+    // Flip chart on an easel.
+    const fx = w - 84;
+    pm.line(fx, b - 1, fx + 4, b - 15, 0x6b4426);
+    pm.line(fx + 9, b - 1, fx + 5, b - 15, 0x6b4426);
+    pm.rect(fx + 1, b - 16, 8, 9, 0xf4f4f4);
+    pm.hline(fx + 2, b - 14, 5, S.acc);
+    pm.hline(fx + 2, b - 12, 4, 0x3a3a42);
+    projectionScreen(pm, w - 66, 40, S.acc);
+    plant(r, w - 14, true);
+  }
+}
+
+/** Coin-operated viewer on a post. */
+function towerViewer(pm: PixMap, x: number, b: number, c: number, flip: boolean): void {
+  pm.hline(x - 1, b - 1, 4, 0x6c6c74);
+  pm.vline(x + 1, b - 9, 8, 0x6c6c74);
+  pm.rect(x - 1, b - 13, 5, 4, c);
+  pm.hline(x - 1, b - 13, 5, tint(c, 0.3));
+  pm.set(flip ? x - 2 : x + 4, b - 12, 0x16161a);
+  pm.set(flip ? x - 2 : x + 4, b - 11, 0x16161a);
+  pm.set(x + 1, b - 10, 0xd0a028);
+}
+
+/** Glass pavilion with the ticket kiosk inside. */
+function pavilion(r: R, x: number, wd: number, frame: number, name: string): void {
+  const { pm, base: b } = r;
+  pm.rect(x, 3, wd, 2, frame);
+  pm.hline(x - 2, 2, wd + 4, tint(frame, 0.3));
+  pm.rect(x, 5, wd, b - 5, 0xbcd8e8);
+  pm.dither(x, 5, wd, b - 5, 0xd8ecf6);
+  for (let k = x; k < x + wd; k += 12) pm.vline(k, 5, b - 5, frame);
+  pm.vline(x + wd - 1, 5, b - 5, frame);
+  pm.rect(x + 6, b - 7, 18, 7, shade(frame, 0.2));
+  pm.hline(x + 5, b - 8, 20, tint(frame, 0.4));
+  pm.blit(F.CEILING_LIGHT, x + 10, 5);
+  plate(pm, x + Math.floor((wd - textWidth(name) - 4) / 2), 7, name, frame, 0xffffff, tint(frame, 0.4));
+}
+
+function observationDeck(r: R): void {
+  const { pm, w, th, base: b, v } = r;
+  const S = sty(r, [
+    { deck: 0xd8d4cc, style: 'tile', frame: 0x3a5a7a, viewer: 0x2a8a8a, flag: 0xc83030, name: 'VISTA' },
+    { deck: 0xb8875a, style: 'wood', frame: 0x4a4a52, viewer: 0x3464bc, flag: 0xf0c020, name: 'TOP' },
+    { deck: 0xa8a8a0, style: 'concrete', frame: 0x2a5a4a, viewer: 0xd08a20, flag: 0x3f6fb0, name: 'VISTA' },
+  ] as const);
+  floorStrip(r, S.deck, S.style);
+  // Glass balustrade along the edge; the sky shows above it.
+  pm.rect(0, th - 7, w, 3, shade(S.deck, 0.12));
+  pm.hline(0, th - 7, w, tint(S.deck, 0.25));
+  for (let x = 0; x < w; x++) for (let y = 11; y < th - 7; y++) if (((x + y) & 3) === 0) pm.set(x, y, 0xcfe8f4);
+  pm.hline(0, 9, w, 0xd8dde2);
+  pm.hline(0, 10, w, 0x8a929c);
+  for (let x = 1; x < w; x += 16) pm.vline(x, 9, th - 16, 0x8a929c);
+  const px = v === 0 ? (w >> 1) - 40 : w - 100;
+  pavilion(r, px, 80, S.frame, S.name);
+  // Flagpoles at the ends.
+  for (const x of [3, w - 4]) {
+    pm.vline(x, 0, b, 0xcfd0d4);
+    pm.rect(x + (x < 10 ? 1 : -8), 1, 7, 4, S.flag);
+    pm.hline(x + (x < 10 ? 1 : -8), 3, 7, shade(S.flag, 0.3));
+  }
+  // Viewers, benches and planters either side of the pavilion.
+  for (const [x0, x1] of [[v === 1 ? 56 : 10, px - 6], [px + 86, w - 10]] as const) {
+    let x = x0 + 4, k = 0;
+    while (x + 16 <= x1) {
+      if (k % 3 === 1) { pm.stand(F.BENCH, x, b, { inks: accent(S.frame) }); x += 22; }
+      else if (k % 3 === 2) { plant(r, x, true); x += 14; }
+      else { towerViewer(pm, x + 2, b, S.viewer, x > px); x += 14; }
+      k++;
+    }
+  }
+  if (v === 1) {
+    // A telescope on its tripod at the far end.
+    const tx = 30;
+    pm.line(tx, b - 1, tx + 3, b - 8, 0x3a3a42);
+    pm.line(tx + 6, b - 1, tx + 3, b - 8, 0x3a3a42);
+    pm.line(tx + 1, b - 12, tx + 9, b - 15, 0xe8e8e8);
+    pm.line(tx + 1, b - 11, tx + 9, b - 14, 0xb8c0c8);
+    pm.line(tx + 3, b - 8, tx + 4, b - 12, 0x3a3a42);
   }
 }

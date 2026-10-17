@@ -86,6 +86,7 @@ const TYPE_LABELS: Record<string, string> = {
   medical: 'Medical center', parkingRamp: 'Parking ramp', parkingSpace: 'Parking space', recycling: 'Recycling center',
   metro: 'Metro station', cathedral: 'Cathedral', fireStation: 'Fire station', bank: 'Bank', helipad: 'Helipad',
   rooftopPool: 'Rooftop pool', maintenance: 'Maintenance office', generator: 'Backup generator', lobby: 'Lobby',
+  apartment: 'Apartment', gym: 'Gym', supermarket: 'Supermarket', bar: 'Bar', conference: 'Conference centre', observationDeck: 'Observation deck',
 };
 /** Player-facing facility name ("Fast food", "Hotel suite"). */
 export function tenantTypeLabel(type: string): string {

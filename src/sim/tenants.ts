@@ -53,6 +53,11 @@ export interface Tenant {
   tradingDays?: number;
   externalDemand?: number;
   externalArrivals?: number;
+  /** Leisure venues: paying visits on the previous trading day (evaluation). */
+  lastDayVisits?: number;
+  /** Conference centre: operating day of the current booking and its delegates (0 = no event). */
+  conferenceDay?: number;
+  conferenceDelegates?: number;
 }
 
 export function isUnlocked(state: GameState, type: TenantType): boolean {
@@ -361,7 +366,7 @@ export function stepConstruction(state: GameState): void {
     tenant.constructionTicksLeft--;
     if (tenant.constructionTicksLeft > 0) continue;
     tenant.state = 'open';
-    if (tenant.type === 'condo' && !tenant.sold && !condoHasAccess(state, tenant)) tenant.state = 'vacant';
+    if (((tenant.type === 'condo' && !tenant.sold) || tenant.type === 'apartment') && !condoHasAccess(state, tenant)) tenant.state = 'vacant';
     else sellCondo(tenant);
     for (let f = tenant.floor; f < tenant.floor + facilityHeight(tenant.type); f++) {
       const floor = getFloor(state.tower, f);

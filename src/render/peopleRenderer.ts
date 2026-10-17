@@ -1,4 +1,4 @@
-import { Particle, ParticleContainer } from 'pixi.js';
+import { Container, Particle, ParticleContainer, Sprite, type Texture } from 'pixi.js';
 import { CONFIG } from '../data/config';
 import {
   carWorldY,
@@ -17,7 +17,8 @@ import { roomLighting } from './roomLighting';
 import { carOutOfService } from './simCompat';
 import type { Camera } from './camera';
 import type { Motion } from './motion';
-import { hash32 } from './sprites/pixmap';
+import { PixMap, hash32 } from './sprites/pixmap';
+import { emptyDrawn, pickNearest, recordDrawn } from './personPick';
 import {
   OUTFITS,
   PERSON_H,
@@ -88,12 +89,35 @@ export class PeopleView {
   private readonly groups: ElevatorGroup[] = [];
   /** Per-frame cache: queue places free on a landing side (key*2 + 0/1). */
   private readonly slots = new Map<number, number>();
+  /** Pickable figures drawn last frame (people out in the open, not in rooms). */
+  private readonly drawn = emptyDrawn();
+  /** Person whose position is tracked every frame (camera follow / card), or -1. */
+  focusId = -1;
+  /** World centre of the focused person on the last draw (null = not in view of the tower). */
+  focusPos: { x: number; y: number } | null = null;
+  private readonly focusAt = { x: 0, y: 0 };
+  /** Starred people: a small star floats above each drawn favourite. */
+  favorites: ReadonlySet<number> = new Set();
+  /** Few sprites (one per visible favourite), kept apart from the batched crowd. */
+  readonly stars = new Container();
+  private readonly starPool: Sprite[] = [];
+  private starTexture: Texture | null = null;
 
   constructor(
     private readonly camera: Camera | null = null,
     private readonly viewport: (() => ViewportSize) | null = null,
   ) {
     this.container.eventMode = 'none';
+    this.stars.eventMode = 'none';
+  }
+
+  /**
+   * Id of the person drawn nearest world point (wx, wy) — walkers, queuers,
+   * riders and climbers, not people inside rooms (clicks there open the
+   * room) — or -1. `radius` is extra slack around the figure in world px.
+   */
+  hitTest(wx: number, wy: number, radius: number): number {
+    return pickNearest(this.drawn, wx, wy, FIGURE_W, FIGURE_H, radius);
   }
 
   draw(state: GameState, alpha = 1, motion?: Motion): void {
@@ -101,6 +125,11 @@ export class PeopleView {
     const H = CONFIG.FLOOR_HEIGHT_PX;
     const cell = CONFIG.CELL_WIDTH_PX;
 
+    const focusId = this.focusId;
+    let focus: { x: number; y: number } | null = null;
+    this.drawn.count = 0;
+    let stars = 0;
+    const favorites = this.favorites.size > 0 ? this.favorites : null;
     const riderX = this.riderX, riderY = this.riderY;
     riderX.clear(); riderY.clear();
     const enclosed = this.enclosed;
@@ -118,6 +147,11 @@ export class PeopleView {
         // broken car keeps them behind closed doors.
         if (car.state !== 'doors' || carOutOfService(car)) {
           for (const id of car.passengers) enclosed.add(id);
+          if (focusId >= 0 && car.passengers.includes(focusId)) {
+            focus = this.focusAt;
+            focus.x = group.x * cell + 3 + carW / 2;
+            focus.y = feet - FIGURE_H / 2;
+          }
           continue;
         }
         car.passengers.forEach((id, index) => {
@@ -146,7 +180,7 @@ export class PeopleView {
     for (const person of state.people.values()) {
       const st = person.state;
       if (st === 'offscreen') continue;
-      if (rect && st !== 'riding' && st !== 'onStairs' && st !== 'onEscalator') {
+      if (rect && st !== 'riding' && st !== 'onStairs' && st !== 'onEscalator' && person.id !== focusId) {
         const f = Math.round(person.pos.floor);
         const top = floorTopY(f, lh);
         if (top > cullBottom || top + (f === lobby ? H * lh : H) < cullTop) continue;
@@ -194,7 +228,10 @@ export class PeopleView {
           // Two staggered rows fill the free floor beside the shaft; the rest
           // of a long queue stands hidden behind them (counted on the badge,
           // never drawn into a neighbouring shaft or off the tower's edge).
-          if (k >= slots * 2) continue;
+          if (k >= slots * 2) {
+            if (person.id === focusId) { focus = this.focusAt; focus.x = before ? left - FIGURE_W * 2 : right + FIGURE_W * 2; focus.y = py + FIGURE_H / 2; }
+            continue;
+          }
           const row = Math.floor(k / slots);
           const slot = k % slots;
           px = before
@@ -205,7 +242,10 @@ export class PeopleView {
           const key = floor * 100000 + Math.round(px);
           const k = queues.get(key) ?? 0;
           queues.set(key, k + 1);
-          if (k >= QUEUE_ROW * 2) continue;
+          if (k >= QUEUE_ROW * 2) {
+            if (person.id === focusId) { focus = this.focusAt; focus.x = px + FIGURE_W / 2; focus.y = py + FIGURE_H / 2; }
+            continue;
+          }
           const row = Math.floor(k / QUEUE_ROW) % 2;
           const slot = k % QUEUE_ROW;
           px += slot * QUEUE_PITCH + row * 2;
@@ -231,6 +271,11 @@ export class PeopleView {
           py = floorTopY(tenant.floor, state.tower.lobbyHeight) + band - FIGURE_H - 2;
         }
       }
+      if (person.id === focusId) {
+        focus = this.focusAt;
+        focus.x = Math.round(px) - 1 + FIGURE_W / 2;
+        focus.y = Math.round(py) + FIGURE_H / 2;
+      }
       if (rect && !overlapsRect(px, py, rect)) continue;
       if (visible >= CONFIG.MAX_PEOPLE) break;
       const particle = this.particleAt(visible);
@@ -241,7 +286,15 @@ export class PeopleView {
       if (particle.texture !== texture) particle.texture = texture;
       if (particle.alpha !== 1) particle.alpha = 1;
       if (particle.tint !== tint) particle.tint = tint;
+      if (st !== 'inTenant' && st !== 'cleaning') recordDrawn(this.drawn, person.id, particle.x, particle.y);
+      if (favorites?.has(person.id)) {
+        const star = this.starAt(stars++);
+        star.x = particle.x + Math.floor(FIGURE_W / 2) - 4;
+        star.y = particle.y - 10;
+      }
     }
+    this.focusPos = focus;
+    for (let i = stars; i < this.starPool.length; i++) this.starPool[i]!.visible = false;
     // Hide the tail that was visible last frame but is gone/culled now.
     for (let i = visible; i < this.written; i++) this.pool[i]!.alpha = 0;
     this.written = visible;
@@ -270,6 +323,20 @@ export class PeopleView {
       this.slots.set(key, slots);
     }
     return slots;
+  }
+
+  /** Star sprite at `index` (made visible), growing the small pool. */
+  private starAt(index: number): Sprite {
+    let star = this.starPool[index];
+    if (!star) {
+      this.starTexture ??= starTexture();
+      star = new Sprite(this.starTexture);
+      star.roundPixels = true;
+      this.stars.addChild(star);
+      this.starPool.push(star);
+    }
+    star.visible = true;
+    return star;
   }
 
   /** Particle at `index`, growing the pool (never beyond MAX_PEOPLE). */
@@ -396,4 +463,18 @@ function poseOf(p: Person, walkStep: number): number {
   if (dir === 0) return POSE_IDLE;
   const frame = (walkStep + p.id) & 3;
   return (dir > 0 ? POSE_WALK_RIGHT : POSE_WALK_LEFT) + frame;
+}
+
+/** A 9x9 pixel star with a dark outline, floated above favourites. */
+function starTexture(): Texture {
+  const shape = ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'];
+  const map = new PixMap(9, 9);
+  const inside = (x: number, y: number): boolean => shape[y - 1]?.[x - 1] === '#';
+  for (let y = 0; y < 9; y++) {
+    for (let x = 0; x < 9; x++) {
+      if (inside(x, y)) map.set(x, y, y >= 5 ? 0xe09a00 : 0xffd23f);
+      else if (inside(x - 1, y) || inside(x + 1, y) || inside(x, y - 1) || inside(x, y + 1)) map.set(x, y, 0x3a2a00);
+    }
+  }
+  return map.texture();
 }

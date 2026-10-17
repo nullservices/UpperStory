@@ -20,6 +20,8 @@ export interface CursorSource {
   entityAt(floor: number, cell: number): HoverEntity | null;
   /** What Bulldoze would remove at a cell ("Office on floor 2"), if anything. */
   demolishTarget?(floor: number, cell: number): string | null;
+  /** Name of the person under the pointer (Inspect picks people first), if any. */
+  personAt?(): string | null;
 }
 
 export type HoverEntity = { kind: 'elevator'; group: ElevatorGroup } | { kind: 'tenant'; tenant: Tenant };
@@ -144,6 +146,14 @@ export class CursorTip {
 
   private inspectContent(state: GameState, src: CursorSource): string {
     if (src.pointerDown) { this.hoverKey = ''; return ''; }
+    const person = src.personAt?.();
+    if (person) {
+      const key = `p${person}`;
+      const now = performance.now();
+      if (key !== this.hoverKey) { this.hoverKey = key; this.hoverSince = now; }
+      if (now - this.hoverSince < HOVER_DELAY_MS / 2) return '';
+      return `<div class="tip-card"><b>${escapeHtml(person)}</b><small>Click to see what they're up to</small></div>`;
+    }
     const entity = src.entityAt(src.hover!.floor, src.hover!.cell);
     const key = entity ? (entity.kind === 'elevator' ? `g${entity.group.id}` : `t${entity.tenant.id}`) : '';
     const now = performance.now();

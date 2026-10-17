@@ -67,6 +67,13 @@ export interface Person {
   /** Accrued stress today; resets at sunrise and feeds evaluation. */
   dayStress: number;
   failedTripsToday: number;
+  /**
+   * Trips completed / given up this operating day (person card). Set at
+   * creation so every person keeps the same object shape in hot loops;
+   * absent in older saves.
+   */
+  tripsToday?: number;
+  giveUpsToday?: number;
   jitterTicks: number;
   dayTracked: number;
   /** Completed cleaning jobs this operating day; absent in older saves. */
@@ -169,6 +176,8 @@ export function spawnTenantPeople(state: GameState, tenant: Tenant): void {
       stress: 0,
       dayStress: 0,
       failedTripsToday: 0,
+      tripsToday: 0,
+      giveUpsToday: 0,
       jitterTicks: rngInt(state, -CONFIG.ARRIVAL_JITTER_TICKS, CONFIG.ARRIVAL_JITTER_TICKS),
       dayTracked: operatingDay(state),
       activityTicksLeft: 0,
@@ -287,6 +296,8 @@ export function spawnVisitor(state: GameState, kind: PersonKind, preferred?: Ten
     stress: 0,
     dayStress: 0,
     failedTripsToday: 0,
+    tripsToday: 0,
+    giveUpsToday: 0,
     jitterTicks: 0,
     dayTracked: operatingDay(state),
     activityTicksLeft: activityTicks,
@@ -458,6 +469,7 @@ function continueTrip(state: GameState, p: Person): void {
 }
 
 function arrive(state: GameState, p: Person): void {
+  if (p.route) p.tripsToday = (p.tripsToday ?? 0) + 1;
   // Patrons pay when their activity starts (arrival at the eatery/shop).
   if (p.endState === 'inTenant' && p.activityTenantId >= 0 && p.state !== 'inTenant') {
     chargePatron(state, p);
@@ -510,6 +522,7 @@ export function giveUp(state: GameState, p: Person): void {
   p.stress = Math.min(Math.max(p.stress + CONFIG.STRESS_GIVEUP, 0), CONFIG.STRESS_MAX);
   p.dayStress += CONFIG.STRESS_GIVEUP;
   p.failedTripsToday++;
+  p.giveUpsToday = (p.giveUpsToday ?? 0) + 1;
   pushEvent(state, { type: 'PERSON_GAVE_UP', personId: p.id, floor: p.pos.floor });
   p.route = null;
   p.target = null;
@@ -789,6 +802,8 @@ export function stepPeople(state: GameState): void {
       p.dayTracked = day;
       p.dayStress = 0;
       p.roomsCleanedToday = 0;
+      if (p.tripsToday) p.tripsToday = 0;
+      if (p.giveUpsToday) p.giveUpsToday = 0;
       p.scheduleIndex = 0;
       p.scheduleDone = false;
       p.jitterTicks = rngInt(state, -CONFIG.ARRIVAL_JITTER_TICKS, CONFIG.ARRIVAL_JITTER_TICKS);

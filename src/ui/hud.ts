@@ -10,7 +10,7 @@ import { chromeInsets, clampWindow, closeButton, escapeHtml, makeDraggable, read
 const cash = (cents: number): string => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 /** Menu commands main.ts provides (windows owned outside the HUD). */
-export type HudCommand = 'new' | 'save' | 'load' | 'sound' | 'map' | 'events' | 'tips' | 'tutorial' | 'finances' | 'stats' | 'scenarios' | 'undo';
+export type HudCommand = 'new' | 'save' | 'load' | 'sound' | 'map' | 'events' | 'tips' | 'tutorial' | 'finances' | 'stats' | 'scenarios' | 'undo' | 'people';
 
 type MenuItem =
   | { label: string; shortcut?: string; action: () => void; checked?: () => boolean; disabled?: () => boolean }
@@ -132,6 +132,7 @@ export class Hud {
         { label: 'Message log', shortcut: 'L', action: () => this.toggleLog(), checked: () => !this.log.hidden },
         { label: 'Finances & loans…', action: () => this.onCommand?.('finances') },
         { label: 'Statistics…', shortcut: 'G', action: () => this.onCommand?.('stats') },
+        { label: 'People…', shortcut: 'P', action: () => this.onCommand?.('people') },
       ]),
       this.menu('Speed', SPEEDS.map(([mult, , label, key]): MenuItem => ({ label, shortcut: key, action: () => this.selectSpeed(mult), checked: () => this.speed === mult }))),
       this.menu('Help', [
@@ -463,6 +464,7 @@ export class Hud {
     if (e.key === '-' || e.key === '_') { this.onCamera?.('out'); return; }
     if (e.key === 'm' || e.key === 'M') { this.onCommand?.('map'); return; }
     if (e.key === 'v' || e.key === 'V') { this.onCommand?.('events'); return; }
+    if (e.key === 'p' || e.key === 'P') { this.onCommand?.('people'); return; }
     if (e.key === 'l' || e.key === 'L') { this.toggleLog(); return; }
     if (e.key === 'r' || e.key === 'R') this.toggleReport();
   }
@@ -574,7 +576,7 @@ export class Hud {
     title.append(closeButton('Close help', () => dialog.close()));
     const body = document.createElement('div');
     body.className = 'window-body';
-    body.innerHTML = '<h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><h3>Keyboard</h3><dl class="key-list"><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space · 1 / 2 / 3 / 4</dt><dd>Pause · normal / fast / fastest / ultra</dd><dt>+ / − · Home</dt><dd>Zoom · center the tower</dd><dt>Right-drag / arrows · scroll</dt><dd>Pan (Shift+arrows: faster) · zoom</dd><dt>M · R · V · L</dt><dd>Tower map · tower report · events &amp; ratings · message log</dd><dt>Ctrl+Z</dt><dd>Undo the last build (refunded; within about a game hour, or while still under construction)</dd><dt>Ctrl+S / Ctrl+O</dt><dd>Save / load towers</dd><dt>F1</dt><dd>This help</dd><dt>Escape</dt><dd>Close window, then return to Inspect</dd></dl><p class="hint">Tip: drag the Construction palette by its title bar, or roll it up with ▾.</p>';
+    body.innerHTML = '<h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><h3>Keyboard</h3><dl class="key-list"><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space · 1 / 2 / 3 / 4</dt><dd>Pause · normal / fast / fastest / ultra</dd><dt>+ / − · Home</dt><dd>Zoom · center the tower</dd><dt>Right-drag / arrows · scroll</dt><dd>Pan (Shift+arrows: faster) · zoom</dd><dt>M · R · V · L · G · P</dt><dd>Tower map · tower report · events &amp; ratings · message log · statistics · people</dd><dt>Ctrl+Z</dt><dd>Undo the last build (refunded; within about a game hour, or while still under construction)</dd><dt>Ctrl+S / Ctrl+O</dt><dd>Save / load towers</dd><dt>F1</dt><dd>This help</dd><dt>Escape</dt><dd>Close window, stop following, then return to Inspect</dd></dl><p class="hint">With Inspect, click a person to see their card: rename them, follow them with the camera, or star them as a favourite.</p><p class="hint">Tip: drag the Construction palette by its title bar, or roll it up with ▾.</p>';
     const footer = document.createElement('div');
     footer.className = 'window-footer';
     footer.append(this.button('Back to my tower', () => dialog.close()));

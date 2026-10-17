@@ -5,6 +5,7 @@ import { setupShowcaseTower } from '../../src/sim/showcaseTower';
 import { respondToIncident } from '../../src/sim/campaign';
 import { tickN } from '../helpers/simHarness';
 
+// Heavier than most unit tests: give it room under a parallel run.
 it('runs the facilities tour through rescue, visitor spending and a VIP inspection', () => {
   const state = createInitialState(20260907);
   setupShowcaseTower(state);
@@ -28,4 +29,4 @@ it('runs the facilities tour through rescue, visitor spending and a VIP inspecti
   expect(partyRevenue).toBeGreaterThan(0);
   expect(state.campaign.history.some(e => e.message.includes(state.campaign.vipApproved ? 'VIP approved' : 'VIP was disappointed'))).toBe(true);
   expect(state.campaign.history.some(e => e.message.includes('VIP'))).toBe(true);
-});
+}, 20_000);

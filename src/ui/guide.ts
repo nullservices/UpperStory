@@ -33,7 +33,8 @@ interface Tip {
   title: string;
   body: string;
   tool?: Tool;
-  when: (state: GameState) => boolean;
+  /** `seen` holds moments the UI reported through Guide.trigger (e.g. a person card opened). */
+  when: (state: GameState, moments: ReadonlySet<string>) => boolean;
 }
 
 const open = (state: GameState, type: Tenant['type']): Tenant[] =>
@@ -85,6 +86,16 @@ const anyOpen = (state: GameState, type: Tenant['type']): boolean =>
   [...state.tenants.values()].some(t => t.type === type && t.state === 'open');
 
 const TIPS: Tip[] = [
+  {
+    id: 'personCard', title: 'Getting to know people',
+    body: 'Click the name to rename them (Enter saves). <b>Follow</b> keeps the camera on them; pan or press Esc to stop. Press <b>☆</b> to star a favourite and find them again in <b>Tower → People</b> (P).',
+    when: (_s, moments) => moments.has('personCard'),
+  },
+  {
+    id: 'favourite', title: 'A new favourite',
+    body: 'Starred people wear a small gold star in the tower, and their home or office speaks in their name. <b>Tower → People</b> (P) lists your favourites, searches everyone by name and remembers who moved out.',
+    when: (_s, moments) => moments.has('favourite'),
+  },
   {
     id: 'star2', title: 'Two stars!',
     body: 'Hotels, housekeeping, security and service elevators are unlocked. Hotel rooms need housekeepers, and staff only ride <b>service</b> elevators.',
@@ -228,6 +239,16 @@ export class Guide {
     this.lastCheck = 0;
   }
 
+  /** UI moments reported this session (first person card, first star). */
+  private readonly moments = new Set<string>();
+
+  /** Report a one-off UI moment that may unlock a tip ('personCard', 'favourite'). */
+  trigger(moment: string): void {
+    if (this.moments.has(moment)) return;
+    this.moments.add(moment);
+    this.lastCheck = 0;
+  }
+
   /** Called every frame; does real work a few times per second. */
   update(state: GameState): void {
     const now = performance.now();
@@ -256,7 +277,7 @@ export class Guide {
     }
 
     if (this.tip) return; // Keep the current tip until the player dismisses it.
-    const next = TIPS.find(t => !this.prefs.seen.includes(t.id) && t.when(state));
+    const next = TIPS.find(t => !this.prefs.seen.includes(t.id) && t.when(state, this.moments));
     if (!next) return this.hide();
     this.tip = next;
     this.show(`tip:${next.id}`, next, 'Tip', () => [

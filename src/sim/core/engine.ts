@@ -13,6 +13,7 @@ import { stepDailySettlement } from '../money';
 import type { GameState } from '../state';
 import { stepScenario } from '../scenarios';
 import { stepStats } from '../stats';
+import { stepPersonNotes } from '../personNotes';
 
 /**
  * One simulation step. Systems run in a FIXED order — this is the heart of
@@ -52,4 +53,5 @@ export function tick(state: GameState): void {
   stepProgression(state, unchanged ? residents : undefined); // population-based star ratings
   stepScenario(state); // scenario goals and outcomes
   stepStats(state); // daily statistics for the graphs window
+  stepPersonNotes(state); // forget notes about people who left (favourites keep a record)
 }

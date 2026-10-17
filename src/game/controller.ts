@@ -1,5 +1,6 @@
 import { shaftWidth } from '../sim/elevators';
 import { housekeepingAccess } from '../sim/housekeepingAccess';
+import { renamePerson, setFavorite } from '../sim/personNotes';
 import { CONFIG } from '../data/config';
 import { floorBuildPlan } from './floorBuild';
 import { addCarRecorded, applyUndo, buildFloorRecorded, createUndoEntry, extendFloorRecorded, pushUndo, shaftPartAfter, undoBlock, type UndoEntry, type UndoPart } from '../sim/undo';
@@ -88,6 +89,13 @@ export class Controller {
   pointer: { x: number; y: number } | null = null;
   /** True while the primary button is held over the canvas (drags, rows). */
   pointerDown = false;
+  /**
+   * Inspect click on a person: given the world point and client anchor,
+   * returns true when it opened a person card (so the room under them stays shut).
+   */
+  pickPerson: ((world: { x: number; y: number }, anchor: { x: number; y: number }) => boolean) | null = null;
+  /** Name of the person at a world point (Inspect hover tip), or null. */
+  personNameAt: ((world: { x: number; y: number }) => string | null) | null = null;
   /** Invoked whenever the active tool changes (palette click, Escape, ...). */
   onToolChange: ((tool: Tool | null) => void) | null = null;
 
@@ -192,6 +200,22 @@ export class Controller {
     this.tenantInfo.close();
     this.elevatorEditor.close();
     this.quarterReport.close();
+  }
+
+  /** Name of the person under the pointer while inspecting (cursor tip). */
+  personAt(): string | null {
+    if (this.tool !== 'select' || !this.pointer || !this.personNameAt) return null;
+    return this.personNameAt(this.camera.screenToWorld(this.pointer.x, this.pointer.y));
+  }
+
+  /** Rename someone (blank = generated name); returns the name now shown. */
+  renamePerson(id: number, name: string): string {
+    return renamePerson(this.state, id, name);
+  }
+
+  /** Star / unstar someone (unstarring a departed favourite forgets them). */
+  setFavorite(id: number, favorite: boolean): void {
+    setFavorite(this.state, id, favorite);
   }
 
   /** What Undo would reverse next, or null when the stack is empty. */
@@ -306,6 +330,7 @@ export class Controller {
     if (pan && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       const step = e.shiftKey ? 360 : 96;
+      this.camera.stopFollow();
       this.camera.x += pan[0] * step;
       this.camera.y += pan[1] * step;
       this.camera.apply();
@@ -319,6 +344,8 @@ export class Controller {
       this.closeOpenDialog();
       return;
     }
+    // Then stop following someone, then drop the tool.
+    if (this.camera.following) { this.camera.stopFollow(); return; }
     this.selectTool('select');
   }
 
@@ -388,7 +415,9 @@ export class Controller {
         case 'select': {
           if (!hover) break;
           // The canvas fills the window, so its coordinates are client coordinates.
-          this.selectAt(hover, { x: e.global.x, y: e.global.y });
+          const anchor = { x: e.global.x, y: e.global.y };
+          if (this.pickPerson?.(this.camera.screenToWorld(e.global.x, e.global.y), anchor)) break;
+          this.selectAt(hover, anchor);
           break;
         }
         case 'demolish': {

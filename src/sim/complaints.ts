@@ -3,6 +3,7 @@ import { condoHasAccess } from './condoEconomy';
 import { housekeepingAccess, type HousekeepingAccess } from './housekeepingAccess';
 import { officeRentScoreAdjustment } from './money';
 import { noiseSources } from './noise';
+import { favoriteOf } from './personNotes';
 import type { GameState } from './state';
 import type { Tenant } from './tenants';
 
@@ -86,8 +87,22 @@ export function voiceFacts(state: GameState, tenant: Tenant): VoiceFacts {
 
 /** Up to three voices for a room, most important first. */
 export function tenantVoices(state: GameState, tenant: Tenant): Voice[] {
-  if (voiceCategory(tenant) === 'none' || tenant.state === 'constructing') return [];
-  return voicesFromFacts(tenant, voiceFacts(state, tenant));
+  const category = voiceCategory(tenant);
+  if (category === 'none' || tenant.state === 'constructing') return [];
+  const voices = voicesFromFacts(tenant, voiceFacts(state, tenant));
+  // A starred resident, worker or guest speaks the room's first line in person.
+  const speaker = category === 'commercial' || tenant.state !== 'open' ? null : favoriteOf(state, tenant.id);
+  return speaker ? withSpeaker(voices, speaker) : voices;
+}
+
+/** Longest voice line once a speaker's name is prefixed. */
+export const VOICE_SPEAKER_MAX = 60;
+
+/** Prefix the first voice that still fits with "Name: " (pure). */
+export function withSpeaker(voices: Voice[], name: string): Voice[] {
+  const index = voices.findIndex(v => v.tone !== 'info' && name.length + 2 + v.text.length <= VOICE_SPEAKER_MAX);
+  if (index < 0) return voices;
+  return voices.map((v, i) => i === index ? { ...v, text: `${name}: ${v.text}` } : v);
 }
 
 const NOISE_NAMES: Record<string, string> = {

@@ -1,4 +1,5 @@
 import type { ScenarioState } from './scenarios';
+import type { PersonNote } from './personNotes';
 import type { StatsState } from './stats';
 import { newCampaign, type CampaignState } from './campaign';
 import { CONFIG } from '../data/config';
@@ -22,6 +23,8 @@ export interface GameState {
   stats?: StatsState;
   /** Active scenario, or absent for a free-play tower. */
   scenario?: ScenarioState;
+  /** Player renames / favourites by person id; absent in older saves. */
+  personNotes?: Record<number, PersonNote>;
   seed: number;
   /** Live mulberry32 state — part of the save so replays resume the stream. */
   rngState: number;

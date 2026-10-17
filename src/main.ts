@@ -9,8 +9,15 @@ import {
   setupNewGame,
   tick,
   floorTopY,
+  floorHeightPx,
+  getFloor,
+  carWorldY,
+  favoriteIds,
+  personName,
   type GameState,
 } from './sim';
+import { FollowChip, PersonCard, type PersonActions } from './ui/personCard';
+import { PeopleWindow } from './ui/peopleWindow';
 import { Controller } from './game/controller';
 import { IncidentView } from './render/incidents';
 import { TowerMap } from './ui/towerMap';
@@ -91,6 +98,7 @@ async function main(): Promise<void> {
     height: window.innerHeight,
   }));
   camera.view.addChild(peopleView.container);
+  camera.view.addChild(peopleView.stars);
   const incidents = new IncidentView();
   camera.view.addChild(incidents.world);
   app.stage.addChild(incidents.weather);
@@ -104,6 +112,7 @@ async function main(): Promise<void> {
   const openSound = installAudioPanel(audio);
   // Centre the camera on a grid cell (journal "Show location", message log).
   const jumpTo = (floor: number, x: number): void => {
+    camera.stopFollow();
     camera.x = app.screen.width / 2 - x * CONFIG.CELL_WIDTH_PX * camera.zoom;
     camera.y = app.screen.height / 2 - floorTopY(floor, state.tower.lobbyHeight) * camera.zoom;
     camera.apply();
@@ -113,7 +122,7 @@ async function main(): Promise<void> {
   const finances = new FinanceWindow();
   const cursorTip = new CursorTip();
   // Dev-server only: lets browser checks reach the live state.
-  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) Object.defineProperty(window, 'upperStory', { configurable: true, value: { get state() { return state; } } });
+  if ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV) Object.defineProperty(window, 'upperStory', { configurable: true, value: { get state() { return state; }, camera, peopleView } });
   const towerMap = new TowerMap((x, y) => {
     camera.x = app.screen.width / 2 - x * camera.zoom;
     camera.y = app.screen.height / 2 - y * camera.zoom;
@@ -128,6 +137,84 @@ async function main(): Promise<void> {
   palette.onLocked = (tool, star) => hud.toast(`${TOOL_INFO[tool].label} unlocks at ${'★'.repeat(star)}. Tower › Events & ratings (V) lists what the next rating needs.`, 'hint');
   palette.onBanned = tool => hud.toast(`${TOOL_INFO[tool].label} isn't allowed in this scenario. Open the goals card for its rules.`, 'hint');
   controller.selectTool('select');
+  // --- People you can get to know: person card, follow camera, favourites. ---
+  /** World centre of someone right now (riders ride their car; off-site = null). */
+  const personWorld = (id: number): { x: number; y: number } | null => {
+    const person = state.people.get(id);
+    if (!person || person.state === 'offscreen') return null;
+    const lh = state.tower.lobbyHeight;
+    if (person.state === 'riding') {
+      for (const group of state.elevatorGroups.values()) {
+        const car = group.cars.find(c => c.passengers.includes(id));
+        if (car) return { x: (group.x + 1) * CONFIG.CELL_WIDTH_PX, y: carWorldY(car.y, lh) + CONFIG.FLOOR_HEIGHT_PX / 2 };
+      }
+    }
+    const f = Math.round(person.pos.floor);
+    const floor = getFloor(state.tower, f);
+    const band = floor ? floorHeightPx(floor, lh) : CONFIG.FLOOR_HEIGHT_PX;
+    return { x: person.pos.x * CONFIG.CELL_WIDTH_PX, y: floorTopY(f, lh) + band - 8 };
+  };
+  let followedId: number | null = null;
+  const personActions: PersonActions = {
+    rename: (id, name) => controller.renamePerson(id, name),
+    setFavorite: (id, favorite) => {
+      controller.setFavorite(id, favorite);
+      refreshFavorites();
+      if (favorite) guide.trigger('favourite');
+    },
+    follow: id => {
+      if (id === null) { camera.stopFollow(); return; }
+      camera.stopFollow();
+      followedId = id;
+      peopleView.focusId = id;
+      peopleView.focusPos = personWorld(id);
+      // The renderer reports the drawn position each frame; fall back to the
+      // sim position while they're off the drawn layout (e.g. just starred far away).
+      camera.follow(() => peopleView.focusPos ?? personWorld(id));
+      followChip.show(personName(state, id));
+    },
+    following: () => followedId,
+    jump: (floor, x) => jumpTo(floor, x),
+    jumpToPerson: id => {
+      const at = personWorld(id);
+      const person = state.people.get(id);
+      if (at) {
+        camera.stopFollow();
+        camera.x = app.screen.width / 2 - at.x * camera.zoom;
+        camera.y = app.screen.height / 2 - at.y * camera.zoom;
+        camera.apply();
+      } else if (person) {
+        const home = state.tenants.get(person.tenantId);
+        if (home) jumpTo(home.floor, home.x + home.sizeCells / 2);
+        hud.toast(`${personName(state, id)} is off-site right now${home ? ', showing where they belong' : ''}.`, 'hint');
+      }
+    },
+    inspect: id => personCard.open(state, id),
+  };
+  const personCard = new PersonCard(personActions);
+  personCard.onOpen = () => guide.trigger('personCard');
+  const peopleWindow = new PeopleWindow(personActions);
+  const followChip = new FollowChip(() => camera.stopFollow(), () => { if (followedId !== null) personCard.open(state, followedId); });
+  camera.onFollowEnd = () => {
+    followedId = null;
+    peopleView.focusId = -1;
+    followChip.show(null);
+  };
+  /** Favourite ids for the star layer (notes are few; refreshed on change and a few times a second). */
+  const refreshFavorites = (): void => { peopleView.favorites = new Set(favoriteIds(state)); };
+  let lastFavoriteRefresh = 0;
+  // A few screen px of slack, never less than one world px (tiny figures when zoomed out).
+  const personUnder = (world: { x: number; y: number }): number => peopleView.hitTest(world.x, world.y, Math.max(1, 3 / camera.zoom));
+  controller.personNameAt = world => {
+    const id = personUnder(world);
+    return id < 0 ? null : personName(state, id);
+  };
+  controller.pickPerson = (world, anchor) => {
+    const id = personUnder(world);
+    if (id < 0) return false;
+    personCard.open(state, id, anchor);
+    return true;
+  };
   const statsWindow = new StatsWindow();
   const scenarioPanel = new ScenarioPanel();
   const guide = new Guide();
@@ -146,6 +233,8 @@ async function main(): Promise<void> {
   const swapState = (next: GameState): void => {
     state = next;
     controller.setState(state);
+    personCard.close();
+    refreshFavorites();
     camera.center();
     autosaveEnabled = true;
     // Scenarios come with their own briefing; the first-tower tutorial stays out.
@@ -186,6 +275,7 @@ async function main(): Promise<void> {
     }
     else if (command === 'finances') finances.toggle();
     else if (command === 'stats') statsWindow.open();
+    else if (command === 'people') peopleWindow.toggle();
     else if (command === 'scenarios') scenarioPanel.open();
     else if (command === 'undo') controller.undo();
     else settings.open(command);
@@ -226,9 +316,11 @@ async function main(): Promise<void> {
 
   let acc = 0;
   let last = performance.now();
+  refreshFavorites();
   let held = false;
   app.ticker.add(() => {
     const now = performance.now();
+    const frameMs = now - last;
     // Discard suspended-tab time instead of freezing on thousands of catch-up ticks.
     const modalOpen = document.querySelector('[role="dialog"][data-open="true"], dialog[open]') !== null;
     acc += Math.min(now - last, 250) * (modalOpen ? 0 : speed);
@@ -256,6 +348,15 @@ async function main(): Promise<void> {
     statusOverlay.draw(state, hud.statusMode);
     elevatorView.draw(state, acc / CONFIG.TICK_MS, motion);
     peopleView.draw(state, acc / CONFIG.TICK_MS, motion);
+    if (followedId !== null) {
+      if (!state.people.has(followedId)) {
+        hud.toast(`${personName(state, followedId)} has left the tower.`, 'hint');
+        camera.stopFollow();
+      } else camera.updateFollow(frameMs);
+    }
+    if (now - lastFavoriteRefresh > 300) { lastFavoriteRefresh = now; refreshFavorites(); }
+    personCard.update(state);
+    peopleWindow.update(state);
     preview.draw(
       state,
       controller.tool,

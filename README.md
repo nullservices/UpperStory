@@ -14,6 +14,10 @@ As the tower grows, so do its demands. Long elevator queues frustrate tenants. H
 
 Use the tower report to track vacancies, construction, lift queues, and finances. Click a room or elevator to inspect it and manage its settings. Open **Map** to jump between the upper floors and basements.
 
+### People you can get to know
+
+Everyone in the tower has a name. With **Inspect**, click someone walking, queuing or riding to open their card: what they do, what they are up to right now, how stressed they are (pink and red, as in SimTower) and today's trips. Click the name to rename them. **Follow** keeps the camera on them as they go about their day; pan or press `Escape` to stop. Press ☆ to star a favourite: favourites wear a small gold star, their home or office speaks in their name, and **Tower › People** (`P`) lists them, searches everyone by name and remembers who moved out.
+
 ## Facilities and ratings
 
 Build up to 100 floors above ground and nine basement levels. Large facilities occupy several floors, so leave their entire footprint clear before placing them.
@@ -89,7 +93,7 @@ Designed for a desktop browser with a mouse and keyboard.
 
 | Control | Action |
 | --- | --- |
-| Left click | Place the selected facility or inspect a room |
+| Left click | Place the selected facility or inspect a room or person |
 | Left drag with a room, stair, or escalator tool | Build a row; each room snaps to its own width |
 | Left drag with an elevator tool | Build a shaft or extend an existing one |
 | Right drag | Pan the view |
@@ -104,10 +108,11 @@ Designed for a desktop browser with a mouse and keyboard.
 | `+` / `-` | Zoom in or out |
 | `M` | Tower map |
 | `R` | Tower report |
+| `P` | People: favourites and name search |
 | `Ctrl+S` / `Ctrl+O` | Open the Game window to save or load |
 | `F1` | Help |
 | `Home` | Center the tower |
-| `Escape` | Close a window or return to inspection |
+| `Escape` | Close a window, stop following someone, or return to inspection |
 
 ## Sound
 

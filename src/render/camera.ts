@@ -22,6 +22,10 @@ export class Camera {
 
   private dragging = false;
   private last = { x: 0, y: 0 };
+  /** World point the camera keeps centred (a followed person), or null. */
+  private followTarget: (() => { x: number; y: number } | null) | null = null;
+  /** Called when following stops for any reason (pan, Escape, centre, swap). */
+  onFollowEnd: (() => void) | null = null;
 
   constructor(private readonly app: Application) {
     app.stage.addChild(this.view);
@@ -46,6 +50,7 @@ export class Camera {
    * build into gets most of the screen and a few basements still show.
    */
   center(): void {
+    this.stopFollow();
     const { width, height } = this.app.screen;
     this.level = initialCameraZoom(width);
     this.zoom = deviceZoom(this.level, this.dpr);
@@ -61,6 +66,40 @@ export class Camera {
     this.zoom = deviceZoom(this.level, this.dpr);
     this.x = cx - world.x * this.zoom;
     this.y = cy - world.y * this.zoom;
+    this.apply();
+  }
+
+  /** Keep `target()` (world px) centred, easing toward it each frame. */
+  follow(target: () => { x: number; y: number } | null): void {
+    this.followTarget = target;
+  }
+
+  get following(): boolean {
+    return this.followTarget !== null;
+  }
+
+  stopFollow(): void {
+    if (!this.followTarget) return;
+    this.followTarget = null;
+    this.onFollowEnd?.();
+  }
+
+  /**
+   * Per-frame follow step: ease the view so the target sits at the framing
+   * anchor (clear of the chrome). Snaps when far away so a jump across the
+   * tower doesn't take seconds; `apply` keeps whole device pixels.
+   */
+  updateFollow(dtMs: number): void {
+    const at = this.followTarget?.();
+    if (!at) return;
+    const anchor = cameraAnchor(this.app.screen.width, this.app.screen.height);
+    const tx = anchor.x - at.x * this.zoom, ty = anchor.y - at.y * this.zoom;
+    const far = Math.abs(tx - this.x) > this.app.screen.width || Math.abs(ty - this.y) > this.app.screen.height;
+    const k = far ? 1 : 1 - Math.exp(-Math.max(0, dtMs) / FOLLOW_EASE_MS);
+    const nx = this.x + (tx - this.x) * k, ny = this.y + (ty - this.y) * k;
+    // Settle exactly once within a fraction of a pixel (no endless sub-pixel creep).
+    this.x = Math.abs(tx - nx) < 0.25 ? tx : nx;
+    this.y = Math.abs(ty - ny) < 0.25 ? ty : ny;
     this.apply();
   }
 
@@ -93,6 +132,8 @@ export class Camera {
     });
     stage.on('pointermove', (e: FederatedPointerEvent) => {
       if (!this.dragging) return;
+      if (e.global.x === this.last.x && e.global.y === this.last.y) return;
+      this.stopFollow(); // panning by hand takes the camera back
       this.x += e.global.x - this.last.x;
       this.y += e.global.y - this.last.y;
       this.last = { x: e.global.x, y: e.global.y };
@@ -134,3 +175,6 @@ export class Camera {
     this.apply();
   }
 }
+
+/** Follow easing time constant: the view closes ~63% of the gap per this many ms. */
+const FOLLOW_EASE_MS = 140;

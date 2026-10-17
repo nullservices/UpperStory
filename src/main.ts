@@ -172,6 +172,7 @@ async function main(): Promise<void> {
     hud.toast('Scenario started. Goals are in the card at the top left; pause any time to plan.');
   };
   hud.onOpenMenu = section => settings.open(section);
+  hud.canUndo = () => controller.undoLabel !== null;
   hud.onCommand = command => {
     if (command === 'sound') openSound();
     else if (command === 'map') towerMap.open();
@@ -186,6 +187,7 @@ async function main(): Promise<void> {
     else if (command === 'finances') finances.toggle();
     else if (command === 'stats') statsWindow.open();
     else if (command === 'scenarios') scenarioPanel.open();
+    else if (command === 'undo') controller.undo();
     else settings.open(command);
   };
 
@@ -212,8 +214,11 @@ async function main(): Promise<void> {
   });
 
   // --- Fixed-timestep sim loop (CONFIG.TICK_MS) + per-frame render.
-  // The HUD owns the speed; multiplying frame deltas means 2×/4× run more
-  // ticks per real frame and Pause (speed 0) never accumulates at all. ---
+  // The HUD owns the speed; multiplying frame deltas means 2×/4×/10× run more
+  // ticks per real frame and Pause (speed 0) never accumulates at all.
+  // Catch-up is bounded per frame (tick count and wall time) and the backlog
+  // beyond it is dropped, so a big tower at Ultra slows the clock instead of
+  // freezing the UI. ---
   let speed = hud.speedMultiplier;
   hud.onSpeedChange = (mult) => {
     speed = mult;
@@ -230,7 +235,13 @@ async function main(): Promise<void> {
     // Show "Paused" in the clock while a window holds the tower.
     if (modalOpen !== held) { held = modalOpen; document.body.classList.toggle('held', held); }
     last = now;
+    let ticks = 0;
     while (acc >= CONFIG.TICK_MS) {
+      if (ticks >= MAX_TICKS_PER_FRAME || (ticks > 0 && performance.now() - now > TICK_BUDGET_MS)) {
+        acc %= CONFIG.TICK_MS;
+        break;
+      }
+      ticks++;
       motion.capture(state);
       tick(state);
       audio.events(state.events);
@@ -275,5 +286,10 @@ async function main(): Promise<void> {
     app.render();
   }).observe(host);
 }
+
+/** At most this many sim ticks per rendered frame (Ultra at 60 fps needs ~2). */
+const MAX_TICKS_PER_FRAME = 12;
+/** Stop catching up once a frame has spent this long ticking. */
+const TICK_BUDGET_MS = 12;
 
 void main();

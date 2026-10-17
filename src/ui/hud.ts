@@ -10,7 +10,7 @@ import { chromeInsets, clampWindow, closeButton, escapeHtml, makeDraggable, read
 const cash = (cents: number): string => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 /** Menu commands main.ts provides (windows owned outside the HUD). */
-export type HudCommand = 'new' | 'save' | 'load' | 'sound' | 'map' | 'events' | 'tips' | 'tutorial' | 'finances' | 'stats' | 'scenarios';
+export type HudCommand = 'new' | 'save' | 'load' | 'sound' | 'map' | 'events' | 'tips' | 'tutorial' | 'finances' | 'stats' | 'scenarios' | 'undo';
 
 type MenuItem =
   | { label: string; shortcut?: string; action: () => void; checked?: () => boolean; disabled?: () => boolean }
@@ -21,6 +21,7 @@ const SPEEDS: Array<[number, string, string, string]> = [
   [1, '▶', 'Normal speed', '1'],
   [2, '▶▶', 'Fast', '2'],
   [4, '▶▶▶', 'Fastest', '3'],
+  [10, '▶▶▶▶', 'Ultra', '4'],
 ];
 const VIEWS: Array<[StatusMode, string]> = [['none', 'Normal view'], ['stress', 'Stress view'], ['grade', 'Tenant grades'], ['population', 'Population view']];
 
@@ -57,6 +58,8 @@ export class Hud {
   onCommand: ((command: HudCommand) => void) | null = null;
   /** Reports the guide's tips setting for the Help menu check mark. */
   tipsEnabled: (() => boolean) | null = null;
+  /** Whether Game › Undo last build has anything to reverse. */
+  canUndo: (() => boolean) | null = null;
   /** Move the camera to a located message (floor, cell). */
   onJump: ((floor: number, x: number) => void) | null = null;
   private mode: StatusMode = 'none';
@@ -107,6 +110,8 @@ export class Hud {
         { label: 'Scenarios…', action: () => this.onCommand?.('scenarios') },
         { label: 'Save tower…', shortcut: 'Ctrl+S', action: () => this.onOpenMenu?.('save') },
         { label: 'Load tower…', shortcut: 'Ctrl+O', action: () => this.onOpenMenu?.('load') },
+        'separator',
+        { label: 'Undo last build', shortcut: 'Ctrl+Z', action: () => this.onCommand?.('undo'), disabled: () => !(this.canUndo?.() ?? false) },
         'separator',
         { label: 'Sound…', action: () => this.onCommand?.('sound') },
         'separator',
@@ -452,7 +457,7 @@ export class Hud {
     if (ctrl && !e.altKey && (e.key === 'o' || e.key === 'O')) { e.preventDefault(); this.onOpenMenu?.('load'); return; }
     if (ctrl || e.altKey) return;
     if (e.code === 'Space') { e.preventDefault(); this.selectSpeed(this.speed === 0 ? 1 : 0); return; }
-    const speed = { '1': 1, '2': 2, '3': 4 }[e.key];
+    const speed = { '1': 1, '2': 2, '3': 4, '4': 10 }[e.key];
     if (speed !== undefined) { this.selectSpeed(speed); return; }
     if (e.key === '+' || e.key === '=') { this.onCamera?.('in'); return; }
     if (e.key === '-' || e.key === '_') { this.onCamera?.('out'); return; }
@@ -569,7 +574,7 @@ export class Hud {
     title.append(closeButton('Close help', () => dialog.close()));
     const body = document.createElement('div');
     body.className = 'window-body';
-    body.innerHTML = '<h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><h3>Keyboard</h3><dl class="key-list"><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space · 1 / 2 / 3</dt><dd>Pause · normal / fast / fastest</dd><dt>+ / − · Home</dt><dd>Zoom · center the tower</dd><dt>Right-drag / arrows · scroll</dt><dd>Pan (Shift+arrows: faster) · zoom</dd><dt>M · R · V · L</dt><dd>Tower map · tower report · events &amp; ratings · message log</dd><dt>Ctrl+S / Ctrl+O</dt><dd>Save / load towers</dd><dt>F1</dt><dd>This help</dd><dt>Escape</dt><dd>Close window, then return to Inspect</dd></dl><p class="hint">Tip: drag the Construction palette by its title bar, or roll it up with ▾.</p>';
+    body.innerHTML = '<h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><h3>Keyboard</h3><dl class="key-list"><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space · 1 / 2 / 3 / 4</dt><dd>Pause · normal / fast / fastest / ultra</dd><dt>+ / − · Home</dt><dd>Zoom · center the tower</dd><dt>Right-drag / arrows · scroll</dt><dd>Pan (Shift+arrows: faster) · zoom</dd><dt>M · R · V · L</dt><dd>Tower map · tower report · events &amp; ratings · message log</dd><dt>Ctrl+Z</dt><dd>Undo the last build (refunded; within about a game hour, or while still under construction)</dd><dt>Ctrl+S / Ctrl+O</dt><dd>Save / load towers</dd><dt>F1</dt><dd>This help</dd><dt>Escape</dt><dd>Close window, then return to Inspect</dd></dl><p class="hint">Tip: drag the Construction palette by its title bar, or roll it up with ▾.</p>';
     const footer = document.createElement('div');
     footer.className = 'window-footer';
     footer.append(this.button('Back to my tower', () => dialog.close()));

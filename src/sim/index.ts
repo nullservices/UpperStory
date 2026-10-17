@@ -135,3 +135,7 @@ export { towerMetrics, flattenMetrics } from './metrics';
 export type { TowerMetrics } from './metrics';
 export { stepStats, createStats, compactStats, mergeSamples, statsHistory, tradeOf, STATS_LIMITS } from './stats';
 export type { StatsState, StatsSample, StatsField, StatsToday } from './stats';
+export { tenantVoices, voicesFromFacts, voiceFacts, voiceCategory } from './complaints';
+export type { Voice, VoiceTone, VoiceCause, VoiceFacts, VoiceCategory } from './complaints';
+export { UNDO_LIMIT, createUndoEntry, pushUndo, undoBlock, applyUndo } from './undo';
+export type { UndoEntry, UndoPart, UndoBlock, UndoResult } from './undo';

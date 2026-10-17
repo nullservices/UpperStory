@@ -1,6 +1,13 @@
 import { deserializeGame, formatTowerDate, population, serializeGame, type GameState } from '../sim';
 import type { SaveBackend, SaveKind, SaveMeta } from './backend';
 import { decodeSave, encodeSave, encodedSize, type Compressor } from './codec';
+import { encodeSaveFile, importedSaveName, readSaveFile, saveFileName, slotToSaveFile } from './saveFile';
+
+/** A save file ready to download. */
+export interface SaveFileExport {
+  fileName: string;
+  bytes: Uint8Array;
+}
 
 /** Original single-slot localStorage key (pre-IndexedDB builds). */
 export const LEGACY_SAVE_KEY = 'towerproject-save-v1';
@@ -112,6 +119,31 @@ export class SaveManager {
     } catch (err) {
       throw new Error(`This save could not be read: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  /** A slot as a `.upperstory` file (its stored gzip bytes, when compressed). */
+  async exportSlot(id: string): Promise<SaveFileExport> {
+    const metas = await this.backend.list();
+    const meta = metas.find(m => m.id === id);
+    const payload = await this.backend.read(id);
+    if (!meta || !payload) throw new Error('That save no longer exists.');
+    return { fileName: saveFileName(meta.name), bytes: await slotToSaveFile(payload, this.compressor) };
+  }
+
+  /** The live tower as a `.upperstory` file. */
+  async exportState(state: GameState, name?: string): Promise<SaveFileExport> {
+    const json = serializeGame(state);
+    const label = (name ?? '').trim() || `Tower ${describeTower(state).dateLabel}`;
+    return { fileName: saveFileName(label), bytes: await encodeSaveFile(json, this.compressor) };
+  }
+
+  /**
+   * Validate a save file and store it in a new manual slot (upgraded to the
+   * current save format). Throws SaveFileError with a player-facing reason.
+   */
+  async importFile(bytes: Uint8Array, fileName: string): Promise<SaveMeta> {
+    const state = await readSaveFile(bytes, this.compressor);
+    return this.save(state, { name: importedSaveName(fileName) });
   }
 
   /** Remove a slot; deleting the imported legacy slot also clears its old key. */

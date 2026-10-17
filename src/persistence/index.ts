@@ -17,7 +17,10 @@ export { IndexedDbBackend } from './indexedDbBackend';
 export {
   AUTOSAVE_ID, LEGACY_ID, LEGACY_SAVE_KEY, SaveManager, describeSaveError, describeTower,
 } from './saveManager';
-export type { LegacyStorage, SaveManagerOptions, SaveRequest } from './saveManager';
+export type { LegacyStorage, SaveFileExport, SaveManagerOptions, SaveRequest } from './saveManager';
+export {
+  SAVE_FILE_EXTENSION, SAVE_FILE_MIME, SaveFileError, decodeSaveFile, encodeSaveFile, importedSaveName, readSaveFile, saveFileName,
+} from './saveFile';
 
 export interface OpenedSaves {
   manager: SaveManager;

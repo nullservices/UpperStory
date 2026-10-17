@@ -1,5 +1,6 @@
 import { CONFIG, TENANT_DATA } from '../data/config';
-import { placeEscalator, placeStair, placeTenant, type GameState } from '../sim';
+import type { GameState } from '../sim';
+import { placeEscalatorRecorded, placeStairRecorded, placeTenantRecorded, type UndoPart } from '../sim/undo';
 import type { Tool } from './controller';
 
 export type RowBuildTool = Exclude<Tool,
@@ -18,6 +19,8 @@ export class BuildStroke {
   /** Total charged for this row so far (cents). */
   spentCents = 0;
   error: string | null = null;
+  /** What each placement created and cost, for Undo (in build order). */
+  readonly parts: UndoPart[] = [];
 
   constructor(readonly tool: RowBuildTool, readonly floor: number, readonly anchor: number) {
     this.width = tool === 'stairs' || tool === 'escalatorUp' || tool === 'escalatorDown'
@@ -34,10 +37,12 @@ export class BuildStroke {
         const x = this.anchor + slot * this.width;
         const before = state.money.balanceCents;
         try {
-          if (this.tool === 'stairs') placeStair(state, this.floor, x);
+          let part: UndoPart;
+          if (this.tool === 'stairs') part = placeStairRecorded(state, this.floor, x);
           else if (this.tool === 'escalatorUp' || this.tool === 'escalatorDown') {
-            placeEscalator(state, this.floor, x, this.tool === 'escalatorUp' ? 'up' : 'down');
-          } else placeTenant(state, this.tool, this.floor, x);
+            part = placeEscalatorRecorded(state, this.floor, x, this.tool === 'escalatorUp' ? 'up' : 'down');
+          } else part = placeTenantRecorded(state, this.tool, this.floor, x);
+          this.parts.push(part);
           this.placed++;
           this.spentCents += Math.max(0, before - state.money.balanceCents);
           this.error = null;

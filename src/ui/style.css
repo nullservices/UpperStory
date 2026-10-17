@@ -395,3 +395,19 @@ dialog::backdrop{background:#14203018}
 .scenario-result-stats dt{color:var(--muted)}
 .scenario-result-stats dd{margin:0;text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
 @media (max-width:700px){.scenario-columns{grid-template-columns:1fr}.scenario-list{max-height:30vh}}
+/* Tenant voices: speech-bubble lines in the room inspector and hover tip */
+.tenant-voices{display:flex;flex-direction:column;gap:4px;margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid #0001}
+.tenant-voices-head{font-weight:700;font-size:11px;color:var(--muted)}
+.tenant-voice{position:relative;align-self:flex-start;max-width:100%;padding:3px 8px;border-radius:9px 9px 9px 2px;font-style:italic;line-height:1.35;border:1px solid transparent}
+.tenant-voice.voice-complaint{background:#fbe9e7;border-color:#e8b4ad;color:#8c1d14}
+.tenant-voice.voice-praise{background:#e6f4e8;border-color:#a9d3b0;color:#1d5e2a}
+.tenant-voice.voice-info{background:#eef1f5;border-color:#cdd5df;color:#33475b}
+.cursor-tip .tip-card span.tip-voice{white-space:normal;font-style:italic;margin-top:2px}
+.cursor-tip .tip-card span.tip-voice.voice-complaint{color:var(--danger)}
+.cursor-tip .tip-card span.tip-voice.voice-praise{color:var(--good)}
+/* Save files: export / import (Game window) */
+.save-files{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px}
+.save-files .window-hint{margin:0;font-size:10.5px;color:var(--muted)}
+.save-slot.fresh{background:#e4f2e0}
+.settings-window.drop-target{outline:3px dashed var(--accent);outline-offset:-6px}
+.settings-window.drop-target .window-body{opacity:.7}

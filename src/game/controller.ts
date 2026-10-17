@@ -2,12 +2,10 @@ import { shaftWidth } from '../sim/elevators';
 import { housekeepingAccess } from '../sim/housekeepingAccess';
 import { CONFIG } from '../data/config';
 import { floorBuildPlan } from './floorBuild';
-import { extendFloor } from '../sim/tower';
+import { addCarRecorded, applyUndo, buildFloorRecorded, createUndoEntry, extendFloorRecorded, pushUndo, shaftPartAfter, undoBlock, type UndoEntry, type UndoPart } from '../sim/undo';
 import type { Application, FederatedPointerEvent } from 'pixi.js';
 import type { Camera } from '../render/camera';
 import {
-  addElevatorCar,
-  buildFloor,
   cellIndexAtWorldX,
   cyclePricing,
   demolishAt,
@@ -47,6 +45,7 @@ export type Tool =
   | 'hotelTwin' | 'hotelSuite' | 'partyHall' | 'cinema' | 'medical'
   | 'parkingRamp' | 'parkingSpace' | 'recycling' | 'metro' | 'cathedral'
   | 'fireStation' | 'bank' | 'helipad' | 'rooftopPool' | 'maintenance' | 'generator'
+  | 'apartment' | 'gym' | 'supermarket' | 'bar' | 'conference' | 'observationDeck'
   | 'lobby'
   | 'stairs'
   | 'office'
@@ -99,6 +98,8 @@ export class Controller {
   private openDialog: 'tenant' | 'elevator' | 'quarter' | null = null;
   private dragStart: ElevatorDrag | null = null;
   private buildStroke: BuildStroke | null = null;
+  /** Recent constructions, newest last (Ctrl+Z reverses the newest). */
+  private undoStack: UndoEntry[] = [];
   /** People who gave up since the last summary toast. */
   private gaveUp = { count: 0, floor: 0, lastToast: -Infinity };
 
@@ -182,6 +183,7 @@ export class Controller {
    */
   setState(state: GameState): void {
     this.state = state;
+    this.undoStack = [];
     this.selectTool('select');
     this.dragStart = null;
     this.hover = null;
@@ -190,6 +192,47 @@ export class Controller {
     this.tenantInfo.close();
     this.elevatorEditor.close();
     this.quarterReport.close();
+  }
+
+  /** What Undo would reverse next, or null when the stack is empty. */
+  get undoLabel(): string | null {
+    return this.undoStack[this.undoStack.length - 1]?.label ?? null;
+  }
+
+  /** Record a finished player build so Undo can reverse it. */
+  private recordBuild(label: string, parts: UndoPart[]): void {
+    pushUndo(this.undoStack, createUndoEntry(this.state, label, parts));
+  }
+
+  /**
+   * Reverse the most recent construction if it is still safe (exists, is
+   * under construction or under an hour old, nobody uses it, nothing depends
+   * on it) and refund what it cost; otherwise say why not.
+   */
+  undo(): void {
+    this.finishBuildStroke();
+    this.dragStart = null;
+    const entry = this.undoStack[this.undoStack.length - 1];
+    if (!entry) { this.hud.toast('Nothing to undo.', 'hint'); return; }
+    const block = undoBlock(this.state, entry);
+    if (block) {
+      if (block.expired) this.undoStack = [];
+      else if (block.permanent) this.undoStack.pop();
+      this.hud.toast(`Can't undo ${lowerFirst(entry.label)}: ${block.reason}.`, 'warn');
+      return;
+    }
+    const total = entry.parts.length;
+    const result = applyUndo(this.state, entry);
+    if (!entry.parts.length) this.undoStack.pop();
+    const refund = result.refundedCents > 0 ? ` · ${formatDollars(result.refundedCents).replace(/\.00$/, '')} refunded` : '';
+    if (result.error) {
+      this.hud.toast(result.undone > 0
+        ? `Partly undid ${lowerFirst(entry.label)} (${result.undone} of ${total})${refund}. Stopped: ${result.error}`
+        : `Can't undo ${lowerFirst(entry.label)}: ${result.error}`, 'warn');
+    } else {
+      this.hud.toast(`Undid: ${entry.label}${refund}`);
+    }
+    this.hoverError = this.errorFor(this.tool, this.hover);
   }
 
   /** Map one tick's sim events to toasts; clears the queue. */
@@ -256,6 +299,7 @@ export class Controller {
 
   private onKeyDown(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || document.querySelector('[role="dialog"][data-open="true"], dialog[open]')) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undo(); return; }
     if (e.key === 'Home') { e.preventDefault(); this.camera.center(); return; }
     // Arrow keys pan the view (Shift for big steps), so the tower is reachable without a mouse.
     const pan = (PAN_KEYS as Partial<Record<string, readonly [number, number]>>)[e.key];
@@ -323,8 +367,8 @@ export class Controller {
         case 'buildFloor': {
           const plan = floorBuildPlan(state, hover, tool === 'buildBasement');
           if (plan.error) throw new Error(plan.error);
-          if (plan.extending) extendFloor(state, plan.floor, hover!.cell);
-          else buildFloor(state, plan.floor);
+          const part = plan.extending ? extendFloorRecorded(state, plan.floor, hover!.cell) : buildFloorRecorded(state, plan.floor);
+          if (part) this.recordBuild(plan.extending ? `${floorLabel(plan.floor)} extension` : `New ${floorLabel(plan.floor)}`, [part]);
           this.hud.toast(`${plan.extending ? 'Extended' : 'Built'} ${floorLabel(plan.floor)}`);
           break;
         }
@@ -393,7 +437,12 @@ export class Controller {
       const before = elevatorBuildPlan(this.state, drag.fromFloor, hoverFloor, drag.cell, kindFor(tool));
       const group = before.groupId === undefined ? undefined : this.state.elevatorGroups.get(before.groupId);
       const unchanged = group !== undefined && group.serviceLo === before.lo && group.serviceHi === before.hi;
+      const ids = new Set(this.state.elevatorGroups.keys());
+      const extended = group ? { groupId: group.id, prevLo: group.serviceLo, prevHi: group.serviceHi } : null;
+      const balance = this.state.money.balanceCents;
       buildElevator(this.state, drag.fromFloor, hoverFloor, drag.cell, kindFor(tool));
+      const part = shaftPartAfter(this.state, ids, extended, Math.max(0, balance - this.state.money.balanceCents));
+      if (part) this.recordBuild(group ? `Shaft extension (${floorLabel(before.lo)} – ${floorLabel(before.hi)})` : `${TOOL_INFO[tool].label} (${floorLabel(before.lo)} – ${floorLabel(before.hi)})`, [part]);
       const span = `${floorLabel(before.lo)} – ${floorLabel(before.hi)}`;
       if (!group) this.hud.toast(`Built ${TOOL_INFO[tool].label.toLowerCase()} · ${span}`);
       else if (!unchanged) this.hud.toast(`Shaft extended · now serves ${span}`);
@@ -407,6 +456,7 @@ export class Controller {
     const stroke = this.buildStroke;
     this.buildStroke = null;
     if (!stroke) return;
+    if (stroke.parts.length) this.recordBuild(strokeLabel(stroke), [...stroke.parts]);
     const what = stroke.tool === 'lobby' ? 'lobby cells' : plural(TOOL_INFO[stroke.tool].label);
     if (stroke.placed > 1) this.hud.toast(`Built ${stroke.placed} ${what}${stroke.error ? ` — stopped: ${stroke.error}` : ''}`, stroke.error ? 'warn' : 'info');
     else if (stroke.error) this.hud.toast(stroke.error, 'error');
@@ -451,6 +501,7 @@ export class Controller {
         lobbyUpkeepQuarter: lobbyUpkeepQuarter(this.state.starLevel, tenant.sizeCells),
         officeLeaseDaysRemaining: Math.max(0, (tenant.officeLeaseUntilTick ?? 0) - this.state.tickCount) / CONFIG.DAY_TICKS,
         condoAccess: tenant.type === 'condo' ? condoHasAccess(this.state, tenant) : undefined,
+        voices: tenantVoices(this.state, tenant),
         noiseSources: noiseSources(this.state, tenant).map(source => {
           const room = this.state.tenants.get(source.tenantId)!;
           return { type: room.type, x: room.x, floor: room.floor, floorDistance: source.floorDistance, gap: source.gap, clearance: source.clearance };
@@ -506,7 +557,10 @@ export class Controller {
     const state = this.state;
     this.openDialog = 'elevator';
     this.elevatorEditor.open(group, {
-      addCar: () => this.elevatorAction(() => addElevatorCar(state, group.id)),
+      addCar: () => this.elevatorAction(() => {
+        const part = addCarRecorded(state, group.id);
+        this.recordBuild(`Elevator car (${floorLabel(group.serviceLo)} – ${floorLabel(group.serviceHi)})`, [part]);
+      }),
       removeCar: (carId: number) =>
         this.elevatorAction(() => removeElevatorCar(state, group.id, carId)),
       upgrade: (carId: number) =>
@@ -601,6 +655,19 @@ export function friendlyAlert(message: string): string {
   return `${tenantLabel(match[1]!)} on ${floorLabel(Number(match[2]))} ${match[3]}`;
 }
 
+function lowerFirst(text: string): string {
+  return /^[A-Z][a-z]/.test(text) ? text[0]!.toLowerCase() + text.slice(1) : text;
+}
+
+/** "Office on floor 5", "3 condos on floor 7", "4 lobby cells". */
+function strokeLabel(stroke: BuildStroke): string {
+  const count = stroke.parts.length;
+  const where = floorLabel(stroke.floor);
+  if (stroke.tool === 'lobby') return count === 1 ? 'Lobby cell' : `${count} lobby cells`;
+  const label = TOOL_INFO[stroke.tool].label.replace(/ [↑↓]$/, '');
+  return count === 1 ? `${label} on ${where}` : `${count} ${plural(label)} on ${where}`;
+}
+
 /** Elevator shaft tool → the group kind it commits as. */
 function kindFor(
   tool: 'elevator' | 'serviceElevator' | 'expressElevator',
@@ -610,5 +677,6 @@ function kindFor(
   return 'standard';
 }
 import { noiseSources } from '../sim/noise';
-import { lobbyUpkeepQuarter } from '../sim/money';
+import { tenantVoices } from '../sim/complaints';
+import { formatDollars, lobbyUpkeepQuarter } from '../sim/money';
 import { condoHasAccess } from '../sim/condoEconomy';

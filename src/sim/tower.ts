@@ -48,7 +48,11 @@ export function emptyCell(): GridCell {
 }
 
 export function getFloor(tower: Tower, index: number): Floor | undefined {
-  return tower.floors.find((f) => f.index === index);
+  // Floors are sorted and usually contiguous: try the direct position first.
+  const floors = tower.floors;
+  const guess = floors.length > 0 ? floors[index - floors[0]!.index] : undefined;
+  if (guess?.index === index) return guess;
+  return floors.find((f) => f.index === index);
 }
 
 /** Half-open horizontal bounds of usable floor space. */

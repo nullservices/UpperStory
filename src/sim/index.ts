@@ -110,8 +110,12 @@ export {
   hasOpenGenerator,
   fireStationCovers,
   maintenanceReaches,
+  maintenanceCoverage,
+  maintenanceOfficeReport,
+  maintenanceSummary,
   reachableSecurityCount,
 } from './services';
+export type { MaintenanceCoverage, MaintenanceOfficeReport, MaintenanceSummary } from './services';
 export { stepProgression } from './progression';
 export { serializeGame, deserializeGame, SAVE_VERSION } from './save';
 export type { SaveEnvelope } from './save';

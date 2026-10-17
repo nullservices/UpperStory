@@ -47,6 +47,21 @@ let giveUpsQuarter = 0;
 let peakGiveUpsPerDay = 0;
 const giveUpBreakdown: Record<string, number> = {};
 let weddingCheckedDay = 0;
+/** Tower events by kind, counted from their journal alerts. */
+const EVENT_PATTERNS: [string, RegExp][] = [
+  ['breakdowns', /broke down/],
+  ['mechanicRepairs', /^Mechanics repaired/],
+  ['paidRepairs', /^Elevator car repaired/],
+  ['blackouts', /^Blackout/],
+  ['fires', /^Fire reported/],
+  ['fireSpread', /^Fire spread/],
+  ['bombs', /^Bomb threat/],
+  ['infestations', /^Cockroach infestation/],
+  ['vipVisits', /^VIP (arriving|inspection)/],
+  ['damage', /damaged the tower|forced the facility to close/],
+  ['vacancies', /gone vacant/],
+];
+const eventCounts: Record<string, number> = Object.fromEntries(EVENT_PATTERNS.map(([key]) => [key, 0]));
 let lastVip: string | null = null;
 function describeVip(id: number): string {
   const incident = state.campaign.incidents.find(i => i.id === id)!;
@@ -104,6 +119,7 @@ while (state.calendar.day <= maxDays && state.starLevel < 6) {
       giveUpBreakdown[key] = (giveUpBreakdown[key] ?? 0) + 1;
     }
     if (event.type === 'ALERT' && /VIP/.test(event.message)) console.log(`  .. ${formatTowerDate(state.calendar.day)}: ${event.message}`);
+    if (event.type === 'ALERT') for (const [key, pattern] of EVENT_PATTERNS) if (pattern.test(event.message)) eventCounts[key]!++;
     if (event.type === 'LEVEL_UP') {
       starDays.push({ stars: event.starLevel, day: state.calendar.day });
       console.log(`  >> ${STAR_LABEL[event.starLevel]} reached on ${formatTowerDate(state.calendar.day)} (day ${state.calendar.day}), population ${population(state)}`);
@@ -171,6 +187,7 @@ console.log(JSON.stringify({
   floors: final.floors,
   starDays,
   peakGiveUpsPerDay,
+  events: eventCounts,
   giveUpsByKindAndPlace: Object.fromEntries(Object.entries(giveUpBreakdown).sort((a, b) => b[1] - a[1])),
   wallSeconds: Number((wallMs / 1000).toFixed(1)),
   msPerTick: Number((wallMs / state.tickCount).toFixed(3)),

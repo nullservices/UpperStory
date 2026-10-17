@@ -6,6 +6,7 @@ import type { GameState } from './state';
 import { noiseIndex, noisePenalty } from './noise';
 import { officeRentScoreAdjustment } from './money';
 import { sellCondo, repurchaseCondo, condoHasAccess } from './condoEconomy';
+import { floorLabel, tenantTypeLabel } from './campaign';
 
 /**
  * Daily tenant evaluation (JudgeT equivalent): grades from occupancy,
@@ -35,11 +36,18 @@ export function stepEvaluation(state: GameState): void {
     .filter(t => t.type === 'rooftopPool' && t.state === 'open').map(t => t.floor);
   // One pass over people instead of one per tenant. Each tenant only changes
   // its own roster below, after reading it, so the snapshot stays accurate.
-  const stressByTenant = new Map<number, { sum: number; count: number }>();
+  // Workers already travelling back to their own office (after lunch, or a
+  // late commute) count as present: on wide floors the walk alone can take
+  // hours of the compressed afternoon, and the trip's cost shows up as stress.
+  const stressByTenant = new Map<number, { sum: number; count: number; enRoute: number }>();
   for (const p of state.people.values()) {
-    const entry = stressByTenant.get(p.tenantId) ?? { sum: 0, count: 0 };
+    const entry = stressByTenant.get(p.tenantId) ?? { sum: 0, count: 0, enRoute: 0 };
     entry.sum += p.dayStress;
     entry.count++;
+    if (p.kind === 'officeWorker' && p.state !== 'inTenant' && p.state !== 'offscreen' && p.endState === 'inTenant' && p.destination) {
+      const office = state.tenants.get(p.tenantId);
+      if (office && p.destination.floor === office.floor && p.destination.x === office.x + office.sizeCells / 2) entry.enRoute++;
+    }
     stressByTenant.set(p.tenantId, entry);
   }
 
@@ -52,8 +60,10 @@ export function stepEvaluation(state: GameState): void {
 
     // Condos grade on stress (residents are home most of the day); offices
     // grade on actual presence at the 15:00 evaluation.
-    const ratio = tenant.type === 'condo' ? 1 : tenant.occupancy / tenant.capacity;
     const roster = stressByTenant.get(tenant.id);
+    const ratio = tenant.type === 'condo' ? 1
+      : tenant.type === 'office' ? Math.min(1, (tenant.occupancy + (roster?.enRoute ?? 0)) / tenant.capacity)
+        : tenant.occupancy / tenant.capacity;
     const avgStress = roster ? roster.sum / roster.count : 0;
 
     let score = 100 * ratio - avgStress * 0.6;
@@ -87,7 +97,8 @@ export function stepEvaluation(state: GameState): void {
           spawnTenantPeople(state, tenant);
           pushEvent(state, {
             type: 'ALERT',
-            message: `A ${tenant.type} on floor ${tenant.floor} has new occupants!`,
+            message: `${tenantTypeLabel(tenant.type)} on ${floorLabel(tenant.floor)} has new occupants`,
+            tenantId: tenant.id, floor: tenant.floor, kind: 'occupied',
           });
         }
       } else {
@@ -107,7 +118,8 @@ export function stepEvaluation(state: GameState): void {
           removeTenantPeople(state, tenant.id);
           pushEvent(state, {
             type: 'ALERT',
-            message: `A ${tenant.type} on floor ${tenant.floor} has gone vacant!`,
+            message: `${tenantTypeLabel(tenant.type)} on ${floorLabel(tenant.floor)} has gone vacant`,
+            tenantId: tenant.id, floor: tenant.floor, kind: 'vacancy',
           });
         }
       }
@@ -124,7 +136,8 @@ export function stepEvaluation(state: GameState): void {
           state.people.delete(p.id);
           pushEvent(state, {
             type: 'ALERT',
-            message: 'Guests are leaving your filthy hotel!',
+            message: `Guests are leaving a filthy ${tenantTypeLabel(tenant.type).toLowerCase()} on ${floorLabel(tenant.floor)}: send housekeeping`,
+            tenantId: tenant.id, floor: tenant.floor, kind: 'filthyHotel',
           });
           break; // one departure per evaluation keeps it gradual
         }

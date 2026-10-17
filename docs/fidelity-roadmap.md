@@ -254,6 +254,74 @@ manual car repairs (about 118 cars late in the run), so the breakdown mean was
 eased from 8 to 12 days per car; mechanics only reach shafts via service
 routes, so large towers need several maintenance offices.
 
+## Quality audit (2026-10-16)
+
+**Performance.** The events batch raised the perf smoke from about 1.8 to
+3.7 ms per tick on the audit machine. The overflow change keeps up to 16,700
+people waiting at once, and each one rescanned the hall queue every eight
+ticks with three passes and allocations. Progression also recomputed every
+requirement each tick once the population gate was met, with tenant scans,
+a pass over everyone and route searches. Fixes, all behavior-preserving (state
+hashes identical to the previous commit at every 5-day checkpoint of a
+40-day bot run):
+a single-pass overflow rejoin with an exact early exit; allocation-free queue
+counts and `leaveQueue`; lazy, cheapest-first rating requirements; the stress
+pass hands its headcount to progression when nobody joined or left in between;
+occupancy and hotel-guest presence are counted inside the people loop instead
+of extra passes (one pass per cleaner per tick before); O(1) floor lookup;
+stair columns memoized per structure revision. The perf smoke now runs at about 1.75–2.1 ms
+per tick under load. Worst ticks are about 35–45 ms, mostly garbage collection.
+
+**Maintenance redesign.** One office on floor 2 previously had 523 paid repairs
+in the 150-day run (337 in the audit's baseline). Coverage was rolled for the
+stop nearest the office, but mechanics were dispatched to the floor where the
+car broke, through staff-only routes, so they almost never arrived. Now an
+office covers every shaft with a stop within 15 floors that its mechanics can
+reach by any car, stairs or escalator. Mechanics then work along the shaft.
+Three mechanics per office give repair capacity that scales with offices. A repair
+takes 120 ticks plus 2 per floor travelled. Messages say whether mechanics are
+coming, busy, or that no office covers the shaft; a new office reports how
+many shafts it covers. Firefighters use the same any-car reach. With four
+service floors (2, 30, 60, 90) the bot needed no paid repairs:
+124 breakdowns, 123 fixed by mechanics. The 12-day mean and 0.25 covered
+factor were kept. Covered towers absorb about one breakdown a day late in the
+run, while an uncovered car stays out until a $10,000 repair.
+
+**Bugs fixed (each with a failing test first).**
+- Offices vacated because workers were still walking back from lunch at the
+  15:00 evaluation. At 0.5 cells per tick, a 150-cell walk takes about
+  3 game hours in the compressed afternoon. Workers already travelling to
+  their own office now count as present; their trip still adds stress. The
+  30-day run went from 59 vacancies to 0.
+- Fire and bomb damage picked the first nearby room, which could be the
+  lobby (sparing the real neighbour) or a sky lobby (damaging transfers).
+  Damage now goes to the closest open room and never to a lobby.
+- When a breakdown took a shaft's last working car, its queued passengers
+  waited out their full patience; they now re-plan at once.
+- Infestations pre-empted every other incident whenever any hotel room was
+  dirty (2 fires and 0 bombs in 108 days). They now win the pick with
+  `INFESTATION_PICK_CHANCE` (0.5).
+- Vacancy, new-occupant and filthy-hotel alerts now use player-facing names
+  and floor labels and carry `tenantId`, `floor` and `kind`. A room
+  overhanging the floor edge now says how many cells it needs.
+
+**Playthrough bot.** The bot now covers every shaft with maintenance on the
+service floors, pays only for uncovered or long-waiting cars, and builds a
+generator and fire stations when cash allows. Beyond a 40-room core, it adds
+hotel rooms only with spare cash, and they no longer block growth. Before,
+the 3★ plateau lasted 33 days while hotel rooms took the bot's $10.7M.
+
+**Balance evidence (150 days, seed 20261015).** Star days: baseline 5/19/76/94
+(TOWER 114); now 5/16/58/75 (TOWER 93). Funds stayed between $0.6M and $4.4M
+while growing, ending at $26M: neither trivially infinite nor starved.
+Events in 93 days: 118 breakdowns (117 by mechanics, 0 paid), 5 blackouts
+(generator from 3★), 4 fires (none spread, with stations), 0 bombs,
+7 infestations and 9 VIP visits. Incidents remain sparse: one every 3–6 days,
+and VIP visits take the slot until one approves. Late-game office vacancy
+is 12% (13% baseline). It comes from lobby congestion: about 140,000
+office-worker lobby give-ups once the bot reaches the 24-shaft cap. That is
+the main remaining balance issue.
+
 ## Order and completion policy
 
 Resolve batch 2 where reference evidence permits, while building the comparison

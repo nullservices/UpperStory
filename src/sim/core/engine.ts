@@ -32,7 +32,11 @@ export function tick(state: GameState): void {
   checkRouting(state); // rebuild routing tables on structural changes
   stepPeople(state); // schedules, visitors, walking, queue joins, give-ups
   stepElevators(state); // dispatch, movement, doors, boarding
-  stepStress(state); // stress accrual/decay by state
+  const residents = stepStress(state); // stress accrual/decay by state
+  // Additions always take a fresh entity id and removals shrink the map, so
+  // an unchanged size and id counter means the same people as stepStress saw.
+  const peopleSize = state.people.size;
+  const nextEntityId = state.nextEntityId;
   // Daily evaluation at 15:00 (everyone present), settlement at day end.
   if (
     state.calendar.minuteOfDay % 1440 >= CONFIG.EVAL_TIME_MIN &&
@@ -42,5 +46,6 @@ export function tick(state: GameState): void {
     stepEvaluation(state);
   }
   stepCampaign(state);
-  stepProgression(state); // population-based star ratings
+  const unchanged = state.people.size === peopleSize && state.nextEntityId === nextEntityId;
+  stepProgression(state, unchanged ? residents : undefined); // population-based star ratings
 }

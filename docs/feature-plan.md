@@ -32,7 +32,9 @@ weather, more likely in rain).
 
 **Status (simulation):** fire response choice, fire spread, bomb search
 scaling, breakdowns, blackouts, bank/loans, pool, helipad, fire station,
-maintenance and generator rules are implemented and tested (save version 10).
+maintenance and generator rules are implemented and tested (save version 11;
+maintenance coverage, mechanic crews and responder reach were reworked in the
+quality audit, see [fidelity-roadmap.md](fidelity-roadmap.md#quality-audit-2026-10-16)).
 Extra sim APIs beyond the contracts: `responseQuote(state, id, action)`,
 `repairElevatorCarError`, `takeLoanError`, `repayLoanError`,
 `floorLabel(floor)`; `QUARTER_REPORT` events carry `interest` when charged and

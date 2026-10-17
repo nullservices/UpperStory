@@ -389,7 +389,7 @@ describe('journal locations and saves', () => {
     const group = placeElevatorGroup(state, -2, 0, 200);
     group.cars[0]!.breakdownAtTick = state.tickCount + 1;
     tick(state);
-    expect(state.campaign.history[0]!.message).toBe('An elevator car broke down at B3.');
+    expect(state.campaign.history[0]!.message).toMatch(/^An elevator car broke down at B3\. /);
   });
 
   it('records where incidents happen and keeps old two-field entries valid', () => {

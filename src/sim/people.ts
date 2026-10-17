@@ -4,8 +4,9 @@ import { recordCommercialVisit } from './commercialEconomy';
 import { CONFIG, TENANT_DATA, isHotel } from '../data/config';
 import { pushEvent } from './core/events';
 import { rngInt, rngNext } from './core/rng';
-import { joinQueue, leaveQueue, pressCall, queueHead } from './queues';
+import { joinQueue, leaveQueue, pressCall, retryJoinQueue } from './queues';
 import { pickupRoute, type RouteLeg } from './routing';
+import { getFloor } from './tower';
 import type { GameState } from './state';
 import { patienceTicks } from './stress';
 import type { Tenant } from './tenants';
@@ -83,10 +84,20 @@ export function tenantCenter(state: GameState, tenantId: number): { floor: numbe
   return { floor: t.floor, x: t.x + t.sizeCells / 2 };
 }
 
-/** Population = everyone tracked (off-screen workers included). */
-export function population(state: GameState): number {
+/** Visitors (diners, shoppers, bank customers) are not part of the population. */
+export function countsTowardPopulation(person: Person): boolean {
+  return person.kind !== 'diner' && person.kind !== 'shopper';
+}
+
+/**
+ * Population = everyone tracked (off-screen workers included) plus the
+ * reported commercial head counts. `residents` may supply an exact count of
+ * the tracked part already taken this tick, saving a pass over everyone.
+ */
+export function population(state: GameState, residents?: number): number {
   let total = 0;
-  for (const person of state.people.values()) if (person.kind !== 'diner' && person.kind !== 'shopper') total++;
+  if (residents !== undefined) total = residents;
+  else for (const person of state.people.values()) if (countsTowardPopulation(person)) total++;
   for (const tenant of state.tenants.values()) if (tenant.state === 'open') total += tenant.reportedPopulation ?? 0;
   return total;
 }
@@ -525,11 +536,6 @@ function officeRosterRank(state: GameState, p: Person): number {
   return officeRanks.get(p.id) ?? 0;
 }
 
-function hotelHasGuestInside(state: GameState, hotelId: number): boolean {
-  return [...state.people.values()].some(p => p.kind === 'hotelGuest' &&
-    p.tenantId === hotelId && p.state === 'inTenant');
-}
-
 function applyAction(state: GameState, p: Person, action: ScheduleAction): void {
   // A schedule call ends any pool visit in progress.
   if ((p.kind === 'resident' || p.kind === 'hotelGuest') && p.activityTenantId >= 0) {
@@ -702,21 +708,16 @@ function stepPoolVisits(state: GameState): void {
 // --- Occupancy ---
 
 /**
- * Refresh per-tenant occupancy: people currently inside each tenant (the
- * lobby included). Called at the end of the people step.
+ * Count a person toward the occupancy of the tenant they stand in (the lobby
+ * included). The people step counts everyone as it finishes with them, so
+ * occupancy reflects where people are at the end of the step.
  */
-function refreshOccupancy(state: GameState): void {
-  for (const tenant of state.tenants.values()) tenant.occupancy = 0;
-  const floors = new Map<number, { cells: { tenantId: number }[] }>();
-  for (const floor of state.tower.floors) floors.set(floor.index, floor);
-  for (const p of state.people.values()) {
-    if (p.state !== 'inTenant' && p.state !== 'cleaning') continue;
-    const floor = floors.get(Math.round(p.pos.floor));
-    const cell = floor?.cells[Math.round(p.pos.x)];
-    if (!cell || cell.tenantId < 0) continue;
-    const tenant = state.tenants.get(cell.tenantId);
-    if (tenant && !(isHotel(tenant.type) && isStaff(p.kind))) tenant.occupancy++;
-  }
+function countOccupant(state: GameState, p: Person): void {
+  if (p.state !== 'inTenant' && p.state !== 'cleaning') return;
+  const cell = getFloor(state.tower, Math.round(p.pos.floor))?.cells[Math.round(p.pos.x)];
+  if (!cell || cell.tenantId < 0) return;
+  const tenant = state.tenants.get(cell.tenantId);
+  if (tenant && !(isHotel(tenant.type) && isStaff(p.kind))) tenant.occupancy++;
 }
 
 // --- Hotel cleanliness ---
@@ -740,8 +741,25 @@ export function stepPeople(state: GameState): void {
   officeRanks = null; // rosters only change outside this step
   spawnExternalVisitors(state);
   stepPoolVisits(state);
-  stepHotels(state);
+  stepHotels(state); // reads last step's occupancy before it is recounted
+  for (const tenant of state.tenants.values()) tenant.occupancy = 0;
+  // Guests inside each hotel (cleaners must wait for an empty room). Built on
+  // first use, then kept current as each guest is processed. Within this loop
+  // people only change during their own turn, so the count stays exact.
+  let guestsInside: Map<number, number> | null = null;
+  const hotelHasGuestInside = (hotelId: number): boolean => {
+    if (!guestsInside) {
+      guestsInside = new Map();
+      for (const other of state.people.values()) {
+        if (other.kind === 'hotelGuest' && other.state === 'inTenant') guestsInside.set(other.tenantId, (guestsInside.get(other.tenantId) ?? 0) + 1);
+      }
+    }
+    return (guestsInside.get(hotelId) ?? 0) > 0;
+  };
   for (const p of state.people.values()) {
+    // Only the person being processed can leave the simulation in their turn.
+    const sizeBefore = state.people.size;
+    const guestWasInside = p.kind === 'hotelGuest' && p.state === 'inTenant';
     // Daily rollover: fresh stress counters, fresh arrival jitter, and the
     // day's schedule restarts from its first entry.
     if (p.dayTracked !== day) {
@@ -835,7 +853,7 @@ export function stepPeople(state: GameState): void {
         // Overflow waiters retry on staggered ticks; rush hours hold thousands.
         if (leg?.mode === 'elevator' && (state.tickCount + p.id) % 8 === 0) {
           const dir = leg.dir > 0 ? 'up' : 'down';
-          if (!queueHead(state, leg.from, dir).includes(p.id) && joinQueue(state, p.id, leg.from, dir)) pressCall(state, leg.from, dir);
+          if (retryJoinQueue(state, p.id, leg.from, dir)) pressCall(state, leg.from, dir);
         }
         p.waitTicks++;
         if (p.waitTicks > patienceTicks(p.stress)) giveUp(state, p);
@@ -858,7 +876,7 @@ export function stepPeople(state: GameState): void {
       case 'cleaning': {
         p.stairsTicksLeft--;
         const hotel = state.tenants.get(p.activityTenantId);
-        const canClean = hotel && isHotel(hotel.type) && hotel.state === 'open' && !hotelHasGuestInside(state, hotel.id);
+        const canClean = hotel && isHotel(hotel.type) && hotel.state === 'open' && !hotelHasGuestInside(hotel.id);
         if (canClean) {
           const wasDirty = hotel.cleanliness < 100;
           hotel.cleanliness = Math.min(
@@ -878,6 +896,14 @@ export function stepPeople(state: GameState): void {
       case 'riding':
         break; // the elevator moves the person
     }
+    const present = state.people.size === sizeBefore;
+    if (guestsInside && p.kind === 'hotelGuest') {
+      const inside = present && p.state === 'inTenant';
+      if (inside !== guestWasInside) {
+        const map: Map<number, number> = guestsInside;
+        map.set(p.tenantId, (map.get(p.tenantId) ?? 0) + (inside ? 1 : -1));
+      }
+    }
+    if (present) countOccupant(state, p);
   }
-  refreshOccupancy(state);
 }

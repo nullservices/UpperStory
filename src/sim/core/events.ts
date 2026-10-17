@@ -5,7 +5,15 @@
  * simulation state and never influence the sim.
  */
 export type SimEvent =
-  | { type: 'ALERT'; message: string }
+  | {
+      type: 'ALERT';
+      message: string;
+      /** Tenant the alert is about, so the UI can locate and coalesce it. */
+      tenantId?: number;
+      floor?: number;
+      /** Machine-readable alert kind for tenant-status alerts. */
+      kind?: 'vacancy' | 'occupied' | 'filthyHotel';
+    }
   | { type: 'MONEY_CHANGED'; balance: number; delta: number }
   | { type: 'TENANT_COMPLETED'; tenantId: number }
   | { type: 'PERSON_GAVE_UP'; personId: number; floor: number }

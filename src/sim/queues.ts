@@ -24,15 +24,41 @@ export function joinQueue(
   const key = queueKey(floor, dir);
   const queue = (state.queues[key] ??= []);
   if (queue.includes(personId)) return true;
-  const groupId = queuedGroup(state, personId);
-  if (queue.filter(id => queuedGroup(state, id) === groupId).length >= CONFIG.QUEUE_MAX_PER_SIDE) return false;
+  if (groupCount(state, queue, queuedGroup(state, personId), CONFIG.QUEUE_MAX_PER_SIDE) >= CONFIG.QUEUE_MAX_PER_SIDE) return false;
   queue.push(personId);
   return true;
 }
 
+/**
+ * Overflow retry for someone waiting beside a hall queue: joins (true) only
+ * when they are not already queued and their shaft has a free place. One
+ * pass with an early exit. Being queued and finding the shaft full both mean
+ * "do nothing", so the scan can stop at whichever it finds first.
+ */
+export function retryJoinQueue(state: GameState, personId: number, floor: number, dir: QueueDir): boolean {
+  const queue = (state.queues[queueKey(floor, dir)] ??= []);
+  const groupId = queuedGroup(state, personId);
+  let count = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const id = queue[i]!;
+    if (id === personId) return false;
+    if (queuedGroup(state, id) === groupId && ++count >= CONFIG.QUEUE_MAX_PER_SIDE) return false;
+  }
+  queue.push(personId);
+  return true;
+}
+
+/** Queue members riding `groupId`, counting no further than `stopAt`. */
+function groupCount(state: GameState, queue: readonly number[], groupId: number | undefined, stopAt = Infinity): number {
+  let count = 0;
+  for (let i = 0; i < queue.length && count < stopAt; i++) if (queuedGroup(state, queue[i]!) === groupId) count++;
+  return count;
+}
+
 /** Remove a person from whichever queue they are in (if any). */
 export function leaveQueue(state: GameState, personId: number): void {
-  for (const key of Object.keys(state.queues)) {
+  // for-in visits keys in the same order as Object.keys without allocating.
+  for (const key in state.queues) {
     const queue = state.queues[key]!;
     const i = queue.indexOf(personId);
     if (i >= 0) {
@@ -56,7 +82,7 @@ function queuedGroup(state: GameState, personId: number): number | undefined {
 
 export function queueLength(state: GameState, floor: number, dir: QueueDir, groupId?: number): number {
   const queue = state.queues[queueKey(floor, dir)] ?? [];
-  return groupId === undefined ? queue.length : queue.filter(id => queuedGroup(state, id) === groupId).length;
+  return groupId === undefined ? queue.length : groupCount(state, queue, groupId);
 }
 
 /** Queue in arrival order (person ids). */

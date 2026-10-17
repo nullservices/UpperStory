@@ -9,7 +9,7 @@ import type { GameState } from './state';
  * Version bumps go through the migration chain in `deserialize`.
  */
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 
 export interface SaveEnvelope {
   version: number;
@@ -76,7 +76,7 @@ export function deserializeGame(json: string): GameState {
   if (typeof envelope !== 'object' || envelope === null || !('version' in envelope)) {
     throw new Error('Not a TowerProject save file');
   }
-  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, SAVE_VERSION].includes(envelope.version)) {
+  if (![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, SAVE_VERSION].includes(envelope.version)) {
     // Migration chain slot: handle older versions here as they appear.
     throw new Error(
       `Unsupported save version ${envelope.version} (current: ${SAVE_VERSION})`,
@@ -127,5 +127,8 @@ export function deserializeGame(json: string): GameState {
     }
     state.money.loanCents ??= 0;
   }
+  // Version 11 records which maintenance office is repairing each broken car
+  // (`repairOfficeId`, optional). Repairs already under way in older saves
+  // keep their clock and finish normally without holding a mechanic.
   return state;
 }

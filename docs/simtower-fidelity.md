@@ -54,15 +54,28 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   spread, breakdowns, repairs) so the journal can jump to them.
 
 **Upper Story originals (Batch 2, not in SimTower).**
+- Responders: firefighters and mechanics may ride any car, stairs or
+  escalators (guards and housekeepers keep to the original's service-car
+  rule). A responder reaches a floor that is their own or that any public or
+  staff route connects to.
 - Fire station (2★): a station within 20 floors whose firefighters can reach
-  the fire by staff routes makes rescue $20,000 and 60 ticks, and prevents
-  spread.
+  the fire makes rescue $20,000 and 60 ticks, and prevents spread.
+- Maintenance (2★): an office looks after every shaft with a stop within 15
+  floors that its mechanics can reach; once inside, they work along the whole
+  shaft. Each office has three mechanics, one broken car each, so repair
+  capacity scales with offices. A broken car on a covered shaft gets the
+  nearest office with a free mechanic; the repair takes 120 ticks plus 2 per
+  floor travelled (office to entry stop to car). Cars wait for a free
+  mechanic otherwise. A repair stops if its office closes. A new office
+  announces how many shafts it covers, and each breakdown message says
+  whether mechanics are coming, busy, or that no office covers the shaft.
 - Elevator breakdowns (from 2★): each car rolls daily for a breakdown (mean
-  once per 12 days; a quarter as often when a maintenance office's mechanics can
-  reach the shaft's nearest stop). A broken car coasts to the nearest floor,
-  unloads riders (who re-plan from there), is ignored by dispatch and routing
-  (when every car in the shaft is broken), and is fixed by reachable mechanics
-  after 200 ticks or by a $10,000 manual repair.
+  once per 12 days; a quarter as often on covered shafts). A broken car
+  coasts to the nearest floor and unloads riders (who re-plan from there). It
+  is ignored by dispatch, and by routing once every car in the shaft is
+  broken; people already queued for such a shaft re-plan at once instead of
+  waiting out their patience. Uncovered cars stay broken until a $10,000
+  manual repair.
 - Blackouts (from 2★): a 3% daily chance in clear weather, 15% in rain; lasts
   60–120 game minutes. Cars hold position (doors finish) unless an open
   basement generator exists; waiting stress accrues normally.
@@ -77,8 +90,9 @@ The facilities tour at `?demo=1` begins at five stars; normal games start at one
   helipad extends any open medical center's cover tower-wide.
 - Fire stations, maintenance offices, generators, pools and helipads are not
   graded on occupancy. Tower events use their own seeded random stream, so
-  they never shift the main stream. Saves are version 10; version 9 saves load
-  with fresh spread clocks for active fires.
+  they never shift the main stream. Saves are version 11 (cars record the
+  repairing office); version 10 repairs in progress finish on their old clock,
+  and version 9 saves load with fresh spread clocks for active fires.
 
 ## Remaining fidelity work
 

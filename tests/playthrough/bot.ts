@@ -10,7 +10,10 @@
  *  - a hotel block with housekeeping + a service shaft at 2★, security, then
  *    medical, recycling, metro (via the lobby bank extended down), cathedral;
  *  - sky lobbies only on SKY_LOBBY_FLOORS, one express shaft through them;
- *  - cars added when queues grow; incidents answered; damage repaired.
+ *  - cars added when queues grow; incidents answered; damage repaired;
+ *  - maintenance offices until every shaft is looked after (paid repairs
+ *    only where no office covers the shaft), then a backup generator and
+ *    fire stations once the tower can afford them.
  * Every command is pre-checked with the sim's *Error helpers or wrapped so a
  * rejected command is counted (with its reason) rather than crashing the run.
  */
@@ -32,6 +35,7 @@ import { progressionRequirements } from '../../src/sim/progression';
 import { population } from '../../src/sim/people';
 import { queueLength } from '../../src/sim/queues';
 import { pickupRoute } from '../../src/sim/routing';
+import { maintenanceCoverage, maintenanceSummary } from '../../src/sim/services';
 import type { GameState } from '../../src/sim/state';
 import { isUnlocked, placeTenant, placementError, repairTenant, type Tenant, type TenantType } from '../../src/sim/tenants';
 import {
@@ -62,6 +66,8 @@ const BANKS_PER_ZONE = 3;
 const HOTEL_FLOORS: readonly number[] = [4, 5, 6, 7, 8];
 /** Condos insulate the hotel block: offices and shops on adjacent floors are noisy. */
 const QUIET_FLOORS: readonly number[] = [3, 9];
+/** Hotel rooms placed before further rooms wait for spare cash. */
+const HOTEL_CORE_ROOMS = 40;
 const INITIAL_LOBBY_CELLS = 200;
 /** Lobby cells added per widening step (one condo width). */
 const WIDEN_CHUNK = 16;
@@ -71,6 +77,16 @@ const METRO_FLOOR = TENANT_DATA.metro.floorRestriction ?? -8;
 const MEDICAL_X = ROOM_X0;
 const SECURITY_X = ROOM_X0 + TENANT_DATA.medical.sizeCells;
 const COMMERCIAL_X0 = SECURITY_X + TENANT_DATA.security.sizeCells;
+/**
+ * Service floors keep their right end free for a maintenance office and a
+ * fire station: floor 2 plus every other sky lobby. Offices there cover the
+ * lobby banks, the express and the two banks meeting at each sky lobby;
+ * stations 30 floors apart cover the whole tower (reach 20 floors).
+ */
+const SERVICE_FLOORS: readonly number[] = [2, 30, 60, 90];
+const SERVICE_RESERVE = TENANT_DATA.maintenance.sizeCells + TENANT_DATA.fireStation.sizeCells;
+/** Covered cars wait this long for a busy crew before the bot pays instead. */
+const CREW_PATIENCE_TICKS = 600;
 
 export type FloorRole = 'commercial' | 'hotel' | 'condo' | 'office';
 
@@ -90,6 +106,8 @@ export class PlaythroughBot {
   private serviceId: number | null = null;
   private readonly hotelFloors = HOTEL_FLOORS;
   private readonly noted = new Set<string>();
+  /** Tick each broken car was first seen waiting for a mechanic. */
+  private readonly brokenSince = new Map<number, number>();
 
   constructor(readonly state: GameState) {}
 
@@ -204,7 +222,10 @@ export class PlaythroughBot {
 
   /** Planned room placements for a floor, left to right. */
   private plannedRooms(floor: number): { type: TenantType; x: number }[] {
-    const { lo, hi } = floorBounds(this.state, floor);
+    const bounds = floorBounds(this.state, floor);
+    const lo = bounds.lo;
+    // Service floors keep their right end for maintenance and a fire station.
+    const hi = SERVICE_FLOORS.includes(floor) ? bounds.hi - SERVICE_RESERVE : bounds.hi;
     const start = Math.max(lo, ROOM_X0);
     const rooms: { type: TenantType; x: number }[] = [];
     const run = (from: number, types: TenantType[]): void => {
@@ -233,6 +254,10 @@ export class PlaythroughBot {
       // VIP inspections (the only reason hotels matter for ratings) start at
       // 3★; earlier, hotel rooms would starve the population push.
       if (this.state.starLevel < 3 && this.funds < dollars(1_500_000)) return rooms;
+      // Beyond the first block (suites for the VIP), more rooms are a luxury:
+      // guest arrivals are limited, so add them only with cash to spare.
+      const hotelRooms = [...this.state.tenants.values()].filter(t => t.type === 'hotel' || t.type === 'hotelTwin' || t.type === 'hotelSuite').length;
+      if (hotelRooms >= HOTEL_CORE_ROOMS && this.funds < dollars(3_000_000)) return rooms;
       // Each hotel floor gets its own housekeeping office (an office sends at
       // most one cleaner per floor), then full-width rooms: guests take any
       // free bed, and an occupied room cannot be cleaned, so spare beds matter.
@@ -305,13 +330,22 @@ export class PlaythroughBot {
     }
   }
 
-  /** Pay to fix broken cars that no maintenance office can reach. */
+  /**
+   * Pay to fix broken cars that no maintenance office looks after, or that
+   * have waited too long for a busy crew. Mechanics handle the rest for free.
+   */
   private repairCars(): void {
     for (const group of this.state.elevatorGroups.values()) {
+      let covered: boolean | null = null;
       for (const car of group.cars) {
-        if (!car.outOfService || car.repairAtTick !== undefined) continue;
+        if (!car.outOfService || car.repairAtTick !== undefined) { this.brokenSince.delete(car.id); continue; }
+        covered ??= maintenanceCoverage(this.state, group.id).covered;
+        const since = this.brokenSince.get(car.id) ?? this.state.tickCount;
+        this.brokenSince.set(car.id, since);
+        if (covered && this.state.tickCount - since < CREW_PATIENCE_TICKS) continue;
         if (repairElevatorCarError(this.state, group.id, car.id)) continue;
-        this.attempt('repair elevator car', () => repairElevatorCar(this.state, group.id, car.id));
+        const label = covered ? 'repair elevator car (crews busy)' : 'repair elevator car (no maintenance)';
+        if (this.attempt(label, () => repairElevatorCar(this.state, group.id, car.id))) this.brokenSince.delete(car.id);
       }
     }
   }
@@ -474,7 +508,11 @@ export class PlaythroughBot {
     const top = topFloorIndex(this.state.tower);
     // Only grow when every built floor's planned rooms are placed.
     // Rooms still locked behind a star rating (reserved hotel floors) wait.
-    for (let f = 2; f <= top; f++) if (this.freeRooms(f).some(room => isUnlocked(this.state, room.type))) return;
+    // Optional hotel rooms never hold growth back.
+    for (let f = 2; f <= top; f++) {
+      if (this.roleOf(f) === 'hotel' && this.tenantsOf('hotelSuite').length > 0) continue;
+      if (this.freeRooms(f).some(room => isUnlocked(this.state, room.type))) return;
+    }
     if (top >= this.buildCeiling()) {
       if (top < CONFIG.MAX_FLOORS) this.note(`ceiling-${top}`, `growth paused at floor ${top} (needs ${this.state.starLevel < 3 ? '3★ for sky lobbies/express' : 'sky lobby + express'})`);
       return;
@@ -575,14 +613,11 @@ export class PlaythroughBot {
   private buildRequiredFacilities(): void {
     const stars = this.state.starLevel;
     if (stars >= 2) this.placeOnce('security', 2, SECURITY_X);
-    // Mechanics on floor 2 cover the lobby banks (they walk to their landing).
-    if (stars >= 2 && this.tenantsOf('maintenance').length === 0) {
-      const { hi } = floorBounds(this.state, 2);
-      const x = hi - TENANT_DATA.maintenance.sizeCells;
-      if (getFloor(this.state.tower, 2)?.cells.slice(x, hi).every(c => c.content === 'empty')) this.placeOnce('maintenance', 2, x);
-    }
+    if (stars >= 2) this.ensureMaintenance();
     if (stars >= 3) {
       this.placeOnce('medical', 2, MEDICAL_X);
+      this.ensureGenerator();
+      this.ensureFireStations();
       // Waste grows by people/500 a day and each center removes 10: keep up.
       const wanted = Math.max(1, Math.ceil(this.state.people.size / 5000));
       const centers = this.tenantsOf('recycling').length;
@@ -618,6 +653,59 @@ export class PlaythroughBot {
       }
     }
     if (stars >= 5 && topFloorIndex(this.state.tower) >= CATHEDRAL_FLOOR + 3) this.placeOnce('cathedral', CATHEDRAL_FLOOR, CATHEDRAL_X);
+  }
+
+  /** Place `type` in the reserved right end of a service floor (maintenance rightmost). */
+  private placeServiceRoom(type: 'maintenance' | 'fireStation', floor: number): boolean {
+    if (!getFloor(this.state.tower, floor)) return false;
+    const { hi } = floorBounds(this.state, floor);
+    const x = type === 'maintenance' ? hi - TENANT_DATA.maintenance.sizeCells : hi - SERVICE_RESERVE;
+    const error = placementError(this.state, type, floor, x);
+    if (error) {
+      if (!error.startsWith('Requires') && error !== 'Not enough funds') this.reject(`place ${type}`, error);
+      return false;
+    }
+    return this.attempt(`place ${type}`, () => placeTenant(this.state, type, floor, x));
+  }
+
+  /** Add maintenance offices until every shaft is looked after. */
+  private ensureMaintenance(): void {
+    if (this.tenantsOf('maintenance').some(t => t.state === 'constructing')) return; // wait for it to open
+    const uncovered = maintenanceSummary(this.state).uncoveredShaftIds;
+    if (uncovered.length === 0) return;
+    if (!this.canSpendTransport(dollars(TENANT_DATA.maintenance.costDollars))) return;
+    const reach = CONFIG.MAINTENANCE_REACH_FLOORS;
+    for (const id of uncovered) {
+      const group = this.state.elevatorGroups.get(id)!;
+      // Service floors within reach of the shaft's stops, nearest first.
+      const distance = (floor: number): number => Math.min(...group.stops.map(s => Math.abs(s - floor)));
+      const floors = SERVICE_FLOORS.filter(f => distance(f) <= reach && !this.tenantsOf('maintenance').some(t => t.floor === f))
+        .sort((a, b) => distance(a) - distance(b));
+      for (const floor of floors) if (this.placeServiceRoom('maintenance', floor)) return;
+      this.note(`maintenance-${id}`, `no free service floor for a maintenance office near shaft ${id} (stops ${group.stops[0]}..${group.stops.at(-1)})`);
+    }
+  }
+
+  /** A backup generator keeps elevators running through blackouts. */
+  private ensureGenerator(): void {
+    if (this.tenantsOf('generator').length > 0 || this.funds < dollars(1_500_000)) return;
+    const { lo, hi } = floorBounds(this.state, 0);
+    const size = TENANT_DATA.generator.sizeCells;
+    for (let x = Math.max(lo, 20); x + size <= hi; x++) {
+      if (placementError(this.state, 'generator', 0, x)) continue;
+      this.attempt('place generator', () => placeTenant(this.state, 'generator', 0, x));
+      return;
+    }
+  }
+
+  /** Fire stations on the service floors once cash is comfortable (cheap rescues, no spread). */
+  private ensureFireStations(): void {
+    if (this.funds < dollars(2_500_000)) return;
+    for (const floor of SERVICE_FLOORS) {
+      if (this.tenantsOf('fireStation').some(t => t.floor === floor)) continue;
+      if (!this.canSpend(dollars(TENANT_DATA.fireStation.costDollars))) return;
+      if (this.placeServiceRoom('fireStation', floor)) return;
+    }
   }
 
   /** Unmet requirements for the next rating, for progress lines. */

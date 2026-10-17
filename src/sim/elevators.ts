@@ -3,11 +3,12 @@ import { isWeekendDay } from './time';
 import { spend } from './money';
 import { giveUp, resumeTrip } from './people';
 import { floorLabel, recordEvent } from './campaign';
-import { elevatorsPowered, maintenanceReaches } from './services';
+import { assignMechanic, elevatorsPowered, maintenanceCoversShaft } from './services';
 import { checkRouting } from './routing';
 import {
   callPending,
   clearCall,
+  leaveQueue,
   pressCall,
   queueHead,
   type QueueDir,
@@ -140,6 +141,8 @@ export interface ElevatorCar {
   breakdownAtTick?: number;
   /** Mechanics finish repairing a broken car at this tick. */
   repairAtTick?: number;
+  /** Maintenance office whose mechanic is repairing the car (absent in version 10 saves). */
+  repairOfficeId?: number;
 }
 
 export function carSpeed(car: ElevatorCar): number {
@@ -533,7 +536,12 @@ export function stepElevators(state: GameState): void {
     for (const car of group.cars) {
       if (car.breakdownAtTick !== undefined && !car.outOfService && state.tickCount >= car.breakdownAtTick) breakDown(state, group, car);
       if (car.outOfService) {
-        if (assignMechanics && car.repairAtTick === undefined) dispatchMechanics(state, group, car);
+        // A repair stops if its office closes (demolished, damaged or under repair).
+        if (car.repairOfficeId !== undefined && state.tenants.get(car.repairOfficeId)?.state !== 'open') {
+          delete car.repairOfficeId;
+          delete car.repairAtTick;
+        }
+        if (assignMechanics && car.repairAtTick === undefined) assignMechanic(state, group, car, brokenFloor(group, car));
         stepBrokenCar(state, group, car, powered);
         continue;
       }
@@ -557,15 +565,27 @@ function breakDown(state: GameState, group: ElevatorGroup, car: ElevatorCar): vo
   const floor = brokenFloor(group, car);
   // A moving car coasts to the nearest floor; otherwise it stays put.
   car.targetFloor = car.state === 'moving' ? floor : null;
-  recordEvent(state, `An elevator car broke down at ${floorLabel(floor)}.`, { floor, x: group.x });
-  dispatchMechanics(state, group, car);
+  const office = assignMechanic(state, group, car, floor);
+  const followUp = office ? `Mechanics from the ${floorLabel(office.floor)} maintenance office are on the way.`
+    : maintenanceCoversShaft(state, group) ? 'Every mechanic who looks after this shaft is busy; repairs start when one is free.'
+      : `No maintenance office covers this shaft: repair it ($${CONFIG.ELEVATOR_REPAIR_COST_DOLLARS.toLocaleString('en-US')}) or build one within ${CONFIG.MAINTENANCE_REACH_FLOORS} floors of its stops.`;
+  recordEvent(state, `An elevator car broke down at ${floorLabel(floor)}. ${followUp}`, { floor, x: group.x });
   // Routing skips shafts whose every car is out of service.
   state.tower.structureRevision++;
-}
-
-function dispatchMechanics(state: GameState, group: ElevatorGroup, car: ElevatorCar): void {
-  if (!maintenanceReaches(state, brokenFloor(group, car))) return;
-  car.repairAtTick = state.tickCount + CONFIG.MAINTENANCE_REPAIR_TICKS;
+  if (group.cars.every(c => c.outOfService)) {
+    // Nobody is coming: people queued for this shaft find another way now
+    // instead of waiting out their patience.
+    checkRouting(state);
+    for (const p of [...state.people.values()]) {
+      const leg = p.route?.[p.legIndex];
+      if (p.state !== 'waiting' || leg?.mode !== 'elevator' || leg.groupId !== group.id) continue;
+      leaveQueue(state, p.id);
+      p.state = 'walking';
+      p.target = null;
+      p.waitTicks = 0;
+      resumeTrip(state, p);
+    }
+  }
 }
 
 /** Riders leave a broken car and continue their journey from this floor. */
@@ -621,6 +641,7 @@ function restoreCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): v
   if (car.passengers.length > 0) unloadBrokenCar(state, group, car);
   delete car.outOfService;
   delete car.repairAtTick;
+  delete car.repairOfficeId;
   car.state = 'idle';
   car.dir = 0;
   car.targetFloor = null;

@@ -75,6 +75,18 @@ export function recordEvent(state: GameState, message: string, where?: { floor: 
 export function floorLabel(floor: number): string {
   return floor <= 0 ? `B${1 - floor}` : `floor ${floor}`;
 }
+const TYPE_LABELS: Record<string, string> = {
+  office: 'Office', condo: 'Condo', fastfood: 'Fast food', restaurant: 'Restaurant', shop: 'Shop',
+  hotel: 'Single room', hotelTwin: 'Twin room', hotelSuite: 'Hotel suite', security: 'Security office',
+  housekeeping: 'Housekeeping', skyLobby: 'Sky lobby', partyHall: 'Party hall', cinema: 'Cinema',
+  medical: 'Medical center', parkingRamp: 'Parking ramp', parkingSpace: 'Parking space', recycling: 'Recycling center',
+  metro: 'Metro station', cathedral: 'Cathedral', fireStation: 'Fire station', bank: 'Bank', helipad: 'Helipad',
+  rooftopPool: 'Rooftop pool', maintenance: 'Maintenance office', generator: 'Backup generator', lobby: 'Lobby',
+};
+/** Player-facing facility name ("Fast food", "Hotel suite"). */
+export function tenantTypeLabel(type: string): string {
+  return TYPE_LABELS[type] ?? type;
+}
 function tenantSpot(tenant: Tenant): { floor: number; x: number } {
   return { floor: tenant.floor, x: tenant.x + Math.floor(tenant.sizeCells / 2) };
 }
@@ -232,7 +244,7 @@ function rollDailyEvents(state: GameState): void {
     let covered: boolean | null = null;
     for (const car of group.cars) {
       if (car.outOfService || car.breakdownAtTick !== undefined) continue;
-      covered ??= maintenanceCoversShaft(state, group.stops);
+      covered ??= maintenanceCoversShaft(state, group);
       const p = (covered ? CONFIG.MAINTENANCE_BREAKDOWN_FACTOR : 1) / CONFIG.ELEVATOR_BREAKDOWN_MEAN_DAYS;
       if (eventRoll(state) < p) car.breakdownAtTick = state.tickCount + eventInt(state, 1, CONFIG.DAY_TICKS - 1);
     }
@@ -306,7 +318,15 @@ export function stepCampaign(state: GameState): void {
       } else {
         damage(state, tenant.id);
         if (incident.kind === 'fire' || incident.kind === 'bomb') {
-          const neighbor = [...state.tenants.values()].find(t => t.id !== tenant.id && t.floor === tenant.floor && t.state === 'open' && Math.abs(t.x - tenant.x) <= tenant.sizeCells + t.sizeCells);
+          // The closest open room on the same floor (never a lobby or sky lobby).
+          let neighbor: Tenant | undefined;
+          let nearest = Infinity;
+          for (const t of state.tenants.values()) {
+            if (t.id === tenant.id || t.floor !== tenant.floor || t.state !== 'open' || t.type === 'lobby' || t.type === 'skyLobby') continue;
+            if (Math.abs(t.x - tenant.x) > tenant.sizeCells + t.sizeCells) continue;
+            const gap = Math.max(t.x - (tenant.x + tenant.sizeCells), tenant.x - (t.x + t.sizeCells), 0);
+            if (gap < nearest) { nearest = gap; neighbor = t; }
+          }
           if (neighbor) damage(state, neighbor.id);
         }
         result = incident.kind === 'infestation' ? 'Infestation forced the facility to close. Inspect it to renovate.' : 'The incident damaged the tower. Inspect damaged rooms to repair them.';
@@ -330,7 +350,8 @@ export function stepCampaign(state: GameState): void {
   const suite = open.find(t => t.type === 'hotelSuite');
   if (suite && !c.vipApproved && state.starLevel >= 3) { startIncident(state, 'vip', suite.id); return; }
   const dirty = open.find(t => t.cleanliness < 40);
-  if (dirty) { startIncident(state, 'infestation', dirty.id); return; }
+  // Dirty rooms invite pests, but not every time: fires and bombs still occur.
+  if (dirty && eventRoll(state) < CONFIG.INFESTATION_PICK_CHANCE) { startIncident(state, 'infestation', dirty.id); return; }
   const target = open[rngInt(state, 0, open.length - 1)]!;
   startIncident(state, state.starLevel >= 3 && rngNext(state) < 0.35 ? 'bomb' : 'fire', target.id);
 }

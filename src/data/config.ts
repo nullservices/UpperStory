@@ -199,14 +199,24 @@ export const CONFIG = {
   FIRE_SPREAD_MAX_PER_STEP: 2,
   /** Spread never pushes the tower past this many simultaneous fires. */
   FIRE_MAX_ACTIVE: 8,
+  /**
+   * Chance a scheduled incident becomes an infestation when a room is dirty.
+   * It was certain: tall hotel towers always have a dirty room, so fires and
+   * bombs vanished (2 fires, 0 bombs in a 108-day playthrough).
+   */
+  INFESTATION_PICK_CHANCE: 0.5,
 
   // --- Breakdowns and blackouts (Upper Story originals; approx) ---
   /** A car breaks down about once per this many days (from 2★). */
   ELEVATOR_BREAKDOWN_MEAN_DAYS: 12,
   /** Breakdown odds when a maintenance office can reach the shaft. */
   MAINTENANCE_BREAKDOWN_FACTOR: 0.25,
-  /** Reachable mechanics fix a broken car after this many ticks. */
-  MAINTENANCE_REPAIR_TICKS: 200,
+  /** A maintenance office looks after shafts with a stop within this many floors that its mechanics can reach. */
+  MAINTENANCE_REACH_FLOORS: 15,
+  /** A mechanic's repair work once at the car; each office has one mechanic per capacity slot. */
+  MAINTENANCE_REPAIR_TICKS: 120,
+  /** Mechanics' travel from the office to the car, per floor. */
+  MAINTENANCE_TRAVEL_TICKS_PER_FLOOR: 2,
   ELEVATOR_REPAIR_COST_DOLLARS: 10_000,
   /** Daily blackout odds by weather (from 2★). */
   BLACKOUT_CHANCE_CLEAR: 0.03,

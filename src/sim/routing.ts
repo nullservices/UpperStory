@@ -4,7 +4,7 @@ import type { ElevatorGroup } from './elevators';
 import type { PersonKind } from './people';
 import { queueLength } from './queues';
 import type { GameState } from './state';
-import { getFloor, stairCellFloor } from './tower';
+import { getFloor, stairCellFloor, type Floor } from './tower';
 
 /** Mirrors people.ts's isStaff without a runtime import cycle. */
 function isStaff(kind: PersonKind): boolean {
@@ -84,8 +84,30 @@ export function rebuildRouting(state: GameState): void {
 
 // --- Stairs ---
 
-/** Columns of stairs linking `lower` and `lower + 1` (one stair = one link). */
-function stairColumns(state: GameState, lower: number): number[] {
+/**
+ * Stair columns per link, memoized until the structure changes. Route
+ * searches run thousands of times a tick at rush hour; scanning 375 cells
+ * per floor each time dominated short trips. The memo is dropped whenever
+ * the structure revision, the floor list or the routing tables change.
+ */
+const stairMemo = new WeakMap<GameState, { routing: RoutingTables; revision: number; floors: Floor[]; columns: Map<number, number[]> }>();
+
+/** Columns of stairs linking `lower` and `lower + 1` (one stair = one link). Read-only. */
+function stairColumns(state: GameState, lower: number): readonly number[] {
+  let memo = stairMemo.get(state);
+  if (!memo || memo.routing !== state.routing || memo.revision !== state.tower.structureRevision || memo.floors !== state.tower.floors) {
+    memo = { routing: state.routing, revision: state.tower.structureRevision, floors: state.tower.floors, columns: new Map() };
+    stairMemo.set(state, memo);
+  }
+  let columns = memo.columns.get(lower);
+  if (!columns) {
+    columns = scanStairColumns(state, lower);
+    memo.columns.set(lower, columns);
+  }
+  return columns;
+}
+
+function scanStairColumns(state: GameState, lower: number): number[] {
   if (!getFloor(state.tower, lower) || !getFloor(state.tower, lower + 1)) return [];
   const columns: number[] = [];
   getFloor(state.tower, stairCellFloor(lower))?.cells.forEach((cell, x) => {
@@ -102,7 +124,7 @@ function stairRoute(state: GameState, from: number, to: number): RouteLeg[] | nu
   const span = Math.abs(to - from);
   if (span === 0 || span > CONFIG.STAIR_MAX_FLOORS) return null;
   const dir: 1 | -1 = to > from ? 1 : -1;
-  const steps: number[][] = [];
+  const steps: (readonly number[])[] = [];
   for (let f = from; f !== to; f += dir) {
     const columns = stairColumns(state, Math.min(f, f + dir));
     if (columns.length === 0) return null;

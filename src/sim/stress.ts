@@ -1,4 +1,5 @@
 import { CONFIG, isHotel } from '../data/config';
+import { countsTowardPopulation } from './people';
 import type { GameState } from './state';
 
 /**
@@ -18,9 +19,15 @@ export function lobbyWaitStressMultiplier(floor: number): number {
   return 1 + (floor - CONFIG.LOBBY_FLOOR_INDEX) * CONFIG.LOBBY_STRESS_HEIGHT_FACTOR;
 }
 
-/** Per-tick stress accrual/decay for every person, by current state. */
-export function stepStress(state: GameState): void {
+/**
+ * Per-tick stress accrual/decay for every person, by current state. Returns
+ * the number of people counting toward population (see `population`), so the
+ * engine can skip another pass over everyone later in the tick.
+ */
+export function stepStress(state: GameState): number {
+  let residents = 0;
   for (const p of state.people.values()) {
+    if (countsTowardPopulation(p)) residents++;
     let delta: number;
     switch (p.state) {
       case 'walking':
@@ -55,4 +62,5 @@ export function stepStress(state: GameState): void {
     p.stress = Math.min(Math.max(p.stress + delta, 0), CONFIG.STRESS_MAX);
     p.dayStress = Math.max(0, p.dayStress + Math.max(delta, 0));
   }
+  return residents;
 }

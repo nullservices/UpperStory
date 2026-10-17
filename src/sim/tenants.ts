@@ -4,7 +4,8 @@ import { nextId } from './core/ids';
 import { demolishElevatorGroup, groupAt } from './elevators';
 import { spend } from './money';
 import { sellCondo, repurchaseCondo, condoHasAccess } from './condoEconomy';
-import { floorLabel } from './campaign';
+import { floorLabel, recordEvent } from './campaign';
+import { maintenanceOfficeReport } from './services';
 import { giveUp, removeTenantPeople, spawnTenantPeople } from './people';
 import type { RouteLeg } from './routing';
 import type { GameState } from './state';
@@ -146,7 +147,14 @@ export function placementError(
   for (let f = floorIndex; f < floorIndex + facilityHeight(type); f++) {
     const band = getFloor(state.tower, f);
     if (!band) return `Build all ${facilityHeight(type)} floors first`;
-    if (type !== 'lobby' && !floorContains(state, f, x, data.sizeCells)) return 'Extend this floor first';
+    if (type !== 'lobby' && !floorContains(state, f, x, data.sizeCells)) {
+      // Say how short the built floor is when the room overhangs its edge.
+      const bounds = floorBounds(state, f);
+      const built = Math.max(0, Math.min(x + data.sizeCells, bounds.hi) - Math.max(x, bounds.lo));
+      return built > 0
+        ? `Not enough floor here: this room needs ${data.sizeCells} cells (${built} built). Extend this floor first.`
+        : 'Extend this floor first';
+    }
     if (band.cells.slice(x, x + data.sizeCells).some(c => c.content !== 'empty')) return 'Space is occupied';
   }
   const kinship = kinsokuViolation(state, type, floorIndex, x);
@@ -364,6 +372,12 @@ export function stepConstruction(state: GameState): void {
     pushEvent(state, { type: 'TENANT_COMPLETED', tenantId: tenant.id });
     // The occupants move in (6 workers per office, 3 residents per condo).
     if (tenant.state === 'open') spawnTenantPeople(state, tenant);
+    if (tenant.type === 'maintenance') {
+      // Coverage is not visible on the map: say what the new office looks after.
+      const covered = maintenanceOfficeReport(state, tenant.id)?.shafts.length ?? 0;
+      const shafts = state.elevatorGroups.size;
+      recordEvent(state, `Maintenance office opened on ${floorLabel(tenant.floor)}: its mechanics look after ${covered} of ${shafts} elevator shaft${shafts === 1 ? '' : 's'}.`, { floor: tenant.floor, x: tenant.x + Math.floor(tenant.sizeCells / 2) });
+    }
   }
 }
 

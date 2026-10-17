@@ -332,17 +332,17 @@ export const SCENARIOS: readonly ScenarioDef[] = [
     difficulty: 'Hard',
     seed: 5505,
     lobbyHeight: 2,
-    timeLimitDays: 36,
+    timeLimitDays: 48,
     objectives: [
       { kind: 'topFloor', target: 60, label: 'Build up to floor 60' },
       { kind: 'expressSkyLobbies', target: 4, label: 'Express service to 4 sky lobbies' },
       { kind: 'population', target: 1_000, label: 'House or employ 1,000 people' },
     ],
     rules: { lot: { lo: SKY_LO, hi: SKY_HI } },
-    constraints: ['Three years (36 days)', 'A lot only 96 cells wide'],
+    constraints: ['Four years (48 days)', 'A lot only 96 cells wide'],
     setup: state => {
       lobbyPlot(state, SKY_LO, SKY_HI);
-      finish(state, 5_000_000, 3);
+      finish(state, 7_000_000, 3);
     },
   },
   {

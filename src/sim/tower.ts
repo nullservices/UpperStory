@@ -2,6 +2,7 @@ import { CONFIG } from '../data/config';
 import { recordEvent, roofFacilityUnder } from './campaign';
 import { rngInt } from './core/rng';
 import { addMoney, spend } from './money';
+import { scenarioFloorError, scenarioLotError } from './scenarios';
 import type { GameState } from './state';
 
 export type CellContent =
@@ -76,6 +77,8 @@ export function floorExtensionError(state: GameState, index: number, x: number):
   if (!Number.isInteger(x) || x < 0 || x >= CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
   const bounds = floorBounds(state, index);
   if (x >= bounds.lo && x < bounds.hi) return 'Floor already built here';
+  const scenarioRule = scenarioLotError(state, x);
+  if (scenarioRule) return scenarioRule;
   const lo = bounds.lo === bounds.hi ? x : Math.min(x, bounds.lo); const hi = bounds.lo === bounds.hi ? x + 1 : Math.max(x + 1, bounds.hi);
   if (!floorContains(state, index <= 0 ? index + 1 : index - 1, lo, hi - lo)) return index <= 0 ? 'Extend the basement or lobby above first' : 'Extend the floor or lobby below first';
   if (index > CONFIG.LOBBY_FLOOR_INDEX && roofFacilityUnder(state, index - 1, lo, hi)) return 'A rooftop facility occupies the roof below';
@@ -134,6 +137,8 @@ export function buildFloorError(state: GameState, index: number): string | null 
     return 'Floor out of range';
   }
   if (getFloor(state.tower, index)) return 'Floor already exists';
+  const scenarioRule = scenarioFloorError(state, index);
+  if (scenarioRule) return scenarioRule;
   if (index < 0 && !getFloor(state.tower, index + 1)) return 'Build the basement above first';
   if (index < 0) {
     const bounds = floorBounds(state, index + 1);

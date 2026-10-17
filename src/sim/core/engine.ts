@@ -11,6 +11,8 @@ import { stepConstruction } from '../tenants';
 import { stepTime } from '../time';
 import { stepDailySettlement } from '../money';
 import type { GameState } from '../state';
+import { stepScenario } from '../scenarios';
+import { stepStats } from '../stats';
 
 /**
  * One simulation step. Systems run in a FIXED order — this is the heart of
@@ -48,4 +50,6 @@ export function tick(state: GameState): void {
   stepCampaign(state);
   const unchanged = state.people.size === peopleSize && state.nextEntityId === nextEntityId;
   stepProgression(state, unchanged ? residents : undefined); // population-based star ratings
+  stepScenario(state); // scenario goals and outcomes
+  stepStats(state); // daily statistics for the graphs window
 }

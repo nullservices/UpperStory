@@ -117,7 +117,21 @@ export {
 } from './services';
 export type { MaintenanceCoverage, MaintenanceOfficeReport, MaintenanceSummary } from './services';
 export { stepProgression } from './progression';
+export {
+  SCENARIOS,
+  getScenario,
+  startScenario,
+  stepScenario,
+  scenarioProgress,
+  scenarioPlacementError,
+  scenarioFloorError,
+  scenarioLotError,
+  scenarioElevatorError,
+} from './scenarios';
+export type { ScenarioDef, ScenarioState, ScenarioRules, ScenarioOutcome, ScenarioProgress, ObjectiveDef, ObjectiveKind, ObjectiveProgress } from './scenarios';
 export { serializeGame, deserializeGame, SAVE_VERSION } from './save';
 export type { SaveEnvelope } from './save';
 export { towerMetrics, flattenMetrics } from './metrics';
 export type { TowerMetrics } from './metrics';
+export { stepStats, createStats, compactStats, mergeSamples, statsHistory, tradeOf, STATS_LIMITS } from './stats';
+export type { StatsState, StatsSample, StatsField, StatsToday } from './stats';

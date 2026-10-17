@@ -13,6 +13,8 @@ export interface SettingsCallbacks {
   getState: () => GameState;
   /** A slot finished loading; swap it in. */
   onLoaded: (state: GameState, meta: SaveMeta) => void;
+  /** Open the scenario chooser (Game › Scenarios…). */
+  onOpenScenarios?: () => void;
 }
 
 export type GameSection = 'new' | 'save' | 'load';
@@ -105,6 +107,14 @@ export class SettingsDialog {
     newActions.className = 'new-actions';
     newActions.append(this.newButton, tour);
     newGroup.append(heightLabel, seedLabel, newActions);
+    if (callbacks.onOpenScenarios) {
+      const challenge = document.createElement('div');
+      challenge.className = 'scenario-offer';
+      const text = document.createElement('span');
+      text.textContent = 'Prefer a challenge? Scenarios set goals, limits and a deadline.';
+      challenge.append(text, this.button('Scenarios…', () => { this.close(); callbacks.onOpenScenarios?.(); }));
+      newGroup.append(challenge);
+    }
 
     this.status.className = 'settings-message'; this.status.setAttribute('role', 'status');
     body.append(note, savesGroup, newGroup, this.status);

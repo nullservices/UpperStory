@@ -1,3 +1,5 @@
+import type { ScenarioState } from './scenarios';
+import type { StatsState } from './stats';
 import { newCampaign, type CampaignState } from './campaign';
 import { CONFIG } from '../data/config';
 import { seedRng } from './core/rng';
@@ -16,6 +18,10 @@ import type { Calendar } from './time';
  */
 export interface GameState {
   campaign: CampaignState;
+  /** Statistics history for graphs; absent in older saves. */
+  stats?: StatsState;
+  /** Active scenario, or absent for a free-play tower. */
+  scenario?: ScenarioState;
   seed: number;
   /** Live mulberry32 state — part of the save so replays resume the stream. */
   rngState: number;

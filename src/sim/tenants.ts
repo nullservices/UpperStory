@@ -6,6 +6,7 @@ import { spend } from './money';
 import { sellCondo, repurchaseCondo, condoHasAccess } from './condoEconomy';
 import { floorLabel, recordEvent } from './campaign';
 import { maintenanceOfficeReport } from './services';
+import { scenarioPlacementError } from './scenarios';
 import { giveUp, removeTenantPeople, spawnTenantPeople } from './people';
 import type { RouteLeg } from './routing';
 import type { GameState } from './state';
@@ -115,6 +116,8 @@ export function placementError(
   const data: TenantTypeData = TENANT_DATA[type];
   const floor = getFloor(state.tower, floorIndex);
   if (!floor) return 'Build this floor first';
+  const scenarioRule = scenarioPlacementError(state, type, floorIndex, x);
+  if (scenarioRule) return scenarioRule;
   if (!isUnlocked(state, type)) return `Requires ${data.unlockedAtStar}★`;
   if (data.floorRestriction !== undefined && floorIndex !== data.floorRestriction) {
     return `Must be placed on ${floorLabel(data.floorRestriction)}`;

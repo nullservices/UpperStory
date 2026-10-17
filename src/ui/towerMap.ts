@@ -13,14 +13,18 @@ export class TowerMap {
   private state: GameState | null = null;
   private top = 0;
   private bottom = 0;
-  constructor(private readonly move: (worldX: number, worldY: number) => void) {
+  constructor(
+    private readonly move: (worldX: number, worldY: number) => void,
+    /** The world rectangle currently on screen, outlined on the map. */
+    private readonly viewport?: () => { x0: number; y0: number; x1: number; y1: number },
+  ) {
     this.dialog.className = 'ui-dialog tower-map-window';
     this.dialog.setAttribute('aria-label', 'Tower map');
     const title = document.createElement('div'); title.className = 'window-title';
     title.innerHTML = '<span class="title-text">Tower map</span>';
     title.append(closeButton('Close map', () => this.dialog.close()));
     const body = document.createElement('div'); body.className = 'window-body';
-    const help = document.createElement('p'); help.className = 'window-hint'; help.textContent = 'Click the map to move the view. The gold line marks the lobby.';
+    const help = document.createElement('p'); help.className = 'window-hint'; help.textContent = 'Click the map to move the view there. The white frame is the current view; the gold line marks the lobby.';
     this.canvas.width = 600; this.canvas.height = 400;
     this.canvas.className = 'map-canvas';
     this.canvas.setAttribute('aria-label', 'Overview of tower rooms and elevator shafts');
@@ -69,5 +73,15 @@ export class TowerMap {
       (floorTopY(group.serviceHi, state.tower.lobbyHeight) - this.top) * scaleY, shaftWidth(group) * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(group.serviceLo, state.tower.lobbyHeight) + CONFIG.FLOOR_HEIGHT_PX * (group.serviceLo === 1 ? state.tower.lobbyHeight : 1) - floorTopY(group.serviceHi, state.tower.lobbyHeight)) * scaleY);
     const lobbyBounds = floorBounds(state, 1);
     ctx.fillStyle = '#c5a04f'; ctx.fillRect(lobbyBounds.lo * CONFIG.CELL_WIDTH_PX * scaleX, (floorTopY(1, state.tower.lobbyHeight) - this.top) * scaleY, (lobbyBounds.hi - lobbyBounds.lo) * CONFIG.CELL_WIDTH_PX * scaleX, 2);
+    const view = this.viewport?.();
+    if (view) {
+      const x = view.x0 * scaleX, y = (view.y0 - this.top) * scaleY;
+      const w = (view.x1 - view.x0) * scaleX, h = (view.y1 - view.y0) * scaleY;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#1f2933';
+      ctx.strokeRect(x + 1, y + 1, w, h);
+      ctx.strokeStyle = '#ffffff';
+      ctx.strokeRect(x, y, w, h);
+    }
   }
 }

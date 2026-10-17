@@ -142,7 +142,11 @@ export class ToolPalette {
   private readonly caption = document.createElement('div');
   private buttons = new Map<Tool, HTMLButtonElement>();
   private active: Tool | null = 'select';
+  private highlighted: Tool | null = null;
+  private lastCaption = '';
   private lastStateKey = '';
+  /** A locked tool was clicked (or activated by keyboard): explain why. */
+  onLocked: ((tool: Tool, star: number) => void) | null = null;
   private state: GameState | null = null;
   private prefs = readUiPref<PalettePrefs>('palette', { x: null, y: null, collapsed: false });
 
@@ -180,7 +184,12 @@ export class ToolPalette {
         button.type = 'button';
         button.innerHTML = `${toolIcon(info.icon)}<small class="tool-badge"></small>`;
         button.setAttribute('aria-label', info.label);
-        button.onclick = () => { this.setActive(tool); this.onSelect(tool); };
+        // Locked tools stay focusable (aria-disabled) so keyboard and mouse
+        // users can still read when they unlock.
+        button.onclick = () => {
+          if (button.getAttribute('aria-disabled') === 'true') { this.onLocked?.(tool, toolUnlockStar(tool)); return; }
+          this.setActive(tool); this.onSelect(tool);
+        };
         attachTooltip(button, () => this.tooltip(tool));
         this.buttons.set(tool, button);
         grid.append(button);
@@ -203,8 +212,11 @@ export class ToolPalette {
 
   /** Pulse one tool's button (the guide's pointer); null clears it. */
   highlight(tool: Tool | null): void {
+    const changed = tool !== this.highlighted;
+    this.highlighted = tool;
     for (const [id, button] of this.buttons) button.classList.toggle('guide-pulse', id === tool);
-    if (tool && this.prefs.collapsed) this.setCollapsed(false, true);
+    // Unroll once per new pointer, never against a player who just rolled it up.
+    if (tool && changed && this.prefs.collapsed) this.setCollapsed(false, true);
   }
 
   setActive(tool: Tool | null): void {
@@ -222,8 +234,10 @@ export class ToolPalette {
       const required = toolUnlockStar(tool);
       const locked = required > state.starLevel;
       const cost = toolCostDollars(state, tool);
-      button.disabled = locked;
-      button.querySelector('small')!.textContent = locked ? `${required}★` : '';
+      if (locked) button.setAttribute('aria-disabled', 'true'); else button.removeAttribute('aria-disabled');
+      const badge = button.querySelector('small')!;
+      const badgeText = locked ? `${required}★` : '';
+      if (badge.textContent !== badgeText) badge.textContent = badgeText;
       button.classList.toggle('locked', locked);
       button.classList.toggle('unaffordable', !locked && cost !== null && cost * 100 > state.money.balanceCents);
       if (locked && this.active === tool) { this.setActive('select'); this.onSelect('select'); }
@@ -251,10 +265,15 @@ export class ToolPalette {
     const cost = this.state ? toolCostDollars(this.state, tool) : null;
     const key = TOOL_SHORTCUTS[tool];
     const price = costLine(tool, cost);
-    this.caption.innerHTML = '<small class="caption-label">Selected tool</small>'
+    const short = cost !== null && this.state !== null && cost * 100 > this.state.money.balanceCents;
+    const html = '<small class="caption-label">Selected tool</small>'
       + `<div class="caption-row">${toolIcon(info.icon)}<b>${escapeHtml(info.label)}</b>${key ? `<kbd title="Shortcut key">${key}</kbd>` : ''}</div>`
-      + `<span class="caption-cost">${escapeHtml(price || (tool === 'select' ? 'Hover a room for details; click to inspect' : 'No charge'))}</span>`;
-    this.caption.setAttribute('aria-label', `Selected tool: ${info.label}${key ? `, shortcut ${key}` : ''}${price ? `, ${price}` : ''}`);
+      + `<span class="caption-cost${short ? ' tip-warn' : ''}">${escapeHtml(price || (tool === 'select' ? 'Hover a room for details; click to inspect' : 'No charge'))}${short ? ' · not enough funds' : ''}</span>`;
+    if (html !== this.lastCaption) {
+      this.lastCaption = html;
+      this.caption.innerHTML = html;
+      this.caption.setAttribute('aria-label', `Selected tool: ${info.label}${key ? `, shortcut ${key}` : ''}${price ? `, ${price}` : ''}${short ? ', not enough funds' : ''}`);
+    }
     this.titleTool.textContent = this.prefs.collapsed ? `· ${info.label}` : '';
   }
 

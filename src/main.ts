@@ -32,6 +32,7 @@ import { ToolPalette } from './ui/toolPalette';
 import { SettingsDialog } from './ui/dialogs/settings';
 import { CursorTip } from './ui/cursorTip';
 import { FinanceWindow } from './ui/finance';
+import { TOOL_INFO } from './ui/toolPalette';
 import { describeSaveError, openBrowserSaves } from './persistence';
 
 async function main(): Promise<void> {
@@ -115,10 +116,14 @@ async function main(): Promise<void> {
     camera.x = app.screen.width / 2 - x * camera.zoom;
     camera.y = app.screen.height / 2 - y * camera.zoom;
     camera.apply();
+  }, () => {
+    const a = camera.screenToWorld(0, 0), b = camera.screenToWorld(app.screen.width, app.screen.height);
+    return { x0: a.x, y0: a.y, x1: b.x, y1: b.y };
   });
   const controller = new Controller(app, camera, state, hud);
   const palette = new ToolPalette((tool) => controller.selectTool(tool));
   controller.onToolChange = (tool) => palette.setActive(tool);
+  palette.onLocked = (tool, star) => hud.toast(`${TOOL_INFO[tool].label} unlocks at ${'★'.repeat(star)}. Tower › Events & ratings (V) lists what the next rating needs.`, 'hint');
   controller.selectTool('select');
   const guide = new Guide();
   guide.tutorialAllowed = autosaveEnabled; // false on ?demo / ?reference
@@ -160,8 +165,13 @@ async function main(): Promise<void> {
     if (command === 'sound') openSound();
     else if (command === 'map') towerMap.open();
     else if (command === 'events') campaignPanel.open();
-    else if (command === 'tips') guide.setTips(!guide.tipsEnabled);
-    else if (command === 'tutorial') guide.restartTutorial();
+    else if (command === 'tips') {
+      guide.setTips(!guide.tipsEnabled);
+      hud.toast(guide.tipsEnabled ? 'Guide on: tips appear as your tower grows.' : 'Guide off. Turn it back on from Help › Show guide.', 'hint');
+    } else if (command === 'tutorial') {
+      if (guide.tutorialAllowed) guide.restartTutorial();
+      else hud.toast('The tutorial runs on your own towers: start one from Game › New tower.', 'hint');
+    }
     else if (command === 'finances') finances.toggle();
     else settings.open(command);
   };
@@ -198,11 +208,14 @@ async function main(): Promise<void> {
 
   let acc = 0;
   let last = performance.now();
+  let held = false;
   app.ticker.add(() => {
     const now = performance.now();
     // Discard suspended-tab time instead of freezing on thousands of catch-up ticks.
     const modalOpen = document.querySelector('[role="dialog"][data-open="true"], dialog[open]') !== null;
     acc += Math.min(now - last, 250) * (modalOpen ? 0 : speed);
+    // Show "Paused" in the clock while a window holds the tower.
+    if (modalOpen !== held) { held = modalOpen; document.body.classList.toggle('held', held); }
     last = now;
     while (acc >= CONFIG.TICK_MS) {
       motion.capture(state);

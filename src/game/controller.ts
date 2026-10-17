@@ -34,6 +34,7 @@ import { TenantInfo } from '../ui/dialogs/tenantInfo';
 import type { Hud } from '../ui/hud';
 import { TOOL_INFO, TOOL_SHORTCUTS } from '../ui/toolPalette';
 import { floorLabel } from '../sim/campaign';
+import { maintenanceCoverage, maintenanceOfficeReport } from '../sim/services';
 import { BuildStroke, isRowBuildTool } from './buildStroke';
 import { repairTenant, changeMovie } from '../sim/tenants';
 import { buildElevator, elevatorBuildPlan } from './elevatorBuild';
@@ -98,6 +99,8 @@ export class Controller {
   private openDialog: 'tenant' | 'elevator' | 'quarter' | null = null;
   private dragStart: ElevatorDrag | null = null;
   private buildStroke: BuildStroke | null = null;
+  /** People who gave up since the last summary toast. */
+  private gaveUp = { count: 0, floor: 0, lastToast: -Infinity };
 
   constructor(
     app: Application,
@@ -118,7 +121,16 @@ export class Controller {
     this.quarterReport.onClose = () => {
       if (this.openDialog === 'quarter') this.openDialog = null;
     };
-    app.stage.on('pointermove', (e: FederatedPointerEvent) => this.onPointerMove(e));
+    // Pixi reports moves from the whole document, so the hover (and its
+    // preview, cursor tip and footer location) would follow the pointer over
+    // windows and menus. Only the canvas, or a drag that started on it, counts.
+    app.stage.on('pointermove', (e: FederatedPointerEvent) => {
+      if (e.nativeEvent.target !== app.canvas && !this.dragStart && !this.buildStroke) {
+        if (this.pointer || this.hover) { this.pointer = null; this.hover = null; this.hoverError = null; }
+        return;
+      }
+      this.onPointerMove(e);
+    });
     app.canvas.addEventListener('pointerleave', () => {
       this.finishBuildStroke();
       this.pointer = null;
@@ -183,29 +195,34 @@ export class Controller {
   /** Map one tick's sim events to toasts; clears the queue. */
   drainEvents(): void {
     const { events, tenants } = this.state;
+    // A row of rooms finishing together is one message, not one per room.
+    const completed = new Map<string, { count: number; floor: number }>();
     for (const event of events) {
       switch (event.type) {
         case 'TENANT_COMPLETED': {
           const tenant = tenants.get(event.tenantId);
           if (tenant) {
-            const label = (TOOL_INFO as Partial<Record<string, { label: string }>>)[tenant.type]?.label ?? tenant.type;
-            this.hud.toast(`${label} ready on ${floorLabel(tenant.floor)}`);
+            const label = tenantLabel(tenant.type);
+            const entry = completed.get(label) ?? { count: 0, floor: tenant.floor };
+            entry.count++;
+            completed.set(label, entry);
           }
           break;
         }
         case 'LEVEL_UP':
-          this.hud.toast(`Tower rated ★${event.starLevel}!`);
+          this.hud.toast(event.starLevel >= 6 ? 'Your tower earned the TOWER rating!' : `Your tower is now rated ${'★'.repeat(event.starLevel)} (${event.starLevel} stars)!`);
           break;
         case 'ALERT':
-          this.hud.toast(event.message);
+          this.hud.toast(friendlyAlert(event.message));
           break;
         case 'QUARTER_REPORT': {
-          this.finishBuildStroke();
-          this.openDialog = 'quarter';
+          // A floating card: building continues, Escape closes it first.
+          if (!this.openDialog) this.openDialog = 'quarter';
           this.quarterReport.open({
             quarter: event.quarter,
             income: event.income,
             upkeep: event.upkeep,
+            interest: event.interest,
             // The balance already includes the quarter's net (settlement ran
             // before the event was pushed).
             balanceCents: this.state.money.balanceCents,
@@ -213,7 +230,8 @@ export class Controller {
           break;
         }
         case 'PERSON_GAVE_UP':
-          this.hud.toast(`Someone gave up waiting on floor ${event.floor}`);
+          this.gaveUp.count++;
+          this.gaveUp.floor = event.floor;
           break;
         default:
           // MONEY_CHANGED: no toast.
@@ -221,11 +239,34 @@ export class Controller {
       }
     }
     events.length = 0;
+    for (const [label, { count, floor }] of completed) {
+      this.hud.toast(count > 1 ? `${count} ${plural(label)} are ready` : `${label} ready on ${floorLabel(floor)}`);
+    }
+    // Busy towers can lose several people a second; report them at most every
+    // few seconds so the message stack stays readable.
+    const now = performance.now();
+    if (this.gaveUp.count > 0 && now - this.gaveUp.lastToast > GAVE_UP_TOAST_MS) {
+      const { count, floor } = this.gaveUp;
+      this.hud.toast(count === 1
+        ? `Someone gave up waiting for transport on ${floorLabel(floor)}`
+        : `${count} people gave up waiting for transport (latest on ${floorLabel(floor)})`, 'warn');
+      this.gaveUp = { count: 0, floor: 0, lastToast: now };
+    }
   }
 
   private onKeyDown(e: KeyboardEvent): void {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || document.querySelector('[role="dialog"][data-open="true"], dialog[open]')) return;
     if (e.key === 'Home') { e.preventDefault(); this.camera.center(); return; }
+    // Arrow keys pan the view (Shift for big steps), so the tower is reachable without a mouse.
+    const pan = (PAN_KEYS as Partial<Record<string, readonly [number, number]>>)[e.key];
+    if (pan && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const step = e.shiftKey ? 360 : 96;
+      this.camera.x += pan[0] * step;
+      this.camera.y += pan[1] * step;
+      this.camera.apply();
+      return;
+    }
     const shortcut = (Object.keys(TOOL_SHORTCUTS) as Tool[]).find(tool => TOOL_SHORTCUTS[tool]!.toLowerCase() === e.key.toLowerCase());
     if (shortcut && !e.ctrlKey && !e.metaKey && !e.altKey) { this.selectTool(shortcut); return; }
     if (e.key !== 'Escape') return;
@@ -284,8 +325,7 @@ export class Controller {
           if (plan.error) throw new Error(plan.error);
           if (plan.extending) extendFloor(state, plan.floor, hover!.cell);
           else buildFloor(state, plan.floor);
-          const label = plan.floor <= 0 ? `basement B${1 - plan.floor}` : `floor ${plan.floor}`;
-          this.hud.toast(`${plan.extending ? 'Extended' : 'Built'} ${label}`);
+          this.hud.toast(`${plan.extending ? 'Extended' : 'Built'} ${floorLabel(plan.floor)}`);
           break;
         }
         case 'elevator':
@@ -309,7 +349,9 @@ export class Controller {
         }
         case 'demolish': {
           if (!hover) break;
+          const target = this.demolishTarget(hover.floor, hover.cell);
           demolishAt(state, hover.floor, hover.cell);
+          if (target) this.hud.toast(`Removed ${target}`);
           break;
         }
         case 'stairs': {
@@ -327,7 +369,7 @@ export class Controller {
       // Refresh the preview now that funds/structure may have changed.
       this.hoverError = this.errorFor(this.tool, this.hover);
     } catch (err) {
-      this.hud.toast(err instanceof Error ? err.message : String(err));
+      this.hud.toast(err instanceof Error ? err.message : String(err), 'error');
     }
   }
 
@@ -348,9 +390,15 @@ export class Controller {
     this.dragStart = null;
     const hoverFloor = this.hover?.floor ?? drag.fromFloor;
     try {
+      const before = elevatorBuildPlan(this.state, drag.fromFloor, hoverFloor, drag.cell, kindFor(tool));
+      const group = before.groupId === undefined ? undefined : this.state.elevatorGroups.get(before.groupId);
+      const unchanged = group !== undefined && group.serviceLo === before.lo && group.serviceHi === before.hi;
       buildElevator(this.state, drag.fromFloor, hoverFloor, drag.cell, kindFor(tool));
+      const span = `${floorLabel(before.lo)} – ${floorLabel(before.hi)}`;
+      if (!group) this.hud.toast(`Built ${TOOL_INFO[tool].label.toLowerCase()} · ${span}`);
+      else if (!unchanged) this.hud.toast(`Shaft extended · now serves ${span}`);
     } catch (err) {
-      this.hud.toast(err instanceof Error ? err.message : String(err));
+      this.hud.toast(err instanceof Error ? err.message : String(err), 'error');
     }
     this.hoverError = this.errorFor(tool, this.hover);
   }
@@ -359,8 +407,24 @@ export class Controller {
     const stroke = this.buildStroke;
     this.buildStroke = null;
     if (!stroke) return;
-    if (stroke.placed > 1) this.hud.toast(`Built ${stroke.placed} ${stroke.tool === 'lobby' ? 'lobby cells' : 'facilities'}${stroke.error ? ` — ${stroke.error}` : ''}`);
-    else if (stroke.error) this.hud.toast(stroke.error);
+    const what = stroke.tool === 'lobby' ? 'lobby cells' : plural(TOOL_INFO[stroke.tool].label);
+    if (stroke.placed > 1) this.hud.toast(`Built ${stroke.placed} ${what}${stroke.error ? ` — stopped: ${stroke.error}` : ''}`, stroke.error ? 'warn' : 'info');
+    else if (stroke.error) this.hud.toast(stroke.error, 'error');
+  }
+
+  /** What a Bulldoze click at (floor, cell) would remove, for the cursor tip and toast. */
+  demolishTarget(floor: number, cell: number): string | null {
+    const where = floorLabel(floor);
+    const entity = this.entityAt(floor, cell);
+    if (entity?.kind === 'elevator') {
+      const kind = entity.group.kind === 'service' ? 'service elevator' : entity.group.kind === 'express' ? 'express elevator' : 'elevator';
+      return `${kind} (${floorLabel(entity.group.serviceLo)} – ${floorLabel(entity.group.serviceHi)})`;
+    }
+    if (entity) return entity.tenant.type === 'lobby' ? 'a lobby cell' : `${tenantLabel(entity.tenant.type)} on ${where}`;
+    const content = getFloor(this.state.tower, floor)?.cells[cell]?.content;
+    if (content === 'stair') return `stairs on ${where}`;
+    if (content === 'escalator') return `escalator on ${where}`;
+    return null;
   }
 
   /** 'select' click: open the info dialog for the thing under the pointer. */
@@ -393,6 +457,10 @@ export class Controller {
         }),
         occupancy,
         housekeepingAccess: housekeepingAccess(this.state, tenant),
+        maintenance: (() => {
+          const report = maintenanceOfficeReport(this.state, tenant.id);
+          return report && { shafts: report.shafts.length, totalShafts: this.state.elevatorGroups.size, crews: report.crews, busy: report.busy };
+        })(),
         cleaningRemaining: tenant.type === 'housekeeping' ? [...this.state.people.values()]
           .filter(p => p.tenantId === tenant.id && p.kind === 'housekeeper')
           .map(p => Math.max(0, CONFIG.HOUSEKEEPER_ROOMS_PER_DAY - (p.roomsCleanedToday ?? 0))) : undefined,
@@ -449,6 +517,7 @@ export class Controller {
       response: (day, period, floors) => this.elevatorAction(() => setWaitingResponse(state, group.id, day, period, floors)),
       departure: (day, period, seconds) => this.elevatorAction(() => setDepartureDelay(state, group.id, day, period, seconds)),
       stop: (floor, enabled) => this.elevatorAction(() => setElevatorStop(state, group.id, floor, enabled)),
+      maintenanceOffices: () => maintenanceCoverage(state, group.id).officeIds.length,
       close: () => this.elevatorEditor.close(),
     }, anchor);
   }
@@ -504,6 +573,32 @@ export class Controller {
         return placementError(state, tool, hover.floor, hover.cell);
     }
   }
+}
+
+const GAVE_UP_TOAST_MS = 8000;
+const PAN_KEYS = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] } as const;
+
+function tenantLabel(type: string): string {
+  return (TOOL_INFO as Partial<Record<string, { label: string }>>)[type]?.label ?? type;
+}
+
+/** "Office" → "offices", "Parking" → "parking spaces", "Stairs" → "stairs". */
+export function plural(label: string): string {
+  const lower = label.replace(/ [↑↓]$/, '').toLowerCase();
+  if (lower === 'parking') return 'parking spaces';
+  if (lower.endsWith('s')) return lower;
+  if (lower.endsWith('y') && !/[aeiou]y$/.test(lower)) return `${lower.slice(0, -1)}ies`;
+  return `${lower}s`;
+}
+
+/**
+ * The evaluation's vacancy alerts use raw type ids and floor indices
+ * ("A fastfood on floor 0 has gone vacant!"); show the player-facing names.
+ */
+export function friendlyAlert(message: string): string {
+  const match = /^A (\w+) on floor (-?\d+) (has new occupants|has gone vacant)!$/.exec(message);
+  if (!match) return message;
+  return `${tenantLabel(match[1]!)} on ${floorLabel(Number(match[2]))} ${match[3]}`;
 }
 
 /** Elevator shaft tool → the group kind it commits as. */

@@ -29,14 +29,20 @@ export class CampaignPanel {
   private dialog: HTMLDialogElement | null = null;
   private state: GameState | null = null;
   constructor(private readonly focusFloor: (floor: number, x: number) => void, private readonly toast: (text: string) => void) {
+    this.button.type = 'button';
     this.button.textContent = 'Events & ratings';
+    this.button.setAttribute('role', 'menuitem');
+    this.button.setAttribute('aria-haspopup', 'dialog');
     this.button.onclick = () => this.open();
     document.querySelector('.game-header nav')!.append(this.button);
   }
   update(state: GameState): void {
     this.state = state;
     const count = state.campaign.incidents.length;
-    this.button.textContent = `Events & ratings${count ? ` (${count})` : ''}`;
+    const text = `Events & ratings${count ? ` (${count})` : ''}`;
+    if (this.button.textContent === text) return;
+    this.button.textContent = text;
+    this.button.title = count ? `${count} active event${count === 1 ? '' : 's'} need attention (V)` : 'Events & ratings (V)';
     this.button.classList.toggle('incident-alert', count > 0);
   }
   open(): void {
@@ -56,7 +62,7 @@ export class CampaignPanel {
     if (!state || !dialog) return;
     dialog.replaceChildren();
     const heading = document.createElement('h2');
-    heading.textContent = 'Tower operations';
+    heading.textContent = 'Events & ratings';
     const close = this.action('Back to tower', () => dialog.close());
     const header = document.createElement('div'); header.className = 'campaign-heading'; header.append(heading, close); dialog.append(header);
     const summary = document.createElement('p');
@@ -67,9 +73,9 @@ export class CampaignPanel {
       if (!tenant) continue;
       const section = document.createElement('section'); section.className = 'incident-card';
       const title = document.createElement('h3');
-      title.textContent = `${incident.kind === 'vip' ? 'VIP inspection' : incident.kind === 'bomb' ? 'Bomb threat' : incident.kind === 'fire' ? 'Fire' : 'Cockroaches'} · ${TOOL_INFO[tenant.type].label} · ${tenant.floor <= 0 ? `B${1 - tenant.floor}` : `Floor ${tenant.floor}`}`;
+      title.textContent = `${incident.kind === 'vip' ? 'VIP visit' : incident.kind === 'bomb' ? 'Bomb threat' : incident.kind === 'fire' ? 'Fire' : 'Cockroaches'} · ${TOOL_INFO[tenant.type].label} · ${tenant.floor <= 0 ? `B${1 - tenant.floor}` : `Floor ${tenant.floor}`}`;
       const remaining = document.createElement('p');
-      remaining.textContent = `${Math.max(0, Math.ceil((incident.deadline - state.tickCount) / 10))} seconds at 1× remaining. ${incident.response ? 'Response underway.' : incident.kind === 'vip' ? 'Keep the suite clean and transport running.' : 'Choose a response, then return to the tower.'}`;
+      remaining.textContent = `${Math.max(0, Math.ceil((incident.deadline - state.tickCount) / 10))}s left at normal speed (the tower is paused while this window is open). ${incident.response ? 'Response underway.' : incident.kind === 'vip' ? 'Keep the suite clean and transport running.' : 'Choose a response, then return to the tower.'}`;
       section.append(title, remaining, this.action('Show location', () => { this.focusFloor(tenant.floor, tenant.x); dialog.close(); }));
       const options: IncidentResponse[] = incident.kind === 'fire' ? ['security', 'rescue']
         : incident.kind === 'bomb' ? ['search', 'ransom'] : incident.kind === 'infestation' ? ['exterminate'] : [];
@@ -123,10 +129,13 @@ export class CampaignPanel {
         const p = document.createElement('p'); p.textContent = text; history.append(p);
       }
     }
-    if (!state.campaign.history.length) history.append('No events yet.');
+    if (!state.campaign.history.length) {
+      const empty = document.createElement('p'); empty.className = 'window-hint'; empty.textContent = 'No events yet. Fires, VIP visits, new ratings and other news are recorded here.';
+      history.append(empty);
+    }
     dialog.append(history);
   }
   private action(label: string, callback: () => void): HTMLButtonElement {
-    const button = document.createElement('button'); button.textContent = label; button.onclick = callback; return button;
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = label; button.onclick = callback; return button;
   }
 }

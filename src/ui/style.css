@@ -2,7 +2,7 @@
    bevelled windows with blue title bars over a bright sky. */
 :root{
   font-family:"Segoe UI",system-ui,-apple-system,Tahoma,sans-serif;font-size:12px;color:#1f2933;color-scheme:light;
-  --face:#dededa;--face-hi:#f7f7f4;--face-lo:#b4b4af;--edge:#7d7d79;--ink:#1f2933;--muted:#5b6470;
+  --face:#dededa;--face-hi:#f7f7f4;--face-lo:#b4b4af;--edge:#7d7d79;--ink:#1f2933;--muted:#4d5560;
   --title-a:#1b4a8c;--title-b:#3b7bd0;--accent:#2a64b4;--accent-soft:#d6e4f7;--lcd:#fbfbf7;
   --gold:#e5a50a;--danger:#b3261e;--good:#2e7d32;--menu-h:26px;--info-h:48px;--footer-h:24px;
 }
@@ -67,7 +67,7 @@ input[type=range]{accent-color:var(--accent)}
 .info-clock path{stroke:#4a5563;stroke-width:1.2;stroke-linecap:round}
 .info-clock .hand-h{stroke:#1f2933;stroke-width:2.2}
 .info-clock .hand-m{stroke:var(--accent);stroke-width:1.6}
-body.paused .time-label::after{content:" · Paused";color:var(--danger);font-weight:600}
+body.paused .time-label::after,body.held .time-label::after{content:" · Paused";color:var(--danger);font-weight:600}
 .info-message{flex:1;min-width:0;display:flex;align-items:center;padding:0 10px;overflow:hidden;color:var(--ink);font-size:12px;line-height:1.3;background:#f1f4f8}
 .info-message>span,.info-message{text-overflow:ellipsis}
 .info-message .clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -89,6 +89,7 @@ body.paused .time-label::after{content:" · Paused";color:var(--danger);font-wei
 
 /* --- Floating windows (palette, tower report) --- */
 .ui-window{position:fixed;z-index:25;background:var(--face);border:1px solid var(--edge);border-radius:4px;box-shadow:inset 1px 1px var(--face-hi),0 6px 18px #0b1a3033;overflow:hidden}
+.ui-window:focus{outline:none}
 .ui-window.dragging,.ui-dialog.dragging,.game-window.dragging{box-shadow:0 12px 28px #0b1a3055;opacity:.97}
 .window-title{display:flex;align-items:center;gap:6px;height:24px;padding:0 3px 0 8px;background:linear-gradient(90deg,var(--title-a),var(--title-b));color:#fff;font-weight:700;font-size:12px;white-space:nowrap;user-select:none;position:relative}
 .window-title.drag-handle{cursor:grab}
@@ -112,7 +113,7 @@ body.paused .time-label::after{content:" · Paused";color:var(--danger);font-wei
 .tool-grid button{position:relative;width:40px;height:36px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:3px}
 .tool-grid svg{width:30px;height:23px;shape-rendering:crispEdges;pointer-events:none}
 .tool-grid button[aria-pressed=true]{outline:2px solid var(--accent);outline-offset:-2px}
-.tool-grid button.locked:disabled{opacity:1;background:#d4d4d0;box-shadow:none}
+.tool-grid button.locked,.tool-grid button.locked:hover{opacity:1;background:#d4d4d0;box-shadow:none;border-color:var(--edge);cursor:help}
 .tool-grid button.locked svg{filter:grayscale(1);opacity:.35}
 .tool-badge{position:absolute;right:2px;bottom:1px;font-size:9px;font-weight:700;color:#6b5000;line-height:1}
 .tool-grid button.unaffordable::after{content:"";position:absolute;top:3px;right:3px;width:6px;height:6px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 1px #fff}
@@ -145,9 +146,11 @@ body.paused .time-label::after{content:" · Paused";color:var(--danger);font-wei
 /* Toasts */
 .toast-stack{position:fixed;bottom:calc(var(--footer-h) + 10px);left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;z-index:45;pointer-events:none}
 .toast-stack>div{background:#fffef0;border:1px solid #8a8a86;border-radius:3px;box-shadow:0 3px 10px #0002;padding:6px 14px;font-size:12px;max-width:min(560px,80vw)}
+.toast-stack>div.toast-error{background:#fdecea;border-color:#c98b85;color:#7d1a14}
+.toast-stack>div.toast-warn{background:#fff4dc;border-color:#c9a25a;color:#5c3d00}
 
 /* --- Inspector & modal windows --- */
-.game-window{background:var(--face)!important;color:var(--ink)!important;border:1px solid var(--edge)!important;border-radius:4px!important;padding:0 12px 12px!important;box-shadow:inset 1px 1px var(--face-hi),0 10px 30px #0b1a3040!important;max-height:calc(100vh - 40px);overflow:auto;position:relative!important;font:12px "Segoe UI",system-ui,sans-serif!important}
+.game-window{background:var(--face)!important;color:var(--ink)!important;border:1px solid var(--edge)!important;border-radius:4px!important;padding:0 12px 12px!important;box-shadow:inset 1px 1px var(--face-hi),0 10px 30px #0b1a3040!important;max-height:calc(100vh - var(--menu-h) - var(--info-h) - var(--footer-h) - 12px)!important;overflow:auto;position:relative!important;font:12px "Segoe UI",system-ui,sans-serif!important}
 .game-window>.window-title{margin:0 -12px 10px!important;padding:0 30px 0 8px!important;position:sticky!important;top:0;z-index:1;font-size:12px!important}
 .game-window>.window-close{position:absolute!important;top:3px!important;right:4px!important;z-index:2;width:19px;height:18px;padding:0!important;font:700 13px/15px "Segoe UI",sans-serif!important;color:#1f2933!important;background:linear-gradient(#fdfdfb,#e3e3df)!important;border:1px solid var(--edge)!important;border-radius:2px}
 .game-window button:not(.window-close){padding:3px 10px;font-size:11.5px}
@@ -215,6 +218,7 @@ dialog::backdrop{background:#14203018}
 /* --- Guide: tutorial steps and one-time tips (never modal; the game keeps running) --- */
 .guide-card{right:14px;bottom:calc(var(--footer-h) + 14px);width:320px;max-width:calc(100vw - 28px);z-index:24}
 .guide-counter{margin-left:auto;margin-right:4px;font-weight:400;opacity:.85}
+.guide-card .window-title .window-close{margin-left:0}
 .guide-body{margin:0;padding:10px 12px 4px;line-height:1.45;font-size:12.5px}
 .guide-actions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px 12px}
 .guide-actions button.primary{background:linear-gradient(#3b7bd0,#2a64b4);border-color:#1b4a8c;color:#fff;box-shadow:inset 0 1px #ffffff55}
@@ -229,6 +233,7 @@ dialog::backdrop{background:#14203018}
 .tool-caption .caption-row b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tool-caption kbd{font:600 10px/1 "Segoe UI",system-ui,sans-serif;padding:2px 5px;border:1px solid var(--edge);border-bottom-width:2px;border-radius:3px;background:var(--face-hi);color:var(--ink)}
 .tool-caption .caption-cost{color:var(--good)}
+.tool-caption .caption-cost.tip-warn{color:var(--danger)}
 
 /* --- Cursor-side tip (placement price / error, room summary) --- */
 .cursor-tip{position:fixed;left:0;top:0;z-index:35;pointer-events:none;display:flex;flex-direction:column;gap:1px;max-width:260px;padding:4px 8px;background:#fffef0f2;border:1px solid #6f6f6b;border-radius:3px;box-shadow:0 3px 10px #0003;font-size:11.5px;line-height:1.4;white-space:nowrap}
@@ -264,11 +269,21 @@ dialog::backdrop{background:#14203018}
 .log-list .log-jump:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}
 
 /* --- Overlay legend (status views) --- */
-.overlay-legend{position:fixed;left:12px;bottom:calc(var(--footer-h) + 12px);z-index:24;width:220px;padding:7px 10px 8px;background:var(--face);border:1px solid var(--edge);border-radius:4px;box-shadow:inset 1px 1px var(--face-hi),0 4px 12px #0b1a3030;font-size:11px}
+/* Starts right of the default palette spot so the two never stack at 720px tall. */
+.overlay-legend{position:fixed;left:208px;bottom:calc(var(--footer-h) + 12px);z-index:24;width:220px;padding:7px 10px 8px;background:var(--face);border:1px solid var(--edge);border-radius:4px;box-shadow:inset 1px 1px var(--face-hi),0 4px 12px #0b1a3030;font-size:11px}
 .overlay-legend b{display:block;font-size:11.5px;margin-bottom:5px}
 .overlay-legend .legend-bar{height:12px;border:1px solid #8a8a86;border-radius:2px}
 .overlay-legend .legend-labels{display:flex;justify-content:space-between;margin-top:2px;color:var(--ink);font-size:10.5px}
 .overlay-legend p{margin:5px 0 0;color:var(--muted);line-height:1.35}
+
+/* --- Quarterly report (floating card; never pauses the tower) --- */
+.quarter-report{right:14px;top:calc(var(--menu-h) + var(--info-h) + 10px);width:300px}
+.quarter-body{display:flex;flex-direction:column;gap:3px;margin:10px 12px 8px;padding:8px 10px;background:var(--lcd);border:1px solid;border-color:#8a8a86 #f4f4f0 #f4f4f0 #8a8a86;border-radius:2px}
+.quarter-body>div{display:flex;justify-content:space-between;gap:16px}
+.quarter-body span{color:var(--muted)}
+.quarter-body b{font-variant-numeric:tabular-nums;font-weight:600}
+.quarter-body b.good{color:var(--good)}
+.quarter-body b.bad{color:var(--danger)}
 
 /* --- Finances & loans --- */
 .finance-window{width:330px}

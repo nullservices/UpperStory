@@ -16,6 +16,8 @@ export interface CursorSource {
   readonly drag: ElevatorDrag | null;
   readonly stroke: { placed: number; spentCents: number; error: string | null } | null;
   entityAt(floor: number, cell: number): HoverEntity | null;
+  /** What Bulldoze would remove at a cell ("Office on floor 2"), if anything. */
+  demolishTarget?(floor: number, cell: number): string | null;
 }
 
 export type HoverEntity = { kind: 'elevator'; group: ElevatorGroup } | { kind: 'tenant'; tenant: Tenant };
@@ -67,6 +69,8 @@ export class CursorTip {
   private hoverKey = '';
   private hoverSince = 0;
   private lastHtml = '';
+  /** Size of the tip for lastHtml, measured once per content change. */
+  private size = { width: 0, height: 0 };
 
   constructor() {
     this.el.className = 'cursor-tip';
@@ -78,12 +82,16 @@ export class CursorTip {
   update(state: GameState, src: CursorSource): void {
     const html = this.content(state, src);
     if (!html || !src.pointer) return this.hide();
-    if (html !== this.lastHtml) {
-      this.lastHtml = html;
-      this.el.innerHTML = html;
-    }
+    const wasHidden = this.el.hidden;
     this.el.hidden = false;
-    const box = this.el.getBoundingClientRect();
+    if (html !== this.lastHtml || wasHidden) {
+      if (html !== this.lastHtml) this.el.innerHTML = html;
+      this.lastHtml = html;
+      // Measure only when the content changes, not every frame.
+      const rect = this.el.getBoundingClientRect();
+      this.size = { width: rect.width, height: rect.height };
+    }
+    const box = this.size;
     let x = src.pointer.x + 18;
     let y = src.pointer.y + 20;
     if (x + box.width > window.innerWidth - 6) x = src.pointer.x - box.width - 12;
@@ -99,16 +107,24 @@ export class CursorTip {
     }
     if (tool === 'select') return this.inspectContent(state, src);
     this.hoverKey = '';
-    if (tool === 'demolish') return src.hoverError ? `<span class="tip-error">${escapeHtml(src.hoverError)}</span>` : '';
+    if (tool === 'demolish') {
+      if (src.hoverError) return `<span class="tip-error">${escapeHtml(src.hoverError)}</span>`;
+      const target = src.demolishTarget?.(hover.floor, hover.cell);
+      return target ? `<span class="tip-error">Remove ${escapeHtml(target)}</span><small>No refund</small>` : '';
+    }
     const stroke = src.stroke;
     if (stroke && src.pointerDown) {
-      const total = `<span class="tip-total">${stroke.placed} built · ${dollars(stroke.spentCents / 100)}</span>`;
+      const count = tool === 'lobby' ? `${stroke.placed} cell${stroke.placed === 1 ? '' : 's'}` : `${stroke.placed} built`;
+      const total = `<span class="tip-total">${count} · ${dollars(stroke.spentCents / 100)}</span>`;
       return stroke.error ? `${total}<span class="tip-error">${escapeHtml(stroke.error)}</span>` : total;
     }
     if (src.hoverError) return `<span class="tip-error">${escapeHtml(src.hoverError)}</span>`;
     const cost = placementCostDollars(state, tool, hover, src.drag);
     if (cost === null) return '';
-    const per = tool === 'lobby' ? ' <small>per cell � drag for more</small>' : '';
+    // Pointing at an existing shaft (nothing dragged yet) costs nothing: say how to extend it.
+    const shaftTool = tool === 'elevator' || tool === 'serviceElevator' || tool === 'expressElevator';
+    if (shaftTool && cost === 0) return src.drag ? '<span class="tip-total">No new floors</span>' : '<small>Drag up or down to extend this shaft</small>';
+    const per = tool === 'lobby' ? ' <small>per cell · drag for more</small>' : '';
     const drag = src.drag ? `<small>${floorName(Math.min(src.drag.fromFloor, hover.floor))} – ${floorName(Math.max(src.drag.fromFloor, hover.floor))}</small>` : '';
     return `<span class="tip-price">${cost > 0 ? dollars(cost) : 'Free'}${per}</span>${drag}`;
   }

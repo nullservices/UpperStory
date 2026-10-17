@@ -19,6 +19,8 @@ export interface TenantInfoData {
   housekeepingFloors?: number[];
   cleaningRemaining?: number[];
   housekeepingAccess?: HousekeepingAccess;
+  /** Maintenance offices only. */
+  maintenance?: { shafts: number; totalShafts: number; crews: number; busy: number };
   lobbyUpkeepQuarter?: number;
   officeLeaseDaysRemaining?: number;
   condoAccess?: boolean;
@@ -109,10 +111,11 @@ export class TenantInfo {
 
     this.errorEl = document.createElement('div');
     this.errorEl.style.cssText = `color:${C.danger};font-size:11px;margin-top:8px;min-height:0;`;
+    this.errorEl.setAttribute('role', 'alert');
     this.errorEl.textContent = ' ';
 
     this.demolishBtn = this.button('Demolish');
-    this.demolishBtn.style.color = C.danger;
+    this.demolishBtn.classList.add('danger');
     this.demolishBtn.addEventListener('click', () => this.onDemolishClick());
 
     const footer = document.createElement('div');
@@ -165,30 +168,30 @@ export class TenantInfo {
   private renderInfo(data: TenantInfoData): void {
     const tenant = this.tenant;
     if (!tenant) return;
-    this.title.textContent = `${tenantTypeName(tenant.type)} — Floor ${floorLabel(tenant.floor)}`;
+    this.title.textContent = `${tenantTypeName(tenant.type)} · ${tenant.floor <= 0 ? floorLabel(tenant.floor) : `Floor ${tenant.floor}`}`;
     const stateText =
       tenant.state === 'constructing' ? 'Under construction' : tenant.state === 'vacant' ? 'Vacant' : tenant.state === 'damaged' ? 'Damaged — repairs required' : 'Open';
     const capacityText =
       tenant.capacity > 0 ? `${data.occupancy}/${tenant.capacity}` : '—';
-    const rows = [
-      this.line('State', stateText),
-      this.line('Occupancy', capacityText),
-      this.line('Avg stress', `${data.avgStress.toFixed(1)}`),
-    ];
+    // The lobby and other spaces without tenants have no occupancy, stress or grade.
+    const hasPeople = tenant.capacity > 0 && tenant.type !== 'lobby';
+    const rows = [this.line('State', stateText)];
+    if (hasPeople) rows.push(this.line('Occupancy', capacityText), this.line('Average stress', `${data.avgStress.toFixed(1)}`));
     if (tenant.state === 'constructing') rows.push(this.line('Time to open', `${Math.ceil(tenant.constructionTicksLeft * CONFIG.TICK_MS / 1000)}s at 1×`));
     // A scaffold's grade/score are just the placeTenant defaults — hide them
     // until the tenant actually opens.
-    if (tenant.state !== 'constructing') {
+    if (tenant.state !== 'constructing' && tenant.type !== 'lobby') {
       rows.push(
         this.line('Grade', `${stars(tenant.grade)} (score ${Math.round(tenant.evalScore)})`),
-        this.line('Noise at last evaluation', tenant.noisePenalty === undefined ? 'Not yet evaluated' : `${tenant.noisePenalty} point penalty`),
+        this.line('Noise at last evaluation', tenant.noisePenalty === undefined ? 'Not yet evaluated' : tenant.noisePenalty === 0 ? 'No penalty' : `${tenant.noisePenalty}-point penalty`),
       );
     }
     if (isPricable(tenant.type)) {
-      rows.push(this.line('Pricing', CONFIG.PRICING_LEVELS[tenant.pricing]!.label));
+      const pricing = CONFIG.PRICING_LEVELS[tenant.pricing]!.label;
+      rows.push(this.line('Pricing', pricing.charAt(0).toUpperCase() + pricing.slice(1)));
     }
     if (tenant.type === 'office') {
-      rows.push(this.line('Rent / quarter', `$${(officeQuarterRentCents(tenant) / 100).toLocaleString()}`));
+      rows.push(this.line('Rent / quarter', `${cash(officeQuarterRentCents(tenant))}`));
       rows.push(this.line('Collection', tenant.state === 'open' ? 'Collected daily while occupied' : 'No rent until occupied'));
       const adjustment = officeRentScoreAdjustment(tenant);
       rows.push(this.line('Rent effect at next evaluation', `${adjustment > 0 ? '+' : ''}${adjustment} points`));
@@ -200,16 +203,22 @@ export class TenantInfo {
     if (tenant.type === 'condo') {
       rows.push(this.line('Lobby access', data.condoAccess ? 'Connected in both directions' : 'Missing a route to or from the lobby'));
       if (!tenant.sold && !data.condoAccess) rows.push(this.line('Waiting for buyers', 'Connect this floor with public transport'));
-      rows.push(this.line(tenant.sold ? 'Owner purchase price' : 'Asking price', `$${((tenant.sold ? tenant.condoSaleCents ?? 150_000_00 : condoSaleCents(tenant)) / 100).toLocaleString()}`));
+      rows.push(this.line(tenant.sold ? 'Owner purchase price' : 'Asking price', `${cash((tenant.sold ? tenant.condoSaleCents ?? 150_000_00 : condoSaleCents(tenant)))}`));
       rows.push(this.line('Ownership', tenant.sold ? 'Sold · price locked' : 'Available for sale'));
       rows.push(this.line('Move-out / demolition', 'Original sale price returned at daily settlement'));
     }
     if (tenant.type === 'lobby') {
       rows.push(this.line('Built width', `${tenant.sizeCells} cells`));
-      rows.push(this.line('Lobby upkeep', `$${(data.lobbyUpkeepQuarter ?? 0).toLocaleString()} / quarter`));
+      rows.push(this.line('Lobby upkeep', `${dollars(data.lobbyUpkeepQuarter ?? 0)} / quarter`));
       rows.push(this.line('Upkeep per cell', '1–2★: free · 3★: $300 · 4★+: $1,000'));
     }
-    if (operatingCost) rows.push(this.line('Operating cost', `$${operatingCost.toLocaleString()} / quarter`));
+    if (operatingCost) rows.push(this.line('Operating cost', `${dollars(operatingCost)} / quarter`));
+    if (data.maintenance) {
+      const m = data.maintenance;
+      rows.push(this.line('Elevator shafts covered', `${m.shafts} of ${m.totalShafts}`));
+      rows.push(this.line('Mechanics busy', `${m.busy} of ${m.crews}`));
+      if (m.shafts < m.totalShafts) rows.push(this.line('Coverage', 'Covers shafts with a stop within 15 floors that mechanics can reach'));
+    }
     if (isHotel(tenant.type)) {
       rows.push(this.line('Cleanliness', `${Math.round(tenant.cleanliness)}%`));
       const access = data.housekeepingAccess;
@@ -222,14 +231,15 @@ export class TenantInfo {
         if (access.reachableOffices === 0) rows.push(this.line('To provide cleaning',
           access.openOffices === 0 ? 'Build housekeeping here or on a connected floor'
           : 'Add housekeeping on this floor or connect an office by service elevator'));
-        else rows.push(this.line('Cleaning capacity', 'Access does not guarantee an available cleaner'));
+        else rows.push(this.line('Note', 'A reachable office may still have no free cleaner'));
       }
-      rows.push(this.line('Checkout per guest', `$${(hotelCheckoutCents(tenant) / 100).toLocaleString()}`));
-      rows.push(this.line('Full room / night', `$${(hotelCheckoutCents(tenant) * TENANT_DATA[tenant.type].capacity / 100).toLocaleString()}`));
+      rows.push(this.line('Checkout per guest', `${cash(hotelCheckoutCents(tenant))}`));
+      rows.push(this.line('Full room / night', `${cash(hotelCheckoutCents(tenant) * TENANT_DATA[tenant.type].capacity)}`));
     }
     for (const source of data.noiseSources ?? []) {
-      rows.push(this.line(`${tenantTypeName(source.type)} · ${floorLabel(source.floor)} · cell ${source.x + 1}`,
-        `${source.floorDistance === 0 ? 'Same floor' : 'Neighboring floor'} · ${source.gap}/${source.clearance} cells horizontal clearance`));
+      const where = source.floor <= 0 ? floorLabel(source.floor) : `floor ${source.floor}`;
+      rows.push(this.line(`Noise: ${tenantTypeName(source.type)}`,
+        `${source.floorDistance === 0 ? 'same floor' : where}, cell ${source.x + 1} · ${source.gap} of ${source.clearance} cells apart`));
     }
     if (tenant.type === 'housekeeping') {
       rows.push(this.line('Rooms remaining per cleaner', data.cleaningRemaining?.join(' · ') || 'Staff not yet available'));
@@ -239,43 +249,45 @@ export class TenantInfo {
       rows.push(this.line('Assignments', 'One cleaner per floor from this office'));
       rows.push(this.line('Extra coverage', 'Build another office to share a floor'));
     }
-    if (tenant.type === 'cinema') rows.push(this.line('Film age', `${tenant.movieAge ?? 0} days`));
+    if (tenant.type === 'cinema') rows.push(this.line('Film age', `${tenant.movieAge ?? 0} day${(tenant.movieAge ?? 0) === 1 ? '' : 's'}`));
     const opening = commercialOpeningMinute(tenant.type);
     if (opening !== null) {
       if (tenant.type === 'fastfood') rows.push(this.line('External arrivals / target', `${tenant.externalArrivals ?? 0} / ${tenant.externalDemand ?? 'opens at 10:00'}`));
-      rows.push(this.line('Revenue today', `$${(tenant.dailyRevenue / 100).toLocaleString()}`));
+      rows.push(this.line('Revenue today', `${cash(tenant.dailyRevenue)}`));
       rows.push(this.line('External / office visits', `${tenant.paidExternalVisits ?? 0} / ${tenant.paidOfficeVisits ?? 0}`));
       rows.push(this.line('Tower population', String(tenant.reportedPopulation ?? 0)));
       rows.push(this.line('Population update', `${formatTimeOfDay(opening)} · preceding patron count`));
     }
     this.body.replaceChildren(...rows);
+    // Room actions share one right-aligned row under the details.
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:4px';
     if (tenant.state === 'damaged') {
-      const repair = this.button(`Repair · $${Math.round(TENANT_DATA[tenant.type].costDollars / 4).toLocaleString()}`);
-      repair.onclick = () => this.actions?.repair(); this.body.append(repair);
+      const repair = this.button(`Repair ($${Math.round(TENANT_DATA[tenant.type].costDollars / 4).toLocaleString('en-US')})`);
+      repair.classList.add('default');
+      repair.onclick = () => this.actions?.repair(); actions.append(repair);
     }
     if (tenant.type === 'cinema' && tenant.state === 'open') {
-      const movie = this.button('Change film · $5,000');
-      movie.onclick = () => this.actions?.changeMovie(); this.body.append(movie);
+      const movie = this.button('Change film ($5,000)');
+      movie.title = 'New films draw bigger audiences';
+      movie.onclick = () => this.actions?.changeMovie(); actions.append(movie);
     }
-    if (isPricable(tenant.type)) {
-      this.body.appendChild(this.makePricingButton());
-    }
+    if (isPricable(tenant.type)) actions.append(this.makePricingButton());
+    if (actions.childElementCount) this.body.append(actions);
   }
 
-  /** Right-aligned "Change pricing" button under the pricing row. */
-  private makePricingButton(): HTMLDivElement {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;justify-content:flex-end;';
+  /** "Change pricing" (rent / asking price) button for the actions row. */
+  private makePricingButton(): HTMLButtonElement {
     const btn = this.button(this.tenant?.type === 'office' ? 'Change rent' : 'Change pricing');
-    btn.style.color = C.accent;
     if (this.tenant?.type === 'condo') {
       btn.textContent = 'Change asking price';
       btn.disabled = !!this.tenant.sold || this.tenant.state === 'open';
     }
-    btn.title = 'Cycle: very low → low → average → high';
+    btn.title = this.tenant?.type === 'condo' && btn.disabled
+      ? 'The asking price is fixed once a condo is sold or occupied.'
+      : 'Cycle: very low → low → average → high';
     btn.addEventListener('click', () => this.actions?.cyclePricing());
-    row.appendChild(btn);
-    return row;
+    return btn;
   }
 
   private line(label: string, value: string): HTMLDivElement {
@@ -286,6 +298,7 @@ export class TenantInfo {
     k.style.color = C.dim;
     const v = document.createElement('span');
     v.textContent = value;
+    v.style.textAlign = 'right';
     row.append(k, v);
     return row;
   }
@@ -302,23 +315,27 @@ export class TenantInfo {
   }
 
   private paintDemolish(): void {
-    this.demolishBtn.textContent = this.armed ? 'Are you sure?' : this.tenant?.type === 'lobby' ? 'Trim leftmost cell' : 'Demolish';
+    this.demolishBtn.textContent = this.armed ? 'Click again to confirm' : this.tenant?.type === 'lobby' ? 'Trim leftmost cell' : 'Demolish';
+    this.demolishBtn.title = this.armed ? '' : 'Construction costs are not refunded.';
+    this.demolishBtn.classList.toggle('armed', this.armed);
   }
 
+  /** A button in the shared window style (src/ui/style.css). */
   private button(text: string): HTMLButtonElement {
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.textContent = text;
-    btn.style.cssText =
-      `background:${C.panel};color:${C.text};border:1px solid #a5b39b;` +
-      'border-radius:3px;padding:4px 10px;font:11px sans-serif;cursor:pointer;white-space:nowrap';
-    btn.addEventListener('mouseenter', () => {
-      btn.style.background = C.hover;
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.style.background = C.panel;
-    });
     return btn;
   }
+}
+
+/** Whole dollars in the same format as the info bar ("$12,345"). */
+function cash(cents: number): string {
+  return dollars(cents / 100);
+}
+
+function dollars(amount: number): string {
+  return `$${Math.round(amount).toLocaleString('en-US')}`;
 }
 
 /** "★★☆☆☆" for grade 0..5 (grade is rounded down for display). */

@@ -173,7 +173,8 @@ export class SettingsDialog {
         name.append(' ', badge);
       }
       const detail = document.createElement('span');
-      detail.textContent = [meta.dateLabel, `${meta.population.toLocaleString()} people`, meta.stars >= 6 ? 'TOWER' : '★'.repeat(Math.max(0, meta.stars))].filter(Boolean).join(' · ');
+      // Default names already carry the date ("Tower · 1st WD / …"); don't repeat it.
+      detail.textContent = [meta.name.includes(meta.dateLabel) ? '' : meta.dateLabel, `${meta.population.toLocaleString('en-US')} people`, meta.stars >= 6 ? 'TOWER' : '★'.repeat(Math.max(0, meta.stars))].filter(Boolean).join(' · ');
       const when = document.createElement('small');
       when.textContent = `Saved ${formatSavedAt(meta.savedAt)} · ${formatBytes(meta.bytes)}`;
       info.append(name, detail, when);

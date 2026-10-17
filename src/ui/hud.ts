@@ -45,6 +45,10 @@ function blocked(e: KeyboardEvent): boolean {
  * funds, population, messages, speed and view controls), a status bar, and
  * the floating Tower report window.
  */
+function setText(el: HTMLElement, text: string): void {
+  if (el.textContent !== text) el.textContent = text;
+}
+
 export class Hud {
   onSpeedChange: ((mult: number) => void) | null = null;
   /** Game window (New / Save / Load). */
@@ -61,7 +65,8 @@ export class Hud {
   private readonly rating = document.createElement('div');
   private readonly date = document.createElement('b');
   private readonly time = document.createElement('span');
-  private readonly clockHands = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  private readonly hourHand = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  private readonly minuteHand = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   private readonly funds = document.createElement('b');
   private readonly people = document.createElement('b');
   private readonly brief = document.createElement('div');
@@ -83,6 +88,9 @@ export class Hud {
   private lastUpdate = 0;
   private lastState: GameState | null = null;
   private lastBrief = '';
+  private lastReport = '';
+  private lastClock = -1;
+  private readonly toastTimers = new Map<HTMLElement, number>();
   /** Latest event message, echoed in the info bar like the original. */
   private news: { text: string; at: number } | null = null;
   private reportPrefs = readUiPref<{ x: number | null; y: number | null }>('report', { x: null, y: null });
@@ -142,7 +150,11 @@ export class Hud {
     clock.setAttribute('aria-hidden', 'true');
     clock.classList.add('info-clock');
     clock.innerHTML = '<circle cx="12" cy="12" r="10.5"/><path d="M12 2.5v2M21.5 12h-2M12 21.5v-2M2.5 12h2"/>';
-    clock.append(this.clockHands);
+    this.hourHand.setAttribute('class', 'hand-h');
+    this.hourHand.setAttribute('d', 'M12 12 12 6.5');
+    this.minuteHand.setAttribute('class', 'hand-m');
+    this.minuteHand.setAttribute('d', 'M12 12 12 4');
+    clock.append(this.hourHand, this.minuteHand);
     const dateText = document.createElement('div');
     this.date.className = 'date-label';
     this.time.className = 'time-label';
@@ -258,12 +270,17 @@ export class Hud {
     const pop = population(state);
     const gate = PROGRESSION.find(g => g.star > state.starLevel);
     const minute = state.calendar.minuteOfDay;
-    this.date.textContent = formatTowerDate(state.calendar.day);
-    this.time.textContent = formatTimeOfDay(minute);
-    this.clockHands.innerHTML = `<path class="hand-h" d="M12 12 12 6.5" transform="rotate(${(minute % 720) / 2} 12 12)"/><path class="hand-m" d="M12 12 12 4" transform="rotate(${(minute % 60) * 6} 12 12)"/>`;
-    this.funds.textContent = cash(state.money.balanceCents);
+    setText(this.date, formatTowerDate(state.calendar.day));
+    setText(this.time, formatTimeOfDay(minute));
+    const clockMinute = Math.floor(minute);
+    if (clockMinute !== this.lastClock) {
+      this.lastClock = clockMinute;
+      this.hourHand.setAttribute('transform', `rotate(${(clockMinute % 720) / 2} 12 12)`);
+      this.minuteHand.setAttribute('transform', `rotate(${(clockMinute % 60) * 6} 12 12)`);
+    }
+    setText(this.funds, cash(state.money.balanceCents));
     this.funds.classList.toggle('negative', state.money.balanceCents < 0);
-    this.people.textContent = pop.toLocaleString();
+    setText(this.people, pop.toLocaleString('en-US'));
     const ratingHtml = state.starLevel >= 6
       ? '<span class="tower-badge">TOWER</span>'
       : `<span class="stars-on">${'★'.repeat(state.starLevel)}</span><span class="stars-off">${'★'.repeat(Math.max(0, 5 - state.starLevel))}</span>`;
@@ -285,23 +302,46 @@ export class Hud {
     if (!this.inspector.hidden) {
       const tenants = [...state.tenants.values()];
       const waiting = Object.values(state.queues).reduce((n, q) => n + q.length, 0);
-      this.reportBody.innerHTML = `<div class="report-section"><small>Next milestone</small><h3>${gate ? `${gate.star === 6 ? 'TOWER' : `${gate.star}-star`} rating` : 'Top of the world'}</h3><progress max="${gate?.population ?? 1}" value="${gate ? Math.min(pop, gate.population) : 1}"></progress><p>${gate ? `${pop.toLocaleString()} / ${gate.population.toLocaleString()} people` : 'Maximum tower rating'}</p>${gate ? '<ul>' + progressionRequirements(state, gate.star).map(r => `<li class="${r.met ? 'met' : ''}">${r.met ? '✓' : '○'} ${r.label}</li>`).join('') + '</ul>' : ''}</div><dl><dt>Upper floors</dt><dd>${topFloorIndex(state.tower)}</dd><dt>Open facilities</dt><dd>${tenants.filter(t => t.state === 'open').length}</dd><dt>Under construction</dt><dd>${state.constructionQueue.length}</dd><dt>Vacant facilities</dt><dd>${tenants.filter(t => t.state === 'vacant').length}</dd><dt>Waiting for a lift</dt><dd>${waiting}</dd></dl><div class="report-section"><small>This quarter</small><dl><dt>Income</dt><dd>${cash(state.money.quarterIncomeCents)}</dd><dt>Upkeep</dt><dd>${cash(state.money.quarterUpkeepCents)}</dd><dt>Net</dt><dd>${cash(state.money.quarterIncomeCents - state.money.quarterUpkeepCents)}</dd></dl></div>`;
+      const basements = Math.max(0, 1 - (state.tower.floors[0]?.index ?? 1));
+      const net = state.money.quarterIncomeCents - state.money.quarterUpkeepCents;
+      const html = `<div class="report-section"><small>Next milestone</small><h3>${gate ? (gate.star === 6 ? 'TOWER rating' : `${gate.star}-star rating`) : 'Top of the world'}</h3><progress max="${gate?.population ?? 1}" value="${gate ? Math.min(pop, gate.population) : 1}" aria-label="Population toward the next rating"></progress><p>${gate ? `${pop.toLocaleString('en-US')} / ${gate.population.toLocaleString('en-US')} people` : 'Maximum tower rating'}</p>${gate ? '<ul>' + progressionRequirements(state, gate.star).map(r => `<li class="${r.met ? 'met' : ''}">${r.met ? '✓' : '○'} ${escapeHtml(r.label)}</li>`).join('') + '</ul>' : ''}</div><dl><dt>Floors</dt><dd>${topFloorIndex(state.tower)}${basements ? ` + ${basements} basement${basements === 1 ? '' : 's'}` : ''}</dd><dt>Open facilities</dt><dd>${tenants.filter(t => t.state === 'open').length}</dd><dt>Under construction</dt><dd>${state.constructionQueue.length}</dd><dt>Vacant facilities</dt><dd>${tenants.filter(t => t.state === 'vacant').length}</dd><dt>Waiting for transport</dt><dd>${waiting}</dd></dl><div class="report-section"><small>This quarter</small><dl><dt>Income</dt><dd>${cash(state.money.quarterIncomeCents)}</dd><dt>Upkeep</dt><dd>${cash(state.money.quarterUpkeepCents)}</dd><dt>Net</dt><dd class="${net < 0 ? 'error' : ''}">${cash(net)}</dd></dl></div>`;
+      // Rebuild only on change so text stays selectable and hover stays stable.
+      if (html !== this.lastReport) { this.lastReport = html; this.reportBody.innerHTML = html; }
     }
   }
 
-  toast(message: string): void {
-    this.news = { text: message, at: performance.now() };
-    const item = document.createElement('div'); item.textContent = message;
-    this.toasts.append(item);
+  /**
+   * Short message above the status bar. 'error' marks a refused action and
+   * 'hint' an explanation of the interface; neither is echoed in the info
+   * bar, which keeps tower news. A repeat of a visible message bumps its
+   * counter instead of stacking a copy.
+   */
+  toast(message: string, kind: 'info' | 'warn' | 'error' | 'hint' = 'info'): void {
+    if (kind === 'info' || kind === 'warn') this.news = { text: message, at: performance.now() };
+    let item = [...this.toasts.children].find((el): el is HTMLDivElement => el instanceof HTMLDivElement && el.dataset.text === message);
+    if (item) {
+      const count = Number(item.dataset.count ?? '1') + 1;
+      item.dataset.count = String(count);
+      item.textContent = `${message} (×${count})`;
+      this.toasts.append(item);
+    } else {
+      item = document.createElement('div');
+      item.dataset.text = message;
+      item.className = kind === 'warn' || kind === 'error' ? `toast-${kind}` : '';
+      item.textContent = message;
+      this.toasts.append(item);
+    }
     while (this.toasts.childElementCount > 4) this.toasts.firstElementChild?.remove();
-    window.setTimeout(() => item.remove(), 4500);
+    const el = item;
+    window.clearTimeout(this.toastTimers.get(el));
+    this.toastTimers.set(el, window.setTimeout(() => { el.remove(); this.toastTimers.delete(el); }, kind === 'error' ? 3500 : 4500));
   }
 
   private briefFor(state: GameState, pop: number): string {
     const tenants = [...state.tenants.values()];
     const firstConstruction = tenants.find(t => t.state === 'constructing');
     // First-tower steps live in the guide (src/ui/guide.ts), which players can switch off.
-    if (firstConstruction && pop === 0) return `<b>Tenants on the way.</b> Construction: ${Math.ceil(firstConstruction.constructionTicksLeft / 10)}s at 1×.`;
+    if (firstConstruction && pop === 0) return `<b>Under construction.</b> ${escapeHtml(TOOL_INFO[firstConstruction.type as Tool]?.label ?? 'Your first room')} opens in about ${Math.ceil(firstConstruction.constructionTicksLeft / 10)}s at normal speed.`;
     if (state.campaign.bankrupt) return '<b class="error">Tower in debt.</b> Cut upkeep or raise income before the bank steps in.';
     if (this.news && performance.now() - this.news.at < 30_000) return `<span class="news">${escapeHtml(this.news.text)}</span>`;
     return '';
@@ -398,7 +438,7 @@ export class Hud {
       this.menuKey(e);
       return;
     }
-    if (e.key === 'F1') { e.preventDefault(); if (!document.querySelector('dialog[open]')) this.showHelp(); return; }
+    if (e.key === 'F1') { e.preventDefault(); if (!document.querySelector('[role="dialog"][data-open="true"], dialog[open]')) this.showHelp(); return; }
     if (e.key === 'Escape' && !this.log.hidden && !document.querySelector('[role="dialog"][data-open="true"], dialog[open]')) {
       e.preventDefault(); e.stopImmediatePropagation();
       this.toggleLog(false); this.logButton.focus();
@@ -527,7 +567,7 @@ export class Hud {
     title.append(closeButton('Close help', () => dialog.close()));
     const body = document.createElement('div');
     body.className = 'window-body';
-    body.innerHTML = '<h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><h3>Keyboard</h3><dl class="key-list"><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space · 1 / 2 / 3</dt><dd>Pause · normal / fast / fastest</dd><dt>+ / − · Home</dt><dd>Zoom · center the tower</dd><dt>Right-drag / scroll</dt><dd>Pan / zoom</dd><dt>M · R · V · L</dt><dd>Tower map · tower report · events &amp; ratings · message log</dd><dt>Ctrl+S / Ctrl+O</dt><dd>Save / load towers</dd><dt>Escape</dt><dd>Close window, then cancel tool</dd></dl><p class="hint">Tip: drag the Construction palette by its title bar, or roll it up with ▾.</p>';
+    body.innerHTML = '<h2>Build a world above the street.</h2><p>Start by selecting Lobby and dragging along the ground. Extend from either edge for $5,000 per cell. Then add floors, elevators, and rooms.</p><ol><li><b>Build upward.</b> Select Floor and click above your tower.</li><li><b>Connect every floor.</b> Drag elevators vertically; standard and service shafts need four clear cells; express shafts need six.</li><li><b>Move tenants in.</b> Click to place one room, or hold and drag to build a row. Wait for construction to finish.</li><li><b>Keep them happy.</b> Inspect rooms, watch lift queues, and add services as your rating grows.</li></ol><h3>Keyboard</h3><dl class="key-list"><dt>I / F / E / O / C</dt><dd>Inspect / floor / elevator / office / condo</dd><dt>Space · 1 / 2 / 3</dt><dd>Pause · normal / fast / fastest</dd><dt>+ / − · Home</dt><dd>Zoom · center the tower</dd><dt>Right-drag / arrows · scroll</dt><dd>Pan (Shift+arrows: faster) · zoom</dd><dt>M · R · V · L</dt><dd>Tower map · tower report · events &amp; ratings · message log</dd><dt>Ctrl+S / Ctrl+O</dt><dd>Save / load towers</dd><dt>F1</dt><dd>This help</dd><dt>Escape</dt><dd>Close window, then return to Inspect</dd></dl><p class="hint">Tip: drag the Construction palette by its title bar, or roll it up with ▾.</p>';
     const footer = document.createElement('div');
     footer.className = 'window-footer';
     footer.append(this.button('Back to my tower', () => dialog.close()));

@@ -26,7 +26,9 @@ export function configureDialog(overlay: HTMLDivElement, panel: HTMLDivElement, 
   overlay.setAttribute('aria-label', name);
   overlay.dataset.open = 'false';
   let previous: HTMLElement | null = null;
-  const focusable = (): HTMLElement[] => [...panel.querySelectorAll<HTMLElement>('button:not(:disabled), input, select, [tabindex="0"]')];
+  // Visible, enabled controls only: the trap must not wrap to a hidden button.
+  const focusable = (): HTMLElement[] => [...panel.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), a[href], summary, [tabindex="0"]')]
+    .filter(el => el.offsetParent !== null);
   new MutationObserver(() => {
     const open = overlay.style.display !== 'none';
     if (open === (overlay.dataset.open === 'true')) return;
@@ -34,7 +36,8 @@ export function configureDialog(overlay: HTMLDivElement, panel: HTMLDivElement, 
     if (open) {
       decorate(panel);
       previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      focusable()[0]?.focus();
+      // The window's main action if it has one (e.g. "Continue"), else the first control.
+      (panel.querySelector<HTMLElement>('button.default:not(:disabled)') ?? focusable()[0])?.focus();
     } else previous?.focus();
   }).observe(overlay, { attributes: true, attributeFilter: ['style'] });
   window.addEventListener('keydown', e => {

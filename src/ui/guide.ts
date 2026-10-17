@@ -1,6 +1,7 @@
 import type { Tool } from '../game/controller';
 import type { GameState, Tenant } from '../sim';
 import { closeButton, readUiPref, writeUiPref } from './windowing';
+import { TOOL_INFO } from './toolPalette';
 import { blackoutActive, carOutOfService, loanBalanceCents } from './simCompat';
 
 /**
@@ -41,9 +42,10 @@ const open = (state: GameState, type: Tenant['type']): Tenant[] =>
 const STEPS: Step[] = [
   {
     title: 'Build your lobby',
-    body: 'Select <b>Lobby</b> (highlighted) and drag along the ground. Each cell costs $5,000; a wide lobby leaves room for elevators and stairs.',
+    body: 'Select <b>Lobby</b> (highlighted) and drag along the ground, at least <b>16 cells</b> wide (the tip beside the cursor counts them) so an elevator and an office fit side by side above it. Each cell costs $5,000; drag from an edge to widen it later.',
     tool: 'lobby',
-    done: s => [...s.tenants.values()].some(t => t.type === 'lobby' && t.sizeCells >= 8),
+    // An elevator (4 cells) plus an office (9) must fit on the floor above.
+    done: s => [...s.tenants.values()].some(t => t.type === 'lobby' && t.sizeCells >= 16),
   },
   {
     title: 'Add a floor',
@@ -53,13 +55,13 @@ const STEPS: Step[] = [
   },
   {
     title: 'Connect it with an elevator',
-    body: 'Select <b>Elevator</b> and drag from the lobby up to your new floor. People cannot reach rooms that no elevator, stair or escalator serves.',
+    body: 'Select <b>Elevator</b> and drag from the lobby up to your new floor, near one end so an office fits beside it. People cannot reach rooms that no elevator, stair or escalator serves.',
     tool: 'elevator',
     done: s => s.elevatorGroups.size > 0,
   },
   {
     title: 'Rent out an office',
-    body: 'Select <b>Office</b> and click on the new floor beside the elevator. Offices pay rent and bring six workers every weekday.',
+    body: 'Select <b>Office</b> and click on the new floor beside the elevator. The room extends to the right of the cell you click. Offices pay rent and bring six workers every weekday.',
     tool: 'office',
     done: s => [...s.tenants.values()].some(t => t.type === 'office'),
   },
@@ -86,12 +88,13 @@ const TIPS: Tip[] = [
   {
     id: 'star2', title: 'Two stars!',
     body: 'Hotels, housekeeping, security and service elevators are unlocked. Hotel rooms need housekeepers, and staff only ride <b>service</b> elevators.',
-    tool: 'hotel', when: s => s.starLevel >= 2,
+    // Only while the tower holds that rating: a loaded 5-star tower should not hear about two stars.
+    tool: 'hotel', when: s => s.starLevel === 2,
   },
   {
     id: 'star3', title: 'Three stars!',
     body: 'Restaurants, shops, cinemas, party halls and more are unlocked. For tall towers, put <b>sky lobbies</b> on floors 15, 30, 45… and link them with <b>express</b> elevators.',
-    tool: 'skyLobby', when: s => s.starLevel >= 3,
+    tool: 'skyLobby', when: s => s.starLevel === 3,
   },
   {
     id: 'queues', title: 'Elevators are backing up',
@@ -168,6 +171,11 @@ const TIPS: Tip[] = [
   },
 ];
 
+/** Palette name for a "Select …" button ("Select Office"). */
+function toolName(tool: Tool): string {
+  return TOOL_INFO[tool].label;
+}
+
 export class Guide {
   /** Lets the guide select or highlight tools. */
   onSelectTool: ((tool: Tool) => void) | null = null;
@@ -228,15 +236,20 @@ export class Guide {
     if (!this.prefs.tips) return this.hide();
 
     if (this.prefs.tutorial === 'active' && this.tutorialAllowed) {
-      // Skip steps the tower has already completed (e.g. a loaded save).
+      // Rewind to an earlier step the tower no longer satisfies (a new tower
+      // started mid-tutorial, a demolished elevator), then skip steps it
+      // already completed (e.g. a loaded save).
+      const reopened = STEPS.findIndex((s, i) => i < this.step && s.done !== undefined && !s.done(state));
+      if (reopened >= 0) this.step = reopened;
       while (this.step < STEPS.length && STEPS[this.step]!.done?.(state)) this.step++;
       if (this.step >= STEPS.length) {
         this.prefs.tutorial = 'done';
         this.save();
       } else {
-        return this.show(`step:${this.step}`, STEPS[this.step]!, `${this.step + 1} of ${STEPS.length}`, [
-          ...(STEPS[this.step]!.done ? [] : [this.button(this.step === STEPS.length - 1 ? 'Finish' : 'Next', () => this.next(), true)]),
-          ...(STEPS[this.step]!.tool ? [this.button('Select tool', () => this.onSelectTool?.(STEPS[this.step]!.tool!))] : []),
+        const step = STEPS[this.step]!;
+        return this.show(`step:${this.step}`, step, `${this.step + 1} of ${STEPS.length}`, () => [
+          ...(step.done ? [] : [this.button(this.step === STEPS.length - 1 ? 'Finish' : 'Next', () => this.next(), true)]),
+          ...(step.tool ? [this.button(`Select ${toolName(step.tool)}`, () => this.onSelectTool?.(step.tool!))] : []),
           this.button('Skip tutorial', () => { this.prefs.tutorial = 'skipped'; this.save(); this.hide(); }),
         ]);
       }
@@ -246,9 +259,9 @@ export class Guide {
     const next = TIPS.find(t => !this.prefs.seen.includes(t.id) && t.when(state));
     if (!next) return this.hide();
     this.tip = next;
-    this.show(`tip:${next.id}`, next, 'Tip', [
+    this.show(`tip:${next.id}`, next, 'Tip', () => [
       this.button('Got it', () => this.dismiss(), true),
-      ...(next.tool ? [this.button('Select tool', () => this.onSelectTool?.(next.tool!))] : []),
+      ...(next.tool ? [this.button(`Select ${toolName(next.tool)}`, () => this.onSelectTool?.(next.tool!))] : []),
       this.button('Turn off tips', () => this.setTips(false)),
     ]);
   }
@@ -271,14 +284,14 @@ export class Guide {
     this.lastCheck = 0;
   }
 
-  private show(key: string, item: Step | Tip, counter: string, buttons: HTMLButtonElement[]): void {
-    this.onHighlightTool?.(item.tool ?? null);
+  private show(key: string, item: Step | Tip, counter: string, buttons: () => HTMLButtonElement[]): void {
     if (key === this.shownKey && !this.card.hidden) return;
+    this.onHighlightTool?.(item.tool ?? null);
     this.shownKey = key;
     this.title.textContent = item.title;
     this.counter.textContent = counter;
     this.body.innerHTML = item.body;
-    this.actions.replaceChildren(...buttons);
+    this.actions.replaceChildren(...buttons());
     this.card.hidden = false;
   }
 

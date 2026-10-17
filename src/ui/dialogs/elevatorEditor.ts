@@ -1,5 +1,5 @@
 import { configureDialog } from './accessibility';
-import { placeNear } from '../windowing';
+import { keepInView, placeNear } from '../windowing';
 import { CONFIG } from '../../data/config';
 import type { ElevatorGroup } from '../../sim';
 import { elevatorCapacity, SERVICE_PERIODS, type ElevatorPriority } from '../../sim/elevators';
@@ -19,6 +19,8 @@ export interface ElevatorEditorActions {
   response(day: 'weekday' | 'weekend', period: number, floors: number): void;
   departure(day: 'weekday' | 'weekend', period: number, seconds: number): void;
   stop(floor: number, enabled: boolean): void;
+  /** Maintenance offices looking after this shaft (0 = uncovered). */
+  maintenanceOffices?(): number;
   close(): void;
 }
 
@@ -109,6 +111,7 @@ export class ElevatorEditor {
 
     this.errorEl = document.createElement('div');
     this.errorEl.style.cssText = `color:${C.danger};font-size:11px;margin-top:8px;min-height:0;`;
+    this.errorEl.setAttribute('role', 'alert');
     this.errorEl.textContent = ' ';
 
     this.addCarBtn = this.button('Add car');
@@ -119,8 +122,10 @@ export class ElevatorEditor {
     footer.style.cssText = 'margin-top:10px;display:flex;justify-content:flex-end;';
     footer.appendChild(this.addCarBtn);
 
-    this.schedules.style.cssText = 'margin:16px 0;line-height:1.7';
-    this.stops.style.cssText = 'margin:16px 0;line-height:1.7';
+    this.schedules.style.cssText = 'margin:12px 0;line-height:1.6';
+    this.stops.style.cssText = 'margin:12px 0;line-height:1.6';
+    // Opening a section grows the window: keep it on screen.
+    for (const section of [this.schedules, this.stops]) section.addEventListener('toggle', () => keepInView(panel));
     this.runningCost.style.cssText = 'font-size:11px;line-height:1.6';
     panel.append(closeBtn, this.title, body, this.runningCost, this.schedules, this.stops, this.errorEl, footer);
     this.overlay.appendChild(panel);
@@ -135,8 +140,9 @@ export class ElevatorEditor {
     this.clearError();
     this.overlay.style.display = 'flex';
     this.visible = true;
-    if (anchor) placeNear(this.overlay.firstElementChild as HTMLElement, anchor.x, anchor.y);
+    // Build the car rows first so the window is placed at its real size.
     this.refresh();
+    if (anchor) placeNear(this.overlay.firstElementChild as HTMLElement, anchor.x, anchor.y);
     this.timer = window.setInterval(() => this.refresh(), ROW_REFRESH_MS);
   }
 
@@ -167,34 +173,44 @@ export class ElevatorEditor {
   private refresh(): void {
     const group = this.group;
     if (!group || !this.visible) return;
-    this.title.textContent = `Elevator — floors ${floorLabel(group.serviceLo)}–${floorLabel(group.serviceHi)}`;
+    const kind = group.kind === 'service' ? 'Service elevator' : group.kind === 'express' ? 'Express elevator' : 'Elevator';
+    // Runs every ROW_REFRESH_MS: write the DOM only when text changes.
+    setText(this.title, `${kind} · floors ${floorLabel(group.serviceLo)}–${floorLabel(group.serviceHi)}`);
     this.addCarBtn.hidden = group.cars.length >= CONFIG.MAX_CARS_PER_SHAFT;
-    this.addCarBtn.textContent = `Add car ($${fmt(CONFIG.ELEVATOR_PRICES[group.kind].car)})`;
+    setText(this.addCarBtn, `Add car ($${fmt(CONFIG.ELEVATOR_PRICES[group.kind].car)})`);
     const prices = CONFIG.ELEVATOR_PRICES[group.kind];
-    this.runningCost.textContent = `Quarterly upkeep: $${fmt(prices.shaftUpkeepQuarter)} for the shaft + $${fmt(prices.carUpkeepQuarter)} per car. Total: $${fmt(prices.shaftUpkeepQuarter + group.cars.length * prices.carUpkeepQuarter)}. Charged across the three days of the quarter.`;
+    const offices = this.actions?.maintenanceOffices?.() ?? 0;
+    const coverage = offices > 0
+      ? `Maintenance: looked after by ${offices} office${offices === 1 ? '' : 's'}; broken cars are repaired for free.`
+      : 'Maintenance: no office covers this shaft. Build Maintenance within 15 floors of one of its stops, or repair broken cars yourself.';
+    setText(this.runningCost, `${coverage} Quarterly upkeep: $${fmt(prices.shaftUpkeepQuarter)} for the shaft + $${fmt(prices.carUpkeepQuarter)} per car. Total: $${fmt(prices.shaftUpkeepQuarter + group.cars.length * prices.carUpkeepQuarter)}. Charged across the three days of the quarter.`);
 
     // One row per car; rows are keyed by car id so buttons stay stable.
     const seen = new Set<number>();
-    for (const car of group.cars) {
+    for (const [index, car] of group.cars.entries()) {
       seen.add(car.id);
       let row = this.rowEls.get(car.id);
       if (!row) {
         row = this.makeRow(car.id);
         this.rowEls.set(car.id, row);
       }
-      row.label.textContent = `Car ${car.id} · Lv${car.speedLevel} · ${car.passengers.length}/${elevatorCapacity(group.kind)}`;
+      // Car ids are tower-wide; players count the cars of this shaft.
+      const label = `Car ${index + 1} · speed ${car.speedLevel} · ${car.passengers.length}/${elevatorCapacity(group.kind)} aboard`;
+      if (row.label.textContent !== label) row.label.textContent = label;
       row.label.title = `${car.passengers.length} passengers aboard; capacity ${elevatorCapacity(group.kind)}`;
+      row.home.setAttribute('aria-label', `Car ${index + 1} home floor`);
       const broken = car.outOfService === true;
       row.row.style.boxShadow = broken ? `inset 3px 0 ${C.danger}` : '';
       row.repairBtn.hidden = !broken;
       row.status.style.color = broken ? C.danger : C.dim;
-      row.status.textContent = broken
+      const status = broken
         ? `Out of service at ${floorLabel(Math.round(car.y))} · ${car.repairAtTick !== undefined
           ? `mechanics arriving in ${Math.max(1, Math.ceil((car.repairAtTick - this.now()) / 10))}s`
-          : 'no mechanics can reach it — repair it or build Maintenance'}`
+          : offices > 0 ? 'waiting for a free mechanic' : 'no mechanics cover this shaft — repair it or build Maintenance'}`
         : car.state === 'moving' && car.targetFloor !== null
         ? `${car.dir > 0 ? 'Going up' : 'Going down'} to ${floorLabel(car.targetFloor)}`
         : `${car.state === 'doors' ? (car.departureAt !== undefined && car.doorsTicksLeft <= 0 ? 'Waiting to depart' : 'Doors open') : 'Idle'} at ${floorLabel(Math.round(car.y))}`;
+      if (row.status.textContent !== status) row.status.textContent = status;
       row.speedBtn.hidden = car.speedLevel >= CONFIG.ELEVATOR_SPEED_LEVELS.length;
       row.removeBtn.hidden = group.cars.length <= 1;
       const homeOptions = `${group.stops.join(',')}:${car.homeFloor == null}`;
@@ -236,18 +252,20 @@ export class ElevatorEditor {
     const label = document.createElement('span');
     label.style.cssText = 'flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
 
-    const speedBtn = this.button(`Speed ↑ ($${fmt(CONFIG.ELEVATOR_SPEED_UPGRADE_COST_DOLLARS)})`);
+    const speedBtn = this.button(`Faster ($${fmt(CONFIG.ELEVATOR_SPEED_UPGRADE_COST_DOLLARS)})`);
+    speedBtn.title = 'Upgrade this car to the next speed level';
     speedBtn.addEventListener('click', () => this.actions?.upgrade(carId));
     const removeBtn = this.button('Remove');
-    removeBtn.style.color = C.danger;
+    removeBtn.title = 'Remove this car (no refund)';
+    removeBtn.classList.add('danger');
     removeBtn.addEventListener('click', () => this.actions?.removeCar(carId));
     const repairBtn = this.button(`Repair ($${fmt(CONFIG.ELEVATOR_REPAIR_COST_DOLLARS)})`);
-    repairBtn.style.borderColor = C.danger;
+    repairBtn.classList.add('armed');
     repairBtn.title = 'Return this car to service now';
     repairBtn.addEventListener('click', () => this.actions?.repair(carId));
     repairBtn.hidden = true;
 
-    const home = document.createElement('select'); home.setAttribute('aria-label', `Car ${carId} home floor`);
+    const home = document.createElement('select');
     home.onchange = () => this.actions?.home(carId, home.value === '' ? null : Number(home.value));
     const status = document.createElement('span');
     status.style.cssText = `flex-basis:100%;color:${C.dim};font-size:11px;`;
@@ -261,40 +279,46 @@ export class ElevatorEditor {
     const summary = document.createElement('summary'); summary.textContent = 'Weekday & weekend service'; this.schedules.append(summary);
     const help = document.createElement('p'); help.textContent = 'Priority chooses which waiting calls empty cars serve first. A changed home is visited before new pickups, after delivering riders already aboard. Cars then return home whenever no calls remain.';
     const responseHelp = document.createElement('p');
-    responseHelp.textContent = 'Waiting-car response: how many floors closer an idle car must be to take a call from an approaching moving car. Lower values use idle cars sooner. Default: 5 floors.';
+    responseHelp.textContent = 'Resp. (waiting-car response): how many floors closer an idle car must be to take a call from an approaching moving car. Lower values use idle cars sooner. Default: 5 floors.';
     const departureHelp = document.createElement('p');
-    departureHelp.textContent = 'Departure delay is the minimum stop time in game seconds. Doors stay open for later arrivals. Default: 0; normal boarding time still applies. Changes apply at the next stop.';
+    departureHelp.textContent = 'Delay (departure delay): the minimum stop time in game seconds. Doors stay open for later arrivals. Default: 0; normal boarding time still applies. Changes apply at the next stop.';
     this.schedules.append(help, responseHelp, departureHelp);
-    const grid = document.createElement('div'); grid.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:center';
-    for (const title of ['Period', 'Weekday', 'Weekend']) { const strong = document.createElement('strong'); strong.textContent = title; grid.append(strong); }
+    // One compact row per period: priority, response and delay for weekdays, then weekends.
+    const grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:auto repeat(2,minmax(84px,1fr) 52px 52px);gap:4px 6px;align-items:center;line-height:1.3;overflow-x:auto';
+    const head = (text: string, span = 1, title = ''): void => {
+      const strong = document.createElement('strong'); strong.textContent = text; if (title) strong.title = title;
+      strong.style.cssText = `grid-column:span ${span};font-size:11px`; grid.append(strong);
+    };
+    head('Period'); head('Weekday', 3); head('Weekend', 3);
+    head('');
+    for (let i = 0; i < 2; i++) { head('Priority'); head('Resp.', 1, 'Waiting-car response, in floors'); head('Delay', 1, 'Departure delay, in seconds'); }
     for (const [period, data] of SERVICE_PERIODS.entries()) {
-      const time = document.createElement('span'); time.textContent = data.label; grid.append(time);
+      const time = document.createElement('span'); time.textContent = data.label; time.style.whiteSpace = 'nowrap'; grid.append(time);
       for (const day of ['weekday', 'weekend'] as const) {
         const select = document.createElement('select'); select.setAttribute('aria-label', `${day} ${data.label} priority`);
         for (const [value, label] of [['normal', 'Normal'], ['up', 'Up first'], ['down', 'Down first']]) select.add(new Option(label, value));
         select.value = this.group?.schedule?.[day][period] ?? 'normal';
         select.onchange = () => this.actions?.priority(day, period, select.value as ElevatorPriority);
-        const cell = document.createElement('div'); cell.style.cssText = 'display:grid;gap:4px;min-width:0';
-        const label = document.createElement('label'); label.textContent = 'Response (floors)';
         const response = document.createElement('input'); response.type = 'number'; response.min = '0'; response.max = '100'; response.step = '1';
         response.style.cssText = 'width:100%;box-sizing:border-box';
+        response.title = 'Waiting-car response (floors)';
         response.setAttribute('aria-label', `${day} ${data.label} waiting-car response`);
         response.value = String(this.group?.waitingResponse?.[day][period] ?? 5);
         response.onchange = () => {
           this.actions?.response(day, period, response.value === '' ? NaN : Number(response.value));
           response.value = String(this.group?.waitingResponse?.[day][period] ?? 5);
         };
-        const departureLabel = document.createElement('label'); departureLabel.textContent = 'Departure (seconds)';
         const departure = document.createElement('input'); departure.type = 'number'; departure.min = '0'; departure.max = '300'; departure.step = '1';
         departure.style.cssText = 'width:100%;box-sizing:border-box';
+        departure.title = 'Departure delay (seconds)';
         departure.setAttribute('aria-label', `${day} ${data.label} departure delay`);
         departure.value = String(this.group?.departureDelay?.[day][period] ?? 0);
         departure.onchange = () => {
           this.actions?.departure(day, period, departure.value === '' ? NaN : Number(departure.value));
           departure.value = String(this.group?.departureDelay?.[day][period] ?? 0);
         };
-        departureLabel.append(departure);
-        label.append(response); cell.append(select, label, departureLabel); grid.append(cell);
+        grid.append(select, response, departure);
       }
     }
     this.schedules.append(grid);
@@ -322,20 +346,17 @@ export class ElevatorEditor {
     this.stops.append(summary, help, grid);
   }
 
+  /** A button in the shared window style (src/ui/style.css). */
   private button(text: string): HTMLButtonElement {
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.textContent = text;
-    btn.style.cssText =
-      `background:${C.panel};color:${C.text};border:1px solid #a5b39b;` +
-      'border-radius:3px;padding:3px 8px;font:11px sans-serif;cursor:pointer;white-space:nowrap';
-    btn.addEventListener('mouseenter', () => {
-      btn.style.background = C.hover;
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.style.background = C.panel;
-    });
     return btn;
   }
+}
+
+function setText(el: HTMLElement, text: string): void {
+  if (el.textContent !== text) el.textContent = text;
 }
 
 function fmt(dollars: number): string {

@@ -28,6 +28,9 @@ export class FinanceWindow {
     const root = this.root;
     root.className = 'finance-window ui-window';
     root.setAttribute('aria-label', 'Finances and loans');
+    // Focusable as a whole so opening it doesn't park focus in the amount
+    // list (where letter keys would change the amount and shortcuts stop).
+    root.tabIndex = -1;
     root.hidden = true;
     const title = document.createElement('div');
     title.className = 'window-title';
@@ -36,7 +39,7 @@ export class FinanceWindow {
     const body = document.createElement('div');
     body.className = 'window-body';
     const booksHead = document.createElement('h3');
-    booksHead.textContent = 'This quarter';
+    booksHead.textContent = 'Funds & this quarter';
     const loanHead = document.createElement('h3');
     loanHead.textContent = 'Bank loan';
     this.note.className = 'window-hint';
@@ -78,10 +81,11 @@ export class FinanceWindow {
     this.lastKey = '';
     this.message.textContent = '';
     if (this.state) this.update(this.state);
-    this.amount.focus({ preventScroll: true });
+    this.root.focus({ preventScroll: true });
   }
 
   close(): void {
+    if (this.root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
     this.root.hidden = true;
   }
 

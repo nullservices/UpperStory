@@ -1,5 +1,7 @@
-import { configureDialog } from './accessibility';
-import { formatDollars } from '../../sim';
+import { closeButton, raiseWindow } from '../windowing';
+
+/** Whole dollars, like the info bar and Finances window ("-$103,144"). */
+const cash = (cents: number): string => (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 /**
  * Snapshot data shown by the report; the sim pushes QUARTER_REPORT events at
@@ -11,131 +13,102 @@ export interface QuarterReportData {
   income: number;
   upkeep: number;
   balanceCents: number;
+  /** Loan interest already included in upkeep (cents). */
+  interest?: number;
 }
 
-const C = {
-  overlay: 'rgba(20,32,48,0.10)',
-  bg: '#dededa',
-  panel: '#fbfbf7',
-  text: '#1f2933',
-  dim: '#5b6470',
-  accent: '#2a64b4',
-  danger: '#b3261e',
-  hover: '#e3ecf8',
-  money: '#2e7d32',
-};
+/** Time the card stays up on its own (held while hovered or focused). */
+const AUTO_CLOSE_MS = 20_000;
 
 /**
- * Dark end-of-quarter summary modal: income (green), upkeep (red), net, and
- * the current balance. Informational only — the Close button (or overlay /
- * Escape via the controller) dismisses it. Same visual language as the other
- * dialogs.
+ * End-of-quarter summary: income (green), upkeep (red), net and the current
+ * balance. A floating card, not a dialog: it arrives every few game days and
+ * must not pause the tower or block building, so it closes itself after a
+ * while (× / Continue / Escape close it sooner).
  */
 export class QuarterReport {
-  /** Invoked when the dialog closes itself; lets the controller tidy up. */
+  /** Invoked when the card closes; lets the controller tidy up. */
   onClose: (() => void) | null = null;
 
-  private readonly overlay: HTMLDivElement;
-  private readonly title: HTMLDivElement;
-  private readonly body: HTMLDivElement;
-
+  private readonly root = document.createElement('section');
+  private readonly title = document.createElement('span');
+  private readonly body = document.createElement('div');
   private visible = false;
+  private timer = 0;
 
   constructor() {
-    this.overlay = document.createElement('div');
-    this.overlay.style.cssText =
-      'position:fixed;inset:0;z-index:40;display:none;align-items:center;' +
-      'justify-content:center;background:' + C.overlay;
-    this.overlay.addEventListener('pointerdown', (e) => {
-      if (e.target === this.overlay) this.hide();
-    });
-
-    const panel = document.createElement('div');
-    panel.style.cssText =
-      `background:${C.bg};border:1px solid ${C.panel};border-radius:8px;` +
-      'padding:16px;min-width:300px;max-width:360px;box-sizing:border-box;' +
-      'box-shadow:0 8px 32px rgba(0,0,0,0.5);font:12px sans-serif;color:' + C.text;
-    panel.style.position = 'relative';
-    configureDialog(this.overlay, panel, 'Quarterly report', () => this.close());
-    panel.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-    const closeBtn = document.createElement('button');
-    closeBtn.textContent = '×';
-    closeBtn.style.cssText =
-      'position:absolute;top:6px;right:8px;background:none;border:none;' +
-      `color:${C.dim};font:16px sans-serif;cursor:pointer;padding:2px 6px`;
-    closeBtn.title = 'Close (Esc)';
-    closeBtn.addEventListener('click', () => this.hide());
-
-    this.title = document.createElement('div');
-    this.title.style.cssText = 'font-weight:700;margin:2px 26px 10px 0;';
-
-    this.body = document.createElement('div');
-    this.body.style.cssText =
-      `background:${C.panel};border-radius:6px;padding:8px 10px;` +
-      'display:flex;flex-direction:column;gap:4px;';
-
+    const root = this.root;
+    root.className = 'quarter-report ui-window';
+    root.setAttribute('role', 'region');
+    root.setAttribute('aria-label', 'Quarterly report');
+    root.setAttribute('aria-live', 'polite');
+    root.hidden = true;
+    const bar = document.createElement('div');
+    bar.className = 'window-title';
+    this.title.className = 'title-text';
+    bar.append(this.title, closeButton('Close quarterly report', () => this.hide()));
+    this.body.className = 'quarter-body';
     const footer = document.createElement('div');
-    footer.style.cssText = 'margin-top:12px;display:flex;justify-content:flex-end;';
-    const okBtn = this.button('Close');
-    okBtn.addEventListener('click', () => this.hide());
-    footer.appendChild(okBtn);
-
-    panel.append(closeBtn, this.title, this.body, footer);
-    this.overlay.appendChild(panel);
-    document.body.appendChild(this.overlay);
+    footer.className = 'window-footer';
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.className = 'default';
+    ok.textContent = 'Continue';
+    ok.onclick = () => this.hide();
+    footer.append(ok);
+    root.append(bar, this.body, footer);
+    // Reading it holds it open.
+    root.addEventListener('pointerenter', () => window.clearTimeout(this.timer));
+    root.addEventListener('pointerleave', () => this.arm());
+    root.addEventListener('focusin', () => window.clearTimeout(this.timer));
+    root.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); this.hide(); } });
+    document.body.append(root);
   }
 
   open(data: QuarterReportData): void {
-    this.title.textContent = `Quarterly Report — Q${data.quarter}`;
+    // data.quarter counts quarters since the tower opened (1, 2, …).
+    const index = Math.max(0, data.quarter - 1);
+    const ordinal = ['1st', '2nd', '3rd', '4th'][index % 4];
+    this.title.textContent = `Quarterly report · ${ordinal} Qtr / Year ${Math.floor(index / 4) + 1}`;
     const net = data.income - data.upkeep;
     this.body.replaceChildren(
-      this.moneyLine('Income', data.income, C.money),
-      this.moneyLine('Upkeep', data.upkeep, C.danger),
-      this.moneyLine('Net', net, net >= 0 ? C.money : C.danger),
-      this.moneyLine('Current balance', data.balanceCents, C.text),
+      this.moneyLine('Income', data.income, 'good'),
+      this.moneyLine(data.interest ? 'Upkeep (incl. loan interest)' : 'Upkeep', data.upkeep, 'bad'),
+      this.moneyLine('Net', net, net >= 0 ? 'good' : 'bad'),
+      this.moneyLine('Current balance', data.balanceCents, ''),
     );
-    this.overlay.style.display = 'flex';
+    this.root.hidden = false;
     this.visible = true;
+    raiseWindow(this.root);
+    this.arm();
   }
 
   close(): void {
     this.hide();
   }
 
+  private arm(): void {
+    window.clearTimeout(this.timer);
+    if (this.visible) this.timer = window.setTimeout(() => this.hide(), AUTO_CLOSE_MS);
+  }
+
   private hide(): void {
     if (!this.visible) return;
     this.visible = false;
-    this.overlay.style.display = 'none';
+    window.clearTimeout(this.timer);
+    if (this.root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    this.root.hidden = true;
     this.onClose?.();
   }
 
-  private moneyLine(label: string, cents: number, color: string): HTMLDivElement {
+  private moneyLine(label: string, cents: number, tone: 'good' | 'bad' | ''): HTMLDivElement {
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;justify-content:space-between;gap:16px;';
     const k = document.createElement('span');
     k.textContent = label;
-    k.style.color = C.dim;
-    const v = document.createElement('span');
-    v.textContent = formatDollars(cents);
-    v.style.color = color;
-    v.style.font = '12px monospace';
+    const v = document.createElement('b');
+    v.textContent = cash(cents);
+    if (tone) v.className = tone;
     row.append(k, v);
     return row;
-  }
-
-  private button(text: string): HTMLButtonElement {
-    const btn = document.createElement('button');
-    btn.textContent = text;
-    btn.style.cssText =
-      `background:${C.panel};color:${C.text};border:1px solid #a5b39b;` +
-      'border-radius:3px;padding:4px 10px;font:11px sans-serif;cursor:pointer;white-space:nowrap';
-    btn.addEventListener('mouseenter', () => {
-      btn.style.background = C.hover;
-    });
-    btn.addEventListener('mouseleave', () => {
-      btn.style.background = C.panel;
-    });
-    return btn;
   }
 }

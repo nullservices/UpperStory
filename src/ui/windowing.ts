@@ -110,6 +110,20 @@ export function placeNear(win: HTMLElement, x: number, y: number): void {
   win.style.translate = `${Math.round(left - rect.left)}px ${Math.round(desiredTop - rect.top)}px`;
 }
 
+/**
+ * Nudge a centred ('offset') window vertically back between the info bar and
+ * the status bar, e.g. after a collapsible section inside it opened.
+ */
+export function keepInView(win: HTMLElement): void {
+  const rect = win.getBoundingClientRect();
+  const { top, bottom } = chromeInsets();
+  const [x = 0, y = 0] = win.style.translate.split(' ').map(v => parseFloat(v) || 0);
+  const maxBottom = window.innerHeight - bottom - 4;
+  let dy = rect.bottom > maxBottom ? maxBottom - rect.bottom : 0;
+  if (rect.top + dy < top + 4) dy = top + 4 - rect.top;
+  if (dy) win.style.translate = `${Math.round(x)}px ${Math.round(y + dy)}px`;
+}
+
 let topZ = 26;
 /** Bring a floating window above its siblings (click-to-front). */
 export function raiseWindow(win: HTMLElement): void {

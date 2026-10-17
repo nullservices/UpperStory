@@ -98,10 +98,13 @@ describe('maintenance coverage', () => {
   it('a broken car on an uncovered shaft explains how to fix it', () => {
     const { state, groups } = tower(10);
     const car = breakCar(state, groups[0]!, 0, 5);
-    expect(car.repairAtTick).toBeUndefined();
+    // No coverage: an outside contractor is booked instead of mechanics.
+    expect(car.contractorRepair).toBe(true);
+    expect(car.repairOfficeId).toBeUndefined();
     const message = state.campaign.history[0]!.message;
     expect(message).toContain('broke down at floor 5');
     expect(message).toContain('No maintenance office covers this shaft');
+    expect(message).toContain('a contractor will fix it');
     expect(message).toContain(`$${CONFIG.ELEVATOR_REPAIR_COST_DOLLARS.toLocaleString('en-US')}`);
   });
 

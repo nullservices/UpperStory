@@ -3,7 +3,7 @@ import { startIncident } from './campaign';
 import { tick } from './core/engine';
 import { placeElevatorGroup, addElevatorCar } from './elevators';
 import { setupNewGame, type GameState } from './state';
-import { placeTenant } from './tenants';
+import { placeTenant, placementError } from './tenants';
 import { buildFloor, placeStair } from './tower';
 
 /** A playable facilities tour. The normal new game retains its starting budget and rating. */
@@ -39,6 +39,10 @@ export function setupShowcaseTower(state: GameState): void {
   for (const x of [90, 94, 98, 102, 106]) placeTenant(state, 'parkingSpace', 0, x);
   placeTenant(state, 'recycling', -1, 60);
   placeTenant(state, 'metro', -8, 30);
+  // Mechanics keep the tour's elevators running over a long visit.
+  for (let x = 24; x < CONFIG.FLOOR_WIDTH_CELLS; x++) {
+    if (placementError(state, 'maintenance', 12, x) === null) { placeTenant(state, 'maintenance', 12, x); break; }
+  }
   for (let i = 0; i < CONFIG.DAY_TICKS * 2; i++) tick(state);
   state.events.length = 0;
   // The tour presents a real timed response and a VIP taking a real trip.

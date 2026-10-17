@@ -5,6 +5,7 @@ import { giveUp, resumeTrip } from './people';
 import { floorLabel, recordEvent } from './campaign';
 import { assignMechanic, elevatorsPowered, maintenanceCoversShaft } from './services';
 import { checkRouting } from './routing';
+import { scenarioElevatorError } from './scenarios';
 import {
   callPending,
   clearCall,
@@ -143,6 +144,8 @@ export interface ElevatorCar {
   repairAtTick?: number;
   /** Maintenance office whose mechanic is repairing the car (absent in version 10 saves). */
   repairOfficeId?: number;
+  /** An outside contractor (billed on completion) is repairing an uncovered car. */
+  contractorRepair?: boolean;
 }
 
 export function carSpeed(car: ElevatorCar): number {
@@ -188,6 +191,10 @@ export function elevatorPlacementError(
   const existing = existingGroupId === undefined ? undefined : state.elevatorGroups.get(existingGroupId);
   const width = existing ? shaftWidth(existing) : elevatorWidth(kind);
   if (x < 0 || x + width > CONFIG.FLOOR_WIDTH_CELLS) return 'Does not fit on the floor';
+  if (!existing) {
+    const scenarioRule = scenarioElevatorError(state, kind, x, width);
+    if (scenarioRule) return scenarioRule;
+  }
   for (const other of state.elevatorGroups.values()) {
     if (other.id === existingGroupId) continue;
     if (floorLo <= other.serviceHi && floorHi >= other.serviceLo && x < other.x + shaftWidth(other) && x + width > other.x) {
@@ -541,7 +548,8 @@ export function stepElevators(state: GameState): void {
           delete car.repairOfficeId;
           delete car.repairAtTick;
         }
-        if (assignMechanics && car.repairAtTick === undefined) assignMechanic(state, group, car, brokenFloor(group, car));
+        // Mechanics take over from a pending contractor once an office covers the shaft.
+        if (assignMechanics && (car.repairAtTick === undefined || car.contractorRepair) && assignMechanic(state, group, car, brokenFloor(group, car))) delete car.contractorRepair;
         stepBrokenCar(state, group, car, powered);
         continue;
       }
@@ -566,9 +574,17 @@ function breakDown(state: GameState, group: ElevatorGroup, car: ElevatorCar): vo
   // A moving car coasts to the nearest floor; otherwise it stays put.
   car.targetFloor = car.state === 'moving' ? floor : null;
   const office = assignMechanic(state, group, car, floor);
+  const covered = office !== null || maintenanceCoversShaft(state, group);
+  if (!covered) {
+    // Without coverage a contractor comes eventually, so neglect costs money
+    // and downtime but can't strand the tower for good.
+    car.repairAtTick = state.tickCount + CONFIG.CONTRACTOR_REPAIR_TICKS;
+    car.contractorRepair = true;
+  }
+  const fee = `$${CONFIG.ELEVATOR_REPAIR_COST_DOLLARS.toLocaleString('en-US')}`;
   const followUp = office ? `Mechanics from the ${floorLabel(office.floor)} maintenance office are on the way.`
-    : maintenanceCoversShaft(state, group) ? 'Every mechanic who looks after this shaft is busy; repairs start when one is free.'
-      : `No maintenance office covers this shaft: repair it ($${CONFIG.ELEVATOR_REPAIR_COST_DOLLARS.toLocaleString('en-US')}) or build one within ${CONFIG.MAINTENANCE_REACH_FLOORS} floors of its stops.`;
+    : covered ? 'Every mechanic who looks after this shaft is busy; repairs start when one is free.'
+      : `No maintenance office covers this shaft: a contractor will fix it in about half a day for ${fee}, or repair it now for ${fee}. Build Maintenance within ${CONFIG.MAINTENANCE_REACH_FLOORS} floors of its stops to avoid this.`;
   recordEvent(state, `An elevator car broke down at ${floorLabel(floor)}. ${followUp}`, { floor, x: group.x });
   // Routing skips shafts whose every car is out of service.
   state.tower.structureRevision++;
@@ -609,8 +625,16 @@ function unloadBrokenCar(state: GameState, group: ElevatorGroup, car: ElevatorCa
 
 function stepBrokenCar(state: GameState, group: ElevatorGroup, car: ElevatorCar, powered: boolean): void {
   if (car.repairAtTick !== undefined && state.tickCount >= car.repairAtTick) {
+    const contractor = car.contractorRepair === true;
     restoreCar(state, group, car);
-    recordEvent(state, `Mechanics repaired an elevator car at ${floorLabel(Math.round(car.y))}.`, { floor: Math.round(car.y), x: group.x });
+    if (contractor) {
+      const cents = CONFIG.ELEVATOR_REPAIR_COST_DOLLARS * 100;
+      // The bill is due even when funds are short; the tower goes into debt.
+      if (!spend(state, cents)) state.money.balanceCents -= cents;
+    }
+    recordEvent(state, contractor
+      ? `A contractor repaired an elevator car at ${floorLabel(Math.round(car.y))} for $${CONFIG.ELEVATOR_REPAIR_COST_DOLLARS.toLocaleString('en-US')}.`
+      : `Mechanics repaired an elevator car at ${floorLabel(Math.round(car.y))}.`, { floor: Math.round(car.y), x: group.x });
     return;
   }
   if (car.state === 'doors') {
@@ -642,6 +666,7 @@ function restoreCar(state: GameState, group: ElevatorGroup, car: ElevatorCar): v
   delete car.outOfService;
   delete car.repairAtTick;
   delete car.repairOfficeId;
+  delete car.contractorRepair;
   car.state = 'idle';
   car.dir = 0;
   car.targetFloor = null;

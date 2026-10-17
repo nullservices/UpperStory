@@ -199,6 +199,8 @@ export const CONFIG = {
   FIRE_SPREAD_MAX_PER_STEP: 2,
   /** Spread never pushes the tower past this many simultaneous fires. */
   FIRE_MAX_ACTIVE: 8,
+  /** One outbreak spreads to at most this many further rooms, so a missed alert costs a cluster, not the tower. */
+  FIRE_CHAIN_MAX_SPREAD: 3,
   /**
    * Chance a scheduled incident becomes an infestation when a room is dirty.
    * It was certain: tall hotel towers always have a dirty room, so fires and
@@ -218,6 +220,8 @@ export const CONFIG = {
   /** Mechanics' travel from the office to the car, per floor. */
   MAINTENANCE_TRAVEL_TICKS_PER_FLOOR: 2,
   ELEVATOR_REPAIR_COST_DOLLARS: 10_000,
+  /** Uncovered broken cars are fixed by an outside contractor after this long, billed the repair cost. */
+  CONTRACTOR_REPAIR_TICKS: 1300,
   /** Daily blackout odds by weather (from 2★). */
   BLACKOUT_CHANCE_CLEAR: 0.03,
   BLACKOUT_CHANCE_RAIN: 0.15,

@@ -25,6 +25,8 @@ export interface Incident {
   response: IncidentResponse | null;
   /** Fires: next tick an unanswered fire tries to spread (absent in old saves). */
   nextSpreadTick?: number;
+  /** Fires: the outbreak this fire belongs to (its first incident's id); absent = its own outbreak. */
+  outbreakId?: number;
   /** Security firefighting: offices that could reach the floor when dispatched. */
   guards?: number;
   /** VIP arrival floor when flown in to a helipad. */
@@ -38,6 +40,8 @@ export interface HistoryEntry {
   x?: number;
 }
 export interface CampaignState {
+  /** Rooms each burning outbreak has spread to (keyed by outbreak id); absent in old saves. */
+  fireOutbreakSpread?: Record<string, number>;
   waste: number;
   weather: 'clear' | 'rain';
   lastDay: number;
@@ -200,10 +204,15 @@ function burnable(state: GameState, t: Tenant): boolean {
  * rooms directly above. New fires start their own clocks, so a chain grows by
  * at most one ring per spread interval, and the active-fire cap bounds it.
  */
-function spreadFire(state: GameState, tenant: Tenant): void {
+function spreadFire(state: GameState, tenant: Tenant, source: Incident): void {
   const c = state.campaign;
   let active = c.incidents.filter(i => i.kind === 'fire').length;
   if (active >= CONFIG.FIRE_MAX_ACTIVE) return;
+  // Each outbreak may only claim a few rooms beyond where it started.
+  const outbreak = source.outbreakId ?? source.id;
+  c.fireOutbreakSpread ??= {};
+  let spread = c.fireOutbreakSpread[outbreak] ?? 0;
+  if (spread >= CONFIG.FIRE_CHAIN_MAX_SPREAD) return;
   const top = tenant.floor + facilityHeight(tenant.type) - 1;
   const candidates: Tenant[] = [];
   for (const t of state.tenants.values()) {
@@ -216,12 +225,19 @@ function spreadFire(state: GameState, tenant: Tenant): void {
   }
   let ignited = 0;
   for (const t of candidates) {
-    if (ignited >= CONFIG.FIRE_SPREAD_MAX_PER_STEP || active >= CONFIG.FIRE_MAX_ACTIVE) break;
+    if (ignited >= CONFIG.FIRE_SPREAD_MAX_PER_STEP || active >= CONFIG.FIRE_MAX_ACTIVE || spread >= CONFIG.FIRE_CHAIN_MAX_SPREAD) break;
     if (eventRoll(state) >= CONFIG.FIRE_SPREAD_CHANCE) continue;
-    createIncident(state, 'fire', t);
+    createIncident(state, 'fire', t).outbreakId = outbreak;
     recordEvent(state, `Fire spread to ${floorLabel(t.floor)}.`, tenantSpot(t));
     ignited++;
     active++;
+    spread++;
+  }
+  c.fireOutbreakSpread[outbreak] = spread;
+  // Forget outbreaks with no fire still burning.
+  for (const key of Object.keys(c.fireOutbreakSpread)) {
+    const id = Number(key);
+    if (!c.incidents.some(i => i.kind === 'fire' && (i.outbreakId ?? i.id) === id)) delete c.fireOutbreakSpread[key];
   }
 }
 
@@ -335,7 +351,7 @@ export function stepCampaign(state: GameState): void {
       incident.nextSpreadTick ??= state.tickCount + CONFIG.FIRE_SPREAD_INTERVAL_TICKS;
       if (state.tickCount >= incident.nextSpreadTick) {
         incident.nextSpreadTick = state.tickCount + CONFIG.FIRE_SPREAD_INTERVAL_TICKS;
-        if (!fireStationCovers(state, tenant.floor)) spreadFire(state, tenant);
+        if (!fireStationCovers(state, tenant.floor)) spreadFire(state, tenant, incident);
       }
     }
     if (result) {

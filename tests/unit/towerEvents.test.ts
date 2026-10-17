@@ -279,7 +279,8 @@ describe('elevator breakdowns', () => {
     car.breakdownAtTick = state.tickCount + 1;
     tick(state);
     expect(car.outOfService).toBe(true);
-    expect(car.repairAtTick).toBeUndefined();
+    expect(car.contractorRepair).toBe(true); // uncovered: a contractor is booked
+    expect(car.repairAtTick).toBe(state.tickCount + CONFIG.CONTRACTOR_REPAIR_TICKS);
     const money = state.money.balanceCents;
     repairElevatorCar(state, group.id, car.id);
     expect(car.outOfService).toBeUndefined();

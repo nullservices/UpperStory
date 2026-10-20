@@ -30,7 +30,7 @@ import {
   personFrame,
 } from './sprites/people';
 
-/** Person frame size in world px (7x12 pixel-art frames on a 12x24 cell). */
+/** Person frame size in world px (7x12 pixel-art frames; a cell is 8x24, as in the original). */
 const FIGURE_W = PERSON_W;
 const FIGURE_H = PERSON_H;
 /** Horizontal spacing of people queued beside an elevator shaft. */

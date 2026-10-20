@@ -389,8 +389,8 @@ function construction(r: R): void {
   shell(r, { wall: 0xb9b2a2, floor: 0x8e8778, style: 'concrete', wallStyle: 'block' });
   pm.sparse(2, 5, w - 4, r.wallBottom - 6, 0xa8a090, 1);
   const pole = 0xd09040, poleDark = 0x8a5a24, plank = 0xb8884a;
-  // Scaffold standards every cell, ledgers and planks at each lift.
-  for (let x = 4; x < w - 3; x += 12) {
+  // Scaffold standards every two cells, ledgers and planks at each lift.
+  for (let x = 4; x < w - 3; x += 16) {
     pm.vline(x, 2, th - 4, pole);
     pm.vline(x + 1, 2, th - 4, poleDark);
   }
@@ -400,11 +400,11 @@ function construction(r: R): void {
     for (let x = 6; x < w - 4; x += 5) pm.set(x, y, tint(plank, 0.25));
   }
   // Cross bracing between standards.
-  for (let x = 4; x + 12 < w - 3; x += 24) pm.line(x + 2, b - 2, x + 12, 4, 0x7a5a30);
+  for (let x = 4; x + 16 < w - 3; x += 32) pm.line(x + 2, b - 2, x + 16, 4, 0x7a5a30);
   // Hazard tape at the floor line and a few site props.
   for (let x = 1; x < w - 1; x++) pm.set(x, b - 4, ((x >> 2) % 2) ? 0x26262a : 0xf0c020);
   for (let x = 1; x < w - 1; x++) pm.set(x, b - 3, ((x >> 2) % 2) ? 0x26262a : 0xf0c020);
-  for (let x = 10; x < w - 12; x += 37) {
+  for (let x = 8; x < w - 12; x += 37) {
     pm.rect(x, b - 3, 5, 3, 0xd8d0b8); // cement bag
     pm.hline(x, b - 3, 5, 0xf0ead8);
     pm.rect(x + 7, b - 4, 3, 4, 0x606870); // bucket
@@ -553,25 +553,26 @@ function office(r: R): void {
     wallStyle: v === 2 ? 'wainscot' : pick(r, ['plain', 'plain', 'stripe', 'panel', 'paper'] as const, 6),
     lower: pick(r, [0xc8b48c, 0x9aa8b4, 0xa88a6a] as const, 7),
   });
-  pm.blit(F.CEILING_LIGHT, 20, 2);
-  pm.blit(F.CEILING_LIGHT, w - 40, 2);
+  // A 9-cell office is 72 px (8 px cells, as in the original): room for two
+  // desks plus one more piece, so each layout is a different trio.
+  pm.blit(F.CEILING_LIGHT, 14, 2);
+  pm.blit(F.CEILING_LIGHT, w - 22, 2);
   if (v === 0) {
-    for (let x = 4; x + 24 < w - 10; x += 33) workstation(r, x, chair, wood);
-    pm.blit(F.CLOCK, 30, 6);
-    pm.blit(F.SMALL_PICTURE, 62, 6, { inks: accent(0x8cc8f0, 0x4ca040) });
+    for (let x = 3; x + 24 <= w - 12; x += 27) workstation(r, x, chair, wood);
+    pm.blit(F.CLOCK, 25, 6);
+    pm.blit(F.SMALL_PICTURE, 47, 6, { inks: accent(0x8cc8f0, 0x4ca040) });
     cabinet(r, w - 10, 12);
   } else if (v === 1) {
-    workstation(r, 4, chair, wood);
-    workstation(r, 30, chair, wood);
-    pm.blit(F.WHITEBOARD, 58, 5);
-    pm.stand(F.COPIER, 58, b);
-    pm.stand(F.WATER_COOLER, 72, b);
-    plant(r, w - 10);
+    workstation(r, 3, chair, wood);
+    workstation(r, 28, chair, wood);
+    pm.blit(F.WHITEBOARD, w - 19, 4);
+    pm.stand(F.COPIER, w - 18, b);
+    pm.stand(F.WATER_COOLER, w - 8, b);
   } else if (v === 2) {
-    plant(r, 4);
+    plant(r, 3);
     // Meeting table with chair backs behind it.
-    const tx = 14, tw = Math.min(46, w - 50);
-    for (let x = tx + 3; x < tx + tw - 3; x += 9) {
+    const tx = 12, tw = w - 38;
+    for (let x = tx + 3; x < tx + tw - 3; x += 8) {
       pm.rect(x, b - 10, 4, 4, chair);
       pm.hline(x, b - 10, 4, tint(chair, 0.3));
     }
@@ -579,19 +580,19 @@ function office(r: R): void {
     pm.hline(tx, b - 5, tw, wood);
     pm.rect(tx + 2, b - 4, 2, 4, shade(wood, 0.3));
     pm.rect(tx + tw - 4, b - 4, 2, 4, shade(wood, 0.3));
-    pm.blit(F.PICTURE, tx + Math.floor(tw / 2) - 5, 5, { inks: accent(0x8cc8f0, 0x6a9a48) });
-    bookshelf(r, w - 26, 20, 14, 0x8a5a2c, 7);
+    pm.blit(F.PICTURE, tx + Math.floor(tw / 2) - 5, 4, { inks: accent(0x8cc8f0, 0x6a9a48) });
+    bookshelf(r, w - 24, 20, 14, 0x8a5a2c, 7);
   } else {
     // Reception counter with a logo panel.
-    pm.rect(4, b - 8, 24, 8, chair);
-    pm.hline(4, b - 8, 24, tint(chair, 0.4));
-    pm.rect(13, b - 6, 6, 4, 0xf0c020);
-    pm.rect(14, b - 5, 4, 2, chair);
-    pm.stand(F.CRT, 6, b - 8);
-    pm.blit(F.BLINDS, 34, 4);
-    workstation(r, 50, chair, wood);
-    cabinet(r, w - 18, 12);
-    plant(r, w - 10);
+    pm.rect(3, b - 8, 22, 8, chair);
+    pm.hline(3, b - 8, 22, tint(chair, 0.4));
+    pm.rect(11, b - 6, 6, 4, 0xf0c020);
+    pm.rect(12, b - 5, 4, 2, chair);
+    pm.stand(F.CRT, 5, b - 8);
+    pm.blit(F.BLINDS, 30, 4);
+    workstation(r, 28, chair, wood);
+    cabinet(r, w - 17, 12);
+    plant(r, w - 9);
   }
 }
 
@@ -705,38 +706,38 @@ function hotel(r: R, type: TenantType): void {
   shell(r, { wall, floor: carpet, style: 'carpet', wallStyle: suite ? 'wainscot' : pick(r, ['stripe', 'paper', 'plain', 'paper'] as const, 4), lower: 0xd8c08a, trim: suite ? 0xb08a3a : undefined });
   if (suite) pm.hline(2, 5, w - 4, 0xc8a050);
   const wood = 0x6b4426;
+  // Single 32 px, twin 48 px, suite 80 px: beds sized so the whole room reads.
   if (type === 'hotel') {
-    bed(r, 3, 20, blanket, wood);
-    nightstand(r, 28);
-    pm.blit(F.SMALL_PICTURE, 9, 6, { inks: accent(0x8cc8f0, 0x6a9a48) });
-    pm.blit(F.CEILING_LIGHT, 32, 2);
+    bed(r, 2, 16, blanket, wood);
+    nightstand(r, w - 9);
+    pm.blit(F.SMALL_PICTURE, 8, 6, { inks: accent(0x8cc8f0, 0x6a9a48) });
+    pm.blit(F.CEILING_LIGHT, 17, 2);
   } else if (type === 'hotelTwin') {
-    bed(r, 3, 18, blanket, wood);
-    nightstand(r, 26);
-    bed(r, 34, 18, blanket, wood);
-    pm.blit(F.SMALL_PICTURE, 8, 6, { inks: accent(0xe0c49f, 0x8a5a2a) });
-    pm.blit(F.SMALL_PICTURE, 40, 6, { inks: accent(0x8cc8f0, 0x6a9a48) });
+    bed(r, 2, 14, blanket, wood);
+    nightstand(r, 21);
+    bed(r, 28, 14, blanket, wood, false, true);
+    pm.blit(F.SMALL_PICTURE, 7, 6, { inks: accent(0xe0c49f, 0x8a5a2a) });
+    pm.blit(F.SMALL_PICTURE, 35, 6, { inks: accent(0x8cc8f0, 0x6a9a48) });
   } else {
-    bed(r, 3, 26, blanket, wood, true);
-    nightstand(r, 33);
-    pm.blit(F.PICTURE, 10, 5, { inks: accent(0x7fa0c8, 0xd2b062) });
-    pm.stand(F.SOFA, 46, b, { inks: accent(0xa83a42) });
-    pm.stand(F.ARMCHAIR, 72, b, { inks: accent(0xa83a42) });
-    pm.hline(83, b - 4, 9, 0x8a5a2c);
-    pm.vline(84, b - 3, 3, 0x45280f);
-    pm.vline(90, b - 3, 3, 0x45280f);
-    pm.blit(F.CHANDELIER, 58, 2);
-    plant(r, w - 10);
+    bed(r, 2, 22, blanket, wood, true);
+    nightstand(r, 28);
+    pm.blit(F.PICTURE, 8, 5, { inks: accent(0x7fa0c8, 0xd2b062) });
+    pm.stand(F.SOFA, 37, b, { inks: accent(0xa83a42) });
+    pm.stand(F.ARMCHAIR, 60, b, { inks: accent(0xa83a42) });
+    pm.blit(F.CHANDELIER, 43, 2);
+    plant(r, w - 9);
   }
   if (look === 'guest') {
-    pm.stand(F.SUITCASE, w - 10, b, { inks: accent(pick(r, [0x8a3a2a, 0x2a4a7a, 0x3a3a3a, 0x5a6a2a] as const, 5)) });
+    // Luggage on the front of the floor strip, by the foot of the bed.
+    const sx = type === 'hotel' ? w - 9 : type === 'hotelTwin' ? 18 : 48;
+    pm.stand(F.SUITCASE, sx, b + 2, { inks: accent(pick(r, [0x8a3a2a, 0x2a4a7a, 0x3a3a3a, 0x5a6a2a] as const, 5)) });
   } else if (look === 'dirty') {
     // Towels and litter on the floor, a stained carpet and a dingy air.
-    pm.stand(F.TOWELS, w - 13, b + 1);
+    pm.stand(F.TOWELS, type === 'hotel' ? 12 : w - 13, b + 2);
     pm.set(Math.floor(w / 2) - 2, b, 0x8a8a6a);
     pm.hline(Math.floor(w / 2) + 3, b, 2, 0xd8c070);
     pm.sparse(4, b, 6, 2, 0x5a4020);
-    pm.sparse(w - 30, b + 1, 5, 1, 0x5a4020);
+    pm.sparse(w - 12, b + 1, 5, 1, 0x5a4020);
     pm.map((c, _x, y) => (y < 2 ? c : mix(c, 0x8a7a40, 0.12)));
   }
 }
@@ -1201,7 +1202,7 @@ function parkingSpace(r: R): void {
   pm.vline(1, b - 1, 3, 0xf0c020);
   pm.vline(w - 2, b - 1, 3, 0xf0c020);
   pm.hline(2, b + 1, w - 4, 0x7a7a74);
-  if (v !== 5) pm.stand(F.CAR, Math.floor((w - 34) / 2), b + 1, { inks: accent(CAR_COLORS[v]!) });
+  if (v !== 5) pm.stand(F.CAR, Math.floor((w - F.CAR.w) / 2), b + 1, { inks: accent(CAR_COLORS[v]!) });
 }
 
 function parkingRamp(r: R): void {
@@ -2019,32 +2020,31 @@ function apartment(r: R): void {
   const n = 1 + (hash32(r.s * 31 + v) % 9);
   if (v === 0) {
     // Studio: entry door, bed under the window, table for two, galley kitchen.
-    if (S.brick) brickWall(r, 20, 100, S.brick);
+    // 16 cells = 128 px.
+    if (S.brick) brickWall(r, 20, 90, S.brick);
     flatDoor(r, 3, S.door, n);
-    wallWindow(r, 44, 20, 0x8a8270, acc2);
-    bed(r, 22, 22, S.acc, 0x6b4426);
-    radiator(r, 50);
-    nightstand(r, 64);
-    pm.stand(F.CAFE_TABLE, 84, b, { inks: accent(0xa86c36) });
-    pm.stand(F.STOOL, 79, b, { inks: accent(S.acc) });
-    pm.stand(F.STOOL, 94, b, { inks: accent(S.acc) });
-    pm.blit(F.PENDANT, 86, 2);
-    dryingRack(r, 103, r.s);
-    kitchenette(r, w - 66, 50, cab, true);
+    bed(r, 21, 17, S.acc, 0x6b4426);
+    nightstand(r, 42);
+    wallWindow(r, 52, 16, 0x8a8270, acc2);
+    if (r.s % 2) radiator(r, 54); else dryingRack(r, 53, r.s);
+    pm.stand(F.STOOL, 68, b, { inks: accent(S.acc) });
+    pm.stand(F.CAFE_TABLE, 72, b, { inks: accent(0xa86c36) });
+    pm.stand(F.STOOL, 81, b, { inks: accent(S.acc) });
+    pm.blit(F.PENDANT, 74, 2);
+    kitchenette(r, w - 37, 26, cab, true);
   } else {
     // One-bed: kitchen first, a sofa and TV by the window, a desk, then the door.
-    kitchenette(r, 4, 44, cab, false);
-    if (S.brick) brickWall(r, 62, 120, S.brick);
-    wallWindow(r, 76, 22, 0x8a8270, acc2);
-    pm.stand(F.SOFA, 64, b, { inks: accent(S.acc) });
-    pm.stand(F.TV, 100, b);
-    plant(r, 113);
-    desk(r, 124, 20, 0xa86c36);
-    pm.stand(F.TABLE_LAMP, 125, b - 6);
-    pm.hline(133, b - 7, 6, 0x3a3a42); // laptop
-    pm.set(134, b - 8, 0x68acdc);
-    pm.stand(F.OFFICE_CHAIR, 144, b, { inks: accent(acc2), flip: true });
-    pm.blit(F.SMALL_PICTURE, 128, 5);
+    kitchenette(r, 3, 26, cab, false);
+    if (S.brick) brickWall(r, 40, 106, S.brick);
+    wallWindow(r, 46, 18, 0x8a8270, acc2);
+    pm.stand(F.SOFA, 41, b, { inks: accent(S.acc) });
+    pm.stand(F.TV, 65, b);
+    desk(r, 79, 18, 0xa86c36);
+    pm.stand(F.TABLE_LAMP, 80, b - 6);
+    pm.hline(88, b - 7, 6, 0x3a3a42); // laptop
+    pm.set(89, b - 8, 0x68acdc);
+    pm.stand(F.OFFICE_CHAIR, 97, b, { inks: accent(acc2), flip: true });
+    pm.blit(F.SMALL_PICTURE, 84, 5);
     flatDoor(r, w - 20, S.door, n);
   }
 }
@@ -2126,26 +2126,27 @@ function gym(r: R): void {
   ] as const);
   shell(r, { wall: S.wall, floor: S.floor, style: S.style });
   pm.rect(2, wallBottom - 3, w - 4, 2, S.stripe);
-  for (let x = 20; x < w - 20; x += 60) if (v !== 0 || x < 110 || x > 160) pm.blit(F.CEILING_LIGHT, x, 2);
-  plate(pm, v === 0 ? 122 : w - textWidth(S.name) - 52, v === 0 ? 2 : 4, S.name, S.stripe, 0xffffff, tint(S.stripe, 0.4));
+  // 20 cells = 160 px.
+  const plateX = v === 0 ? 82 : w - textWidth(S.name) - 40;
+  for (let x = 16; x < w - 16; x += 48) if (x + 7 < plateX - 2 || x > plateX + textWidth(S.name) + 6) pm.blit(F.CEILING_LIGHT, x, 2);
+  plate(pm, plateX, v === 0 ? 2 : 4, S.name, S.stripe, 0xffffff, tint(S.stripe, 0.4));
   if (v === 0) {
-    mirrorPanel(pm, 6, 106, 4, wallBottom - 4);
-    for (let k = 0; k < 4; k++) treadmill(pm, 8 + k * 24, b, S.kit);
-    weightRack(pm, 118, b, 30);
-    benchPress(pm, 160, b, S.kit);
-    for (let k = 0; k < 3; k++) pm.stand(F.LOCKER, w - 26 + k * 6, b);
+    mirrorPanel(pm, 5, 70, 4, wallBottom - 4);
+    for (let k = 0; k < 3; k++) treadmill(pm, 7 + k * 22, b, S.kit);
+    weightRack(pm, 78, b, 26);
+    benchPress(pm, 112, b, S.kit);
+    for (let k = 0; k < 3; k++) pm.stand(F.LOCKER, w - 22 + k * 6, b);
   } else {
-    for (let k = 0; k < 3; k++) pm.stand(F.LOCKER, 4 + k * 6, b);
-    mirrorPanel(pm, 26, 96, 4, wallBottom - 4);
-    for (let k = 0; k < 6; k++) exerciseBike(pm, 26 + k * 15, b, S.kit);
-    punchBag(pm, 126, S.kit);
-    // Mats and a pair of exercise balls.
-    for (let k = 0; k < 3; k++) pm.hline(140 + k * 14, b - 1, 12, [S.kit, S.stripe, 0x44a03a][k]!);
-    pm.disc(186, b - 4, 3, S.stripe);
-    pm.disc(194, b - 3, 2, S.kit);
-    weightRack(pm, w - 34, b, 26);
+    for (let k = 0; k < 3; k++) pm.stand(F.LOCKER, 3 + k * 6, b);
+    mirrorPanel(pm, 24, 64, 4, wallBottom - 4);
+    for (let k = 0; k < 4; k++) exerciseBike(pm, 25 + k * 15, b, S.kit);
+    punchBag(pm, 92, S.kit);
+    // Mats and an exercise ball.
+    for (let k = 0; k < 2; k++) pm.hline(101 + k * 12, b - 1, 10, [S.kit, S.stripe][k]!);
+    pm.disc(127, b - 4, 3, S.stripe);
+    weightRack(pm, w - 26, b, 22);
   }
-  pm.blit(F.CLOCK, v === 0 ? 196 : 104, 4);
+  pm.blit(F.CLOCK, v === 0 ? 134 : w - 24, 4);
 }
 
 const PRODUCT_COLORS = [0xc83030, 0xe07020, 0xffdc58, 0x44a03a, 0x3464bc, 0xe2d2a8, 0xd06a9a, 0xf4f4f4, 0x5c2c88, 0x8cd05c];
@@ -2303,9 +2304,10 @@ function bar(r: R): void {
     pm.hline(x - 1, 12, textWidth('BAR') + 2, shade(S.neon, 0.5));
   };
   if (v === 0) {
-    backBar(r, 6, 110, S.wood, S.booth, r.s);
+    // 16 cells = 128 px: a back bar on the left, one booth on the right.
+    backBar(r, 4, 64, S.wood, S.booth, r.s);
     // Booth seating around a small table.
-    const bx = w - 66;
+    const bx = w - 55;
     pm.rect(bx, b - 11, 4, 11, S.booth);
     pm.rect(bx + 4, b - 5, 10, 2, S.booth);
     pm.stand(F.CAFE_TABLE, bx + 16, b, { inks: accent(S.wood) });
@@ -2313,7 +2315,7 @@ function bar(r: R): void {
     pm.rect(bx + 39, b - 11, 4, 11, S.booth);
     pm.blit(F.PENDANT, bx + 18, 2);
     neon(bx + 16);
-    plant(r, w - 14);
+    plant(r, w - 10);
   } else {
     jukebox(pm, 6, b, S.booth);
     poolTable(pm, 22, b, pick(r, [0x2a7a3a, 0x2a4a8a, 0x8a2a2a] as const, 7));

@@ -6,7 +6,7 @@ import { BufferImageSource, Rectangle, Texture } from 'pixi.js';
  * RGBA PixMaps, which are baked once into nearest-sampled textures. Every
  * sprite in the game is original art authored in these files.
  *
- * Coordinates are integer world pixels: a cell is 12 px wide and a floor
+ * Coordinates are integer world pixels: a cell is 8 px wide and a floor
  * band 24 px tall, so a sprite drawn here maps 1:1 onto the tower grid and
  * stays crisp at every zoom (nearest-neighbour magnification).
  */

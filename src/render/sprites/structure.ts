@@ -4,10 +4,10 @@ import { PixMap, shade, tint } from './pixmap';
 /**
  * Tower structure tiles: the unfurnished floor band (bare plaster wall,
  * concrete floor, structural column every 8 cells, ceiling slab underside)
- * as a 96x22 tile repeated along each floor by a TilingSprite.
+ * as a 64x22 tile (8 cells of 8 px) repeated along each floor by a TilingSprite.
  */
 
-export const BAND_TILE_W = 96;
+export const BAND_TILE_W = 64;
 export const BAND_TILE_H = 22;
 
 const tiles = new Map<string, Texture>();
@@ -26,7 +26,7 @@ export function emptyBandTexture(basement: boolean): Texture {
   pm.hline(0, 2, w, shade(wall, 0.3));
   pm.dither(0, 3, w, 1, shade(wall, 0.15));
   // Unfinished wall: faint plasterboard joints.
-  for (let x = 24; x < w; x += 24) if (x % 96 !== 0) pm.vline(x, 4, h - 9, shade(wall, 0.08));
+  for (let x = 16; x < w; x += 16) pm.vline(x, 4, h - 9, shade(wall, 0.08));
   pm.hline(0, h - 5, w, shade(wall, 0.35));
   pm.rect(0, h - 4, w, 4, floor);
   pm.sparse(0, h - 4, w, 4, shade(floor, 0.1));

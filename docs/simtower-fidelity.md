@@ -258,7 +258,12 @@ scope.
   use the reference's type-specific amounts. New shafts include one car;
   extensions still use our $500-per-floor rule. Speed upgrades remain custom.
 - Replace procedural artwork and compare synthesized audio with the original sound design.
-  Floor bands are 24 pixels, matching the reference loader. Room, elevator and
+  Floor bands are 24 pixels and each width unit (cell) is 8 pixels, matching
+  the reference loader: OpenSkyscraper crops the original Office art at 72×24
+  px for its 9 units and Fast Food at 128×24 px for 16 units. With the same
+  unit counts, an office is 72 px wide, a condo or fast food 128 px, a single
+  hotel room 32 px, stairs/escalators 64 px and a standard (express) shaft
+  32 (48) px, so rooms keep the original proportions. Room, elevator and
   people art is original procedural drawing in SimTower's visual language; no
   original assets are bundled.
 

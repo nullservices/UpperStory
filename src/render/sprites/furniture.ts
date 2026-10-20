@@ -2,7 +2,7 @@ import { sprite, shade, tint, type Inks } from './pixmap';
 
 /**
  * Original furniture and prop sprites, authored at world-pixel scale (a cell
- * is 12 px, a floor band 24 px; furniture stands on the room's floor strip,
+ * is 8 px, a floor band 24 px; furniture stands on the room's floor strip,
  * so most pieces are 6-14 px tall). Accent slots A/a/q (main, dark, light)
  * and Z/z (second accent) are recoloured per room variant via `accent()`.
  */
@@ -472,20 +472,19 @@ export const IV_STAND = sprite([
 
 // --- Basement -----------------------------------------------------------------
 
-/** A parked car side-on facing right (A body colour). */
+/** A parked car side-on facing right (A body colour), sized for a 4-cell (32 px) bay. */
 export const CAR = sprite([
-  '..........kkkkkkkkkkkk............',
-  '.........kqCCckkCCCcqqk...........',
-  '........kqCCcckkCCccccqk..........',
-  '.......kqqccccckkcccccAAk.........',
-  '..kkkkkqqqqqqqqqqqqqqqqqqkkkkkk...',
-  '.kqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqk.',
-  'kAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAYk',
-  'RAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAAk',
-  'kaaakkkkkaaaaaaaaaaaaaaakkkkkaaaak',
-  '.kkkkKgGKkkkkkkkkkkkkkkkKgGKkkkkk.',
-  '....KgwGgK............KgwGgK......',
-  '.....KKKK..............KKKK.......',
+  '.......kkkkkkkkkk.........',
+  '......kqCCckkCCcqk........',
+  '.....kqCCcckkCcccqk.......',
+  '..kkkqqqqqqqqqqqqqqqkkkk..',
+  '.kqqqqqqqqqqqqqqqqqqqqqqk.',
+  'kAAAAAAAAAAAAkAAAAAAAAAAYk',
+  'RAAAAAAAAAAAAkAAAAAAAAAAAk',
+  'kaakkkkkkaaaaaaaaakkkkkkak',
+  '.kkkKgGKkkkkkkkkkkkKgGKkk.',
+  '...KgwGgK.........KgwGgK..',
+  '....KKKK...........KKKK...',
 ]);
 
 export const RECYCLE_BIN = sprite([

@@ -306,8 +306,13 @@ export const CONFIG = {
   VENUE_TARGET_VISITS: { gym: 30, supermarket: 40, bar: 30, conference: 48, observationDeck: 60 },
 
   // --- Render (tunable but render-side) ---
-  /** World-pixel width of one placement cell at zoom 1. */
-  CELL_WIDTH_PX: 12,
+  /**
+   * World-pixel width of one placement cell at zoom 1: 8 px, as in the
+   * original (its art is 8 px per unit and 24 px per floor, so a 9-unit
+   * office is 72 px wide). Sim rules are cell-based; only the world-x to
+   * cell helper (cellIndexAtWorldX) reads this.
+   */
+  CELL_WIDTH_PX: 8,
 
   // Camera zoom levels live in src/render/cameraLayout.ts (ZOOM_LEVELS).
 } as const;

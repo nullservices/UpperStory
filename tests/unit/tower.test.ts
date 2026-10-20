@@ -148,8 +148,9 @@ describe('grid math', () => {
 
   it('cellIndexAtWorldX clamps to floor width', () => {
     expect(cellIndexAtWorldX(-5)).toBe(0);
-    expect(cellIndexAtWorldX(6)).toBe(0);
-    expect(cellIndexAtWorldX(18)).toBe(1);
+    const cell = CONFIG.CELL_WIDTH_PX;
+    expect(cellIndexAtWorldX(cell / 2)).toBe(0);
+    expect(cellIndexAtWorldX(cell * 1.5)).toBe(1);
     expect(cellIndexAtWorldX(100000)).toBe(CONFIG.FLOOR_WIDTH_CELLS - 1);
   });
 });
